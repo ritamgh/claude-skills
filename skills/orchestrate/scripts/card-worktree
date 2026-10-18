@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Create (or find again) one card's git worktree inside the TARGET repo, in one call.
+# The Workflow harness makes worktrees from the session's launch repo, not the repo a run targets;
+# this makes them where the card belongs, the same way jw does for jcode workers.
+#
+# Usage: card-worktree REPO BRANCH WT BASE
+#   REPO is any path inside the target repo; WT is the worktree path; BASE is the ref a new BRANCH starts from.
+# Last stdout line:  WORKTREE state=<created|reused|attached> wt=<abs WT> branch=<BRANCH> head=<sha>
+#               or:  WORKTREE-ERROR <reason>
+#   created  new branch from BASE, new worktree
+#   reused   WT is already this repo's worktree on BRANCH (uncommitted work is kept)
+#   attached BRANCH existed (a rerun): a worktree is added for it, its commits are kept
+# Git's own output goes to stderr. Exit: 0 ok, 1 error, 2 bad usage.
+set -euo pipefail
+
+[ $# -eq 4 ] || { echo "usage: card-worktree REPO BRANCH WT BASE" >&2; exit 2; }
+repo=$1 branch=$2 wt=$3 base=$4
+case "$wt" in /*) ;; *) wt=$PWD/$wt ;; esac
+
+fail() { echo "WORKTREE-ERROR $*"; exit 1; }
+errfile=$(mktemp)
+trap 'rm -f "$errfile"' EXIT
+# Run git quietly into $errfile; on failure show git's message on stderr and fail with its last line.
+git_or_fail() {
+  if ! git "$@" >&2 2>"$errfile"; then
+    cat "$errfile" >&2
+    fail "git $* failed: $(tail -n 1 "$errfile")"
+  fi
+  cat "$errfile" >&2
+}
+
+top=$(git -C "$repo" rev-parse --show-toplevel 2>"$errfile") || fail "not a git repo: $repo ($(tail -n 1 "$errfile"))"
+git_or_fail -C "$top" worktree prune
+
+state=""
+if [ -e "$wt" ]; then
+  physical=$(cd "$wt" 2>/dev/null && pwd -P || true)
+  # Branch checked out in the registered worktree whose path is WT ("(none)" when absent or detached).
+  checked_out=$(git -C "$top" worktree list --porcelain | awk -v a="$wt" -v b="$physical" '
+    $1 == "worktree" { p = substr($0, 10); hit = (p == a || p == b); next }
+    hit && $1 == "branch" { sub("^refs/heads/", "", $2); print $2; exit }
+    hit && $1 == "detached" { print "(detached)"; exit }')
+  [ -n "$checked_out" ] || fail "$wt exists but is not a worktree of $top; left untouched"
+  [ "$checked_out" = "$branch" ] || fail "$wt is a worktree on '$checked_out', not '$branch'; left untouched"
+  state=reused
+elif git -C "$top" show-ref --verify --quiet "refs/heads/$branch"; then
+  git_or_fail -C "$top" worktree add -q "$wt" "$branch"
+  state=attached
+else
+  git_or_fail -C "$top" worktree add -q -b "$branch" "$wt" "$base"
+  state=created
+fi
+
+head=$(git -C "$wt" rev-parse HEAD 2>"$errfile") || fail "cannot read HEAD of $wt: $(tail -n 1 "$errfile")"
+echo "WORKTREE state=$state wt=$wt branch=$branch head=$head"

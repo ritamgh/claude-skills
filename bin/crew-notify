@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# crew-notify TITLE BODY — push to the user's phone via ntfy.
+# crew-notify --test      — send "crew: test alert"; prints only `sent` or `failed: <http code/reason>`.
+# Server/topic/token are read at runtime from [phone] in the crew notify config:
+# ${XDG_CONFIG_HOME:-$HOME/.config}/crew/notify.toml (or CREW_NOTIFY_CONFIG).
+# An existing TOML file can be symlinked there; nothing is hardcoded or printed.
+# One retry after ~2 s on a 5xx or a timeout/connection failure. Always exits 0 (--test: 1 on failure) and
+# takes at most ~9 s; failures go to ~/.claude/crew/notify.log.
+LOG="${CREW_NOTIFY_LOG:-$HOME/.claude/crew/notify.log}"
+CFG="${CREW_NOTIFY_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/crew/notify.toml}"
+RETRY_DELAY="${CREW_NOTIFY_RETRY_DELAY:-2}"   # tests shorten it
+TEST=0
+if [ "${1:-}" = "--test" ]; then TEST=1; title="crew: test alert"; body="crew-notify --test"; else title=${1:-crew}; body=${2:-}; fi
+FAIL=""   # why the last send failed, without the topic
+title=$(printf '%s' "$title" | LC_ALL=C tr -d '[:cntrl:]')
+
+log() { printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >>"$LOG" 2>/dev/null; }
+
+# Quote dynamic values for curl's config syntax, never shell syntax.
+curl_option() {
+  local value=$2
+  value=${value//\\/\\\\}; value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}; value=${value//$'\r'/\\r}; value=${value//$'\t'/\\t}
+  printf '%s = "%s"\n' "$1" "$value"
+}
+
+# one POST with a time limit of $1 seconds; prints the http code (000 when curl itself failed); curl's own
+# error text lands in $ERRF
+post() {
+  local code
+  code=$({
+    curl_option url "${server%/}/$topic"
+    curl_option header "Title: $title"
+    curl_option header "Priority: default"
+    curl_option header "Tags: crew"
+    [ -z "$token" ] || curl_option header "Authorization: Bearer $token"
+  } | curl -sS --max-time "$1" -o /dev/null -w '%{http_code}' \
+    --config - --data-raw "$body" 2>"$ERRF") || code=000
+  printf '%s' "$code"
+}
+
+main() {
+  [ -r "$CFG" ] || { FAIL="no crew notify config"; log "no crew notify config"; return 1; }
+  local conf
+  conf=$(python3 -I - "$CFG" 2>/dev/null <<'PY'
+import sys, tomllib
+p = tomllib.load(open(sys.argv[1], "rb")).get("phone", {})
+if not p.get("topic"):
+    sys.exit(1)
+print(p.get("server") or "https://ntfy.sh")
+print(p["topic"])
+print(p.get("token") or "")
+PY
+  ) || { FAIL="phone topic not configured"; log "phone topic not configured"; return 1; }
+  local server topic token
+  { read -r server; read -r topic; read -r token; } <<<"$conf"
+  local ERRF ERR code
+  ERRF=$(mktemp) || { FAIL="no temp file"; return 1; }
+  # worst case 4 + 2 + 3 s, inside the 10 s limit crew puts on this command
+  code=$(post 4)
+  case "$code" in 000 | 5??)
+    sleep "$RETRY_DELAY"
+    code=$(post 3) ;;
+  esac
+  ERR=$(head -n 1 "$ERRF" 2>/dev/null); ERR=${ERR//$topic/<topic>}
+  rm -f "$ERRF"
+  case "$code" in
+    2??) return 0 ;;
+    000) FAIL="${ERR:-curl failed}"; log "curl failed: ${ERR:-no response}" ;;
+    *) FAIL="http $code"; log "http $code" ;;
+  esac
+  return 1
+}
+
+main
+rc=$?
+if [ $TEST = 1 ]; then
+  if [ $rc = 0 ]; then echo sent; exit 0; fi
+  echo "failed: $FAIL"; exit 1
+fi
+exit 0

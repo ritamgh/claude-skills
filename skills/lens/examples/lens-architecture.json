@@ -1,0 +1,2504 @@
+{
+ "id": "lens-architecture",
+ "mode": "architecture",
+ "title": "How lens turns a question into a lesson page",
+ "subtitle": "An architecture deep dive: eight parts from a model's pen to a page that can phone Claude, and the rules that keep it honest",
+ "layers": [
+  {
+   "id": "author",
+   "name": "Authoring"
+  },
+  {
+   "id": "build",
+   "name": "Build"
+  },
+  {
+   "id": "page",
+   "name": "Page"
+  },
+  {
+   "id": "helper",
+   "name": "Ask helper"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "writer",
+   "label": "Claude, the writer",
+   "kind": "model in a Claude Code session",
+   "prop": "model",
+   "layer": "author",
+   "col": 0,
+   "row": 0,
+   "files": [
+    "SKILL.md:73-136"
+   ],
+   "simple": "The only part that thinks. It reads the real code, then writes the lesson as plain data: nodes, edges, steps and a quiz. It never writes the page itself.",
+   "deep": "SKILL.md's workflow has Claude resolve the question, gather evidence with `nl -ba FILE | sed -n 'A,Bp'` so line numbers are exact, then write a small Python generator whose `code()` helper slices snippets straight out of the source file. The generator emits the lesson JSON and runs build.py. Everything the model decides lives in that JSON. Layout, interaction and styling are not its job: SKILL.md says 'Your job is to produce excellent *lesson data*. The template does the rest.'",
+   "analogy": "An author who hands the typesetter a manuscript, not a printed book.",
+   "owns": "What the lesson claims, and how sure it is.",
+   "exposes": "One JSON file shaped by reference/lesson-schema.md.",
+   "runs": "Your Claude Code session. The only step in the whole pipeline that needs a model.",
+   "scale": "One lesson per question. The schema budgets (4 to 10 map nodes, at most 25 lines per snippet) cap its size, because the reader is the limit, not the machine.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "source",
+   "label": "Real source files",
+   "kind": "the code being explained",
+   "prop": "folder",
+   "layer": "author",
+   "col": 0,
+   "row": 2,
+   "files": [
+    "scripts/build.py:483-498"
+   ],
+   "simple": "The files the lesson is about. The lesson shows lines copied from them, and the build can check each copy against the original.",
+   "deep": "build.py never runs or parses this code. With `--check-src REPO` it opens the file named by each snippet, takes `start` and the snippet length, and compares line by line (scripts/build.py:493-498). The file is looked up relative to REPO first, then as a `~` path. The comparison ignores trailing spaces and any snippet line that is only `...`.",
+   "owns": "The truth every snippet is held to.",
+   "exposes": "Plain text files, addressed by path and line number.",
+   "runs": "Wherever the explained repo lives. lens only reads it.",
+   "scale": "The whole file is re-read for every snippet (scripts/build.py:493). At 25 lines a snippet that never matters.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "validator",
+   "label": "Validator",
+   "kind": "build.py: validate and check_code",
+   "prop": "shield",
+   "layer": "build",
+   "col": 1,
+   "row": 2,
+   "files": [
+    "scripts/build.py:324-439",
+    "scripts/build.py:459-498"
+   ],
+   "simple": "Reads the lesson before anything is drawn. Mistakes that would break the page are errors and stop the build. Softer problems are warnings you should still read.",
+   "deep": "`validate()` fills two lists and never raises: a field of the wrong type is reported as an error, not a crash. Errors: unknown node ids, a `sync` that is not a real boolean, missing required text, a scene name outside the twelve, a snippet that does not match its file. Warnings: an architecture lesson with no flows, more than half the edges without a protocol, two consecutive steps with no edge between their nodes, a repeated or self-loop edge, an invariant rule over 120 characters. main() prints every warning, then every error, and exits 1 if there is any error (scripts/build.py:523-528).",
+   "analogy": "A proofreader who marks errors in red and warnings in pencil.",
+   "owns": "The definition of a valid lesson.",
+   "exposes": "`validate(L, repo)` returns `(errs, warns)`. On the command line: `warn:` and `ERROR:` lines, and exit code 1.",
+   "runs": "Inside the build.py process on your machine, once per build.",
+   "scale": "Linear in lesson size. The one hidden cost is the file re-read per snippet (scripts/build.py:493).",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "assembler",
+   "label": "Assembler",
+   "kind": "build.py: includes and injection",
+   "prop": "package",
+   "layer": "build",
+   "col": 1,
+   "row": 1,
+   "files": [
+    "scripts/build.py:34-45",
+    "scripts/build.py:501-508",
+    "scripts/build.py:529-531"
+   ],
+   "simple": "Takes the chosen theme file and fills in three blanks: shared parts, the title and the lesson data. The result is one HTML file that opens on its own.",
+   "deep": "`apply_includes()` replaces every line that is exactly `<!-- lens:include NAME -->` with the file `assets/themes/parts/NAME`, verbatim, and exits with an ERROR if the part is missing or contains `__TITLE__` or `__LESSON_JSON__`. Then `render()` fills `__TITLE__` (HTML-escaped) and `__LESSON_JSON__` (the lesson on one line) in a single regex pass, so text inserted for one is never scanned for the other (scripts/build.py:501-508). On the way it rewrites every `</` to `<\\/` and the `<` of any `<!--` or `<script` to `\\u003c`; JSON.parse reads all three back as the original text. Includes run first, so nothing inside a lesson can ever expand one.",
+   "analogy": "A mail merge: the theme is the letter, the lesson is the address list.",
+   "owns": "The final page text.",
+   "exposes": "One self-contained .html file. By itself it fetches only Google Fonts; the ask helper is the one other thing it can call.",
+   "runs": "The same build.py process, after validation has passed.",
+   "scale": "Output size is theme plus lesson: zine.html is 108 KB and examples/jw-ask-flow.html is 111 KB. Every lesson repeats the theme.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "theme",
+   "label": "Theme page",
+   "kind": "single-file HTML renderer",
+   "prop": "browser",
+   "layer": "page",
+   "col": 2,
+   "row": 1,
+   "files": [
+    "assets/themes/zine.html:538-1296",
+    "assets/themes/sketch.html:655-663",
+    "reference/themes.md"
+   ],
+   "simple": "The page the reader sees. It reads the lesson data, draws the map, flows, quiz and notes, and handles keys and clicks. It works with no server at all.",
+   "deep": "A theme is one HTML file. build.py fills `__LESSON_JSON__` into `<script id=\"lesson\" type=\"application/json\">` and the page runs `JSON.parse` on it (assets/themes/zine.html:538, 541). `L.mode === 'architecture'` (assets/themes/zine.html:547) relabels the sections (traces become Flows, whatifs become Failure modes) and adds Interfaces, Invariants and Pressure points. Each node sits in the column of its layer unless it sets `col` or `row` (assets/themes/zine.html:655). Each edge is a single curve between the facing sides of two boxes, fanned apart when several edges join the same pair (assets/themes/zine.html:699); I found no routing around other boxes, so crossings are fixed by choosing rows. A second theme, `sketch` (assets/themes/sketch.html), renders the same JSON with the same script tag and `lens:<id>` keys, and splices in two parts: `parts/props.js`, the icon library (LensProps), then `parts/scenes.js`, Blot and his twelve scenes (LensScenes) (assets/themes/sketch.html:561-562). An authored `scene` is drawn with its `items` (labelled things that move) and `props` (labelled places). A node with no scene gets a context plate instead: ctxPlate() builds it from the graph, with the node's own `prop` in the middle, its neighbours on either side and each edge's `payload` on the arrows (assets/themes/sketch.html:655-663; the choice is made at assets/themes/sketch.html:942). zine.html never mentions `scene` or `prop`, so it ignores all of them.",
+   "analogy": "A reusable stage set: the lesson is the script, the theme decides the lighting and the props.",
+   "owns": "How a lesson looks and behaves.",
+   "exposes": "The contract in reference/themes.md: two placeholders, include lines, and the selectors `.node`, `[data-lens-stop]` and `.choice[data-p]` that scripts/smoke.mjs relies on. The sketch theme also reaches LensProps.draw, LensScenes.render and LensScenes.context in the parts.",
+   "runs": "In the reader's browser. It works from a plain file and from the helper's http://127.0.0.1 address.",
+   "scale": "Client side only. The map is a grid of fixed-size boxes, so the build warns outside 2 to 14 nodes (scripts/build.py:338) and the schema recommends 4 to 10.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "store",
+   "label": "Browser memory",
+   "kind": "localStorage",
+   "prop": "database",
+   "layer": "page",
+   "col": 2,
+   "row": 2,
+   "files": [
+    "assets/themes/zine.html:552-557",
+    "assets/themes/zine.html:1168"
+   ],
+   "simple": "The browser remembers where you stopped, which guesses you answered and how the quiz went, so coming back picks up where you left off.",
+   "deep": "Every key is `lens:<lesson id>:<name>` (assets/themes/zine.html:552). Saved: Plain or Deep, current flow, last stop, light or dark, the model choice, answered guess gates and quiz answers. The gate and quiz keys also contain a hash of their own questions (assets/themes/zine.html:553, 554), so editing a question starts that part fresh instead of pinning old answers to new text. Reads and writes are wrapped in try/catch (assets/themes/zine.html:557), so blocked storage simply means the page forgets. The ask key lives apart, under `lens:key`. Nothing in a key names the theme or the file, so zine and sketch share one set of progress, and in Chromium so do two different file:// pages with the same lesson id (tried: a stop saved in a zine build showed as Welcome back in a sketch build of the same id).",
+   "analogy": "A bookmark that also remembers your quiz marks.",
+   "owns": "One reader's progress through one lesson.",
+   "exposes": "localStorage keys you can read in the dev tools. Nothing here leaves the browser.",
+   "runs": "The reader's browser profile, one store per origin. In Chromium every file:// page counts as the same origin.",
+   "scale": "A handful of small JSON values per lesson. Browsers cap localStorage at a few MB per origin (typical figure, not checked here); a failed write is swallowed.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "helper",
+   "label": "Ask helper (serve.py)",
+   "kind": "localhost HTTP server",
+   "prop": "server",
+   "layer": "helper",
+   "col": 3,
+   "row": 0,
+   "files": [
+    "scripts/serve.py:14-17",
+    "scripts/serve.py:105-214"
+   ],
+   "simple": "A tiny local web server. It serves your lessons and is the one door through which the page can ask Claude. It checks who is knocking before it does anything.",
+   "deep": "A ThreadingHTTPServer on 127.0.0.1, from port 4174 upward (scripts/serve.py:247), one thread per request. GET /__lens/health, GET / and GET /<name>.html need a same-origin Host. POST /__lens/ask also needs the `X-Lens-Key` header, a JSON content type, string fields, a model of haiku or sonnet and a UUID-shaped session id (scripts/serve.py:137-158). It then starts `claude -p` and relays its events as NDJSON. The key is a random token kept in ~/.config/lens/token with mode 600 (scripts/serve.py:46-51) and handed to the page in the link's #fragment, which browsers never send to a server.",
+   "analogy": "A doorman with a guest list: wrong address, no entry; right address but no key, no entry.",
+   "owns": "The key, the port and every claude process.",
+   "exposes": "GET /__lens/health, GET /<name>.html and POST /__lens/ask, all on 127.0.0.1 only.",
+   "runs": "A background Python process started by `serve.py LESSON.html`. One server per lessons folder; a second launch finds it and reuses it.",
+   "scale": "One thread and one claude process per question in flight. I found no cap on concurrent asks in serve.py. Each answer is cut off after 300 seconds (scripts/serve.py:24), set by LENS_ASK_TIMEOUT.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "claude",
+   "label": "claude -p subprocess",
+   "kind": "child process (Claude Code CLI)",
+   "prop": "terminal",
+   "layer": "helper",
+   "col": 3,
+   "row": 1,
+   "files": [
+    "scripts/serve.py:57-66",
+    "scripts/serve.py:177-205"
+   ],
+   "simple": "A fresh Claude Code run for every question, under your own login. It may only read: open files and search them. It cannot edit anything.",
+   "deep": "claude_cmd() builds `claude -p --model haiku|sonnet --tools Read,Grep,Glob --setting-sources \"\" --strict-mcp-config --settings {autoMemoryEnabled:false, disableAllHooks:true} --system-prompt TUTOR --output-format stream-json --verbose --include-partial-messages`, plus `--resume SESSION` for a follow-up (scripts/serve.py:57-66). The process starts in the explained repo (`cwd=repo`), in its own process group, with the prompt written to stdin and stream-json read from stdout (scripts/serve.py:177-205).",
+   "owns": "The session id and the answer text.",
+   "exposes": "A prompt on stdin, one JSON event per line on stdout, an exit code, and `--resume` to continue a chat.",
+   "runs": "A child of serve.py, in the explained repo's directory, under your own Claude Code login (no API key).",
+   "scale": "One process per question. Parallel questions mean parallel processes, limited by your machine and by your Claude usage limits (not measured here).",
+   "confidence": "evidenced"
+  }
+ ],
+ "edges": [
+  {
+   "from": "writer",
+   "to": "validator",
+   "label": "json",
+   "protocol": "command line: LESSON.json OUT.html --check-src REPO",
+   "sync": true,
+   "payload": "lesson.json path",
+   "guarantee": "All or nothing: any error exits 1 before a page is written (scripts/build.py:528)."
+  },
+  {
+   "from": "source",
+   "to": "validator",
+   "label": "lines",
+   "protocol": "file read",
+   "sync": true,
+   "payload": "snippet lines"
+  },
+  {
+   "from": "validator",
+   "to": "assembler",
+   "label": "valid",
+   "protocol": "in-process call, reached only when there are no errors",
+   "sync": true,
+   "payload": "parsed lesson"
+  },
+  {
+   "from": "assembler",
+   "to": "theme",
+   "label": "page",
+   "protocol": "file write: the theme with parts, title and lesson JSON filled in",
+   "sync": true,
+   "payload": "one .html page"
+  },
+  {
+   "from": "theme",
+   "to": "store",
+   "label": "progress",
+   "protocol": "localStorage API",
+   "sync": true,
+   "payload": "lens:<id>:last",
+   "guarantee": "Best effort: a failed write is silently ignored (assets/themes/zine.html:557)."
+  },
+  {
+   "from": "theme",
+   "to": "helper",
+   "label": "ask",
+   "protocol": "HTTP POST; out: q, model, session, lesson, quote, where; back: text, tool, session, error, done",
+   "sync": false,
+   "payload": "POST /__lens/ask",
+   "guarantee": "A stream that ends without a done event is reported as cut off (assets/themes/zine.html:1271)."
+  },
+  {
+   "from": "helper",
+   "to": "claude",
+   "label": "prompt",
+   "protocol": "subprocess: where, quote and question on stdin; JSON event lines out",
+   "sync": true,
+   "payload": "prompt on stdin",
+   "guarantee": "Never outlives its request: SIGKILL to the whole process group on Stop, tab close or timeout (scripts/serve.py:185)."
+  },
+  {
+   "from": "writer",
+   "to": "helper",
+   "label": "start it",
+   "protocol": "shell command in the background: serve.py LESSON.html --open",
+   "sync": false,
+   "payload": "serve.py LESSON"
+  }
+ ],
+ "traces": [
+  {
+   "title": "A lesson is built and opened",
+   "trigger": "You ask lens how something works. Claude has gathered its evidence and now writes the lesson, builds it and opens it.",
+   "steps": [
+    {
+     "node": "writer",
+     "title": "Read the real lines",
+     "simple": "Claude reads the files it will show, with line numbers. It copies nothing from memory.",
+     "deep": "SKILL.md step 2 says to read the actual code with `nl -ba FILE | sed -n 'A,Bp'` so the numbers are exact, and to run cheap, safe code when that gives real values for the state panel. Anything it only guessed gets `inferred` or `uncertain` as its confidence.",
+     "confidence": "evidenced",
+     "scene": {
+      "name": "lookup",
+      "caption": "Claude reads exact line numbers, not memory",
+      "items": [
+       "nl -ba FILE"
+      ],
+      "props": [
+       {
+        "prop": "folder",
+        "label": "source files"
+       }
+      ]
+     }
+    },
+    {
+     "node": "writer",
+     "title": "Write the lesson as data",
+     "simple": "Claude writes a small Python script that produces the JSON. A helper in it slices each snippet out of the real file, so code is right by construction.",
+     "deep": "SKILL.md step 4 describes a generator in the scratchpad with a `code(file, a, b, highlight, notes)` helper; examples/jw-ask-flow.gen.py is the model, and so is the script that produced this lesson. Because snippets are sliced, never typed, only the line numbers can go wrong, and the next stage catches those for snippets. Line numbers written into prose or a node's `files` are not checked (see Weak spots), which is why the `ln()` helper in this lesson's generator looks each one up. Then Claude runs build.py.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "lesson.json",
+       "value": "mode \"architecture\", 8 nodes, 8 edges, 3 flows",
+       "changed": true
+      },
+      {
+       "name": "snippets",
+       "value": "sliced from real files by code()",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "transform",
+      "caption": "gen.py slices snippets, writes lesson.json",
+      "items": [
+       "code(file, a, b)",
+       "lesson.json"
+      ],
+      "props": [
+       {
+        "prop": "process",
+        "label": "gen.py"
+       }
+      ]
+     }
+    },
+    {
+     "node": "validator",
+     "title": "Check the shape",
+     "simple": "build.py reads the JSON and checks it. Missing text, unknown node ids and bad scene names are errors. Odd but legal things are warnings.",
+     "deep": "`validate()` runs every rule in one pass and collects `errs` and `warns` (scripts/build.py:324-439). Nothing is thrown, even for a field of the wrong type, so one build reports every problem at once. Warnings never stop the build, which is why SKILL.md says to read them anyway.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "errs",
+       "value": "[]",
+       "changed": true
+      },
+      {
+       "name": "warns",
+       "value": "[]",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "gate",
+      "caption": "errors stop the build, warnings pass",
+      "items": [
+       "lesson.json",
+       "unknown node id"
+      ],
+      "props": [
+       {
+        "prop": "shield",
+        "label": "validate()"
+       }
+      ]
+     }
+    },
+    {
+     "node": "validator",
+     "title": "Compare each snippet with its file",
+     "simple": "With `--check-src`, build.py opens the real file and compares the snippet line by line. Any difference is an error.",
+     "deep": "The block only runs when a repo was given (scripts/build.py:483). It slices the real file at the snippet's start line and length, then compares line by line after trimming trailing spaces. A line that is only `...` is skipped, so a lesson can elide code. A file that is shorter than the snippet is a mismatch as well. The error names the first five wrong line numbers.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "scripts/build.py",
+      "start": 483,
+      "lang": "python",
+      "src": "    if repo and c.get(\"file\"):\n        if not isinstance(c[\"file\"], str):\n            errs.append(f\"{where}: code.file must be a string\")\n            return\n        p = Path(repo) / c[\"file\"]\n        if not p.exists():\n            p = Path(c[\"file\"]).expanduser()\n        if not p.exists():\n            errs.append(f\"{where}: cannot find {c['file']} to verify the snippet\")\n            return\n        real = p.read_text(errors=\"replace\").splitlines()[start - 1:start - 1 + n]\n        mine = c[\"src\"].rstrip(\"\\n\").split(\"\\n\")\n        norm = lambda s: s.rstrip()\n        bad = [start + i for i, (a, b) in enumerate(zip(mine, real)) if norm(a) != norm(b) and not re.fullmatch(r\"\\s*(\\.\\.\\.|…|# \\.\\.\\.|// \\.\\.\\.)\\s*\", a)]\n        if len(real) < len(mine) or bad:\n            errs.append(f\"{where}: snippet does not match {c['file']} at lines {bad[:5] or 'end of file'}\")",
+      "highlight": [
+       493,
+       495,
+       496,
+       498
+      ],
+      "notes": {
+       "495": "Trailing spaces are trimmed on both sides before comparing.",
+       "496": "Lines that are only `...` are skipped, so a snippet may elide code.",
+       "498": "Any difference, or a file that ends early, is a build error."
+      }
+     },
+     "predict": {
+      "q": "A snippet matches the real file except that one of its lines has extra spaces at the end. What does the build do?",
+      "options": [
+       "It passes, trailing spaces are ignored",
+       "It fails, lines must match exactly",
+       "It passes but prints a warning"
+      ],
+      "answer": 0,
+      "why": "`norm = lambda s: s.rstrip()` (scripts/build.py:495) trims each line on both sides before the comparison, so only differences in the visible text count."
+     },
+     "state": [
+      {
+       "name": "mine",
+       "value": "c['src'] split into lines",
+       "changed": true
+      },
+      {
+       "name": "real",
+       "value": "file lines[start-1 : start-1+n]",
+       "changed": true
+      },
+      {
+       "name": "bad",
+       "value": "[]  (an empty list means a match)",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "watch",
+      "caption": "check_code diffs snippets vs the real file",
+      "items": [
+       "snippet lines"
+      ],
+      "props": [
+       {
+        "prop": "file",
+        "label": "scripts/build.py"
+       }
+      ]
+     }
+    },
+    {
+     "node": "assembler",
+     "title": "Fill the template, then write the page",
+     "simple": "build.py first expands the include lines in the theme, then drops in the title and the lesson in one pass. The lesson is made safe first and nothing it inserts is read again, so lesson text cannot be mistaken for an instruction.",
+     "deep": "`render()` (scripts/build.py:501) serialises the lesson on one line (scripts/build.py:503), rewrites every `</` to `<\\/` and turns the `<` of any `<!--` or `<script` into `\\u003c` (scripts/build.py:506). Line 529 runs `apply_includes` on the theme text and hands the result to `render()`, which replaces `__TITLE__` and `__LESSON_JSON__` in one `re.sub` pass (scripts/build.py:508). Three things keep lesson text from posing as a directive: includes are expanded before the data is inserted, the data is one line so no lesson string is a whole line on its own, and the single pass never rescans inserted text, so a title containing `__LESSON_JSON__` stays literal. scripts/test-build.py pins each: cli_includes_before_placeholders, title_placeholder_cannot_inject_json and comment_open_is_escaped_and_roundtrips.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "scripts/build.py",
+      "start": 501,
+      "lang": "python",
+      "src": "def render(template, title, lesson):\n    \"\"\"Fill __TITLE__ and __LESSON_JSON__ in one pass, so text inserted for one is never rescanned for the other.\"\"\"\n    data = json.dumps(lesson, ensure_ascii=False).replace(\"</\", \"<\\\\/\")\n    # Inside <script> a literal `<!--` followed later by `<script` switches the HTML parser into the\n    # \"script data double escaped\" state and swallows the closing tag. \\u003c is the same character to JSON.parse.\n    data = re.sub(r\"<(?=!--|script)\", r\"\\\\u003c\", data, flags=re.I)\n    values = {\"__TITLE__\": html.escape(title), \"__LESSON_JSON__\": data}\n    return re.sub(\"|\".join(PLACEHOLDERS), lambda m: values[m.group(0)], template)",
+      "highlight": [
+       503,
+       506,
+       508
+      ],
+      "notes": {
+       "503": "Every `</` becomes `<\\/`, so no lesson text can end the data script early.",
+       "506": "A `<` before `!--` or `script` becomes `\\u003c`, so the page cannot go blank.",
+       "508": "One pass fills the title and the data; inserted text is never rescanned."
+      }
+     },
+     "predict": {
+      "q": "A step of a lesson quotes the include line `<!-- lens:include scenes.js -->` as text. What does the built page contain at that spot?",
+      "options": [
+       "That text, unchanged",
+       "The scenes.js file pasted in",
+       "No page: the build stops on it"
+      ],
+      "answer": 0,
+      "why": "Includes are expanded in the theme before the lesson is inserted, and the insert is one pass whose output is never rescanned, so lesson text is never expanded."
+     },
+     "state": [
+      {
+       "name": "data",
+       "value": "the lesson on one line, </ and <!-- escaped",
+       "changed": true
+      },
+      {
+       "name": "page",
+       "value": "theme + parts + title + data",
+       "changed": true
+      },
+      {
+       "name": "out",
+       "value": "one .html file, no other files",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "carry",
+      "caption": "one re.sub pass fills in the lesson",
+      "items": [
+       "lesson JSON"
+      ],
+      "props": [
+       {
+        "prop": "braces",
+        "label": "lesson JSON"
+       },
+       {
+        "prop": "browser",
+        "label": "theme page"
+       }
+      ]
+     }
+    },
+    {
+     "node": "theme",
+     "title": "Open the page and draw it",
+     "simple": "You open the file. The page reads the lesson from its own script tag, then draws the map, the flows and every other section that has something to show.",
+     "deep": "`JSON.parse` of the script tag gives `L` (assets/themes/zine.html:541). The boot line renders every section from it (assets/themes/zine.html:1296); a section with no data hides itself and drops out of the contents rail. In architecture mode `ARCH` is true (assets/themes/zine.html:547), which changes the labels and adds the Interfaces, Invariants and Pressure sections. The sketch theme does the same, and also draws each node's context plate from the edges when you click it.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "L",
+       "value": "the parsed lesson object",
+       "changed": true
+      },
+      {
+       "name": "ARCH",
+       "value": "true",
+       "changed": true
+      },
+      {
+       "name": "S.depth",
+       "value": "\"simple\"  (the default)",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "fork",
+      "caption": "L.mode relabels: traces become Flows",
+      "items": [
+       "code",
+       "architecture"
+      ],
+      "props": [
+       {
+        "prop": "braces",
+        "label": "lesson JSON"
+       }
+      ]
+     }
+    },
+    {
+     "node": "store",
+     "title": "Pick up where you left off",
+     "simple": "The page looks in the browser's memory for this lesson. If you stopped partway last time, it offers a Jump back in button.",
+     "deep": "Initial state is read from localStorage (assets/themes/zine.html:552). Each stop you visit saves `last` (assets/themes/zine.html:982), and the Welcome back banner appears only when the saved step is past the first (assets/themes/zine.html:1299). A fresh browser or cleared storage gives the defaults. scripts/smoke.mjs clears storage on purpose so every run starts the same.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "lens:lens-architecture:last",
+       "value": "{\"trace\":0,\"step\":3}",
+       "changed": true
+      },
+      {
+       "name": "resume banner",
+       "value": "shown (step 3 > 0)",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "lookup",
+      "caption": "the page offers Jump back in",
+      "items": [
+       "lens:<id>:last"
+      ],
+      "props": [
+       {
+        "prop": "database",
+        "label": "localStorage"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "title": "A reader selects text and asks Claude",
+   "trigger": "serve.py is running. You open the link it printed, `http://127.0.0.1:4174/<lesson>.html#k=KEY`, select a sentence and press A.",
+   "steps": [
+    {
+     "node": "store",
+     "title": "Keep the key, hide the key",
+     "simple": "The link carries a secret key after the `#`. The page saves it in browser memory and removes it from the address bar.",
+     "deep": "serve.py creates the key once and keeps it in a private file (scripts/serve.py:46-51). The page reads `k=` from `location.hash`, saves it as `lens:key` and rewrites the address bar without it (assets/themes/zine.html:1168). If storage throws, the key stays in memory for this load only (assets/themes/zine.html:1169).",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "lens:key",
+       "value": "\"Qm3x...(32 chars)\"",
+       "changed": true
+      },
+      {
+       "name": "location.hash",
+       "value": "\"\"",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "store",
+      "caption": "the #fragment key moves to lens:key",
+      "items": [
+       "k=KEY"
+      ],
+      "props": [
+       {
+        "prop": "database",
+        "label": "lens:key"
+       }
+      ]
+     }
+    },
+    {
+     "node": "theme",
+     "title": "Selection becomes a question",
+     "simple": "When you select text, the page records the words and where you were reading, like stop 3 or the Invariants section. Pressing A or the pop-up opens the panel.",
+     "deep": "`selInfo()` keeps the trimmed text (at least 2 characters, cut at 1,500; assets/themes/zine.html:1200), but only from inside the main article. `whereOf()` turns the spot into words such as `stop 3` or `the \"Invariants\" section`. If the helper was not found (a plain file), the same gesture copies a ready-made question to the clipboard instead (assets/themes/zine.html:1218).",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "quote",
+       "value": "\"A watcher thread peeks at the connection\"",
+       "changed": true
+      },
+      {
+       "name": "where",
+       "value": "\"the Invariants section\"",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "carry",
+      "caption": "selected words plus where you were",
+      "items": [
+       "quote + where"
+      ],
+      "props": [
+       {
+        "prop": "browser",
+        "label": "article"
+       },
+       {
+        "prop": "envelope",
+        "label": "ask panel"
+       }
+      ]
+     }
+    },
+    {
+     "node": "theme",
+     "title": "Send the question",
+     "simple": "The page sends the question to the helper and shows an empty answer that fills as text arrives. A tab can run one question at a time.",
+     "deep": "`send()` refuses to start while one is running (assets/themes/zine.html:1240). It POSTs to the relative URL `/__lens/ask`, so only the helper that served the page can answer, with `Content-Type: application/json` and the `X-Lens-Key` header, and passes an AbortController signal so Stop can cancel it (assets/themes/zine.html:1253). The first question carries no session; a follow-up sends the saved one.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "ASK.busy",
+       "value": "AbortController",
+       "changed": true
+      },
+      {
+       "name": "ASK.session",
+       "value": "null (first question)"
+      }
+     ],
+     "scene": {
+      "name": "handoff",
+      "caption": "send() posts with the key, then waits",
+      "items": [
+       "POST /__lens/ask"
+      ],
+      "props": [
+       {
+        "prop": "browser",
+        "label": "theme page"
+       },
+       {
+        "prop": "server",
+        "label": "serve.py"
+       }
+      ]
+     }
+    },
+    {
+     "node": "helper",
+     "title": "Two gates: origin, then key",
+     "simple": "The helper first checks that the request really comes from its own page. Only then does it compare the key. After that it validates every field.",
+     "deep": "`_same_origin()` (scripts/serve.py:105-110) requires the Host header and any Origin header to be 127.0.0.1 or localhost on this server's port. That blocks other sites and DNS rebinding. Next the key is compared in constant time (scripts/serve.py:142). The session id must look like a UUID (scripts/serve.py:157), so a crafted value can never be read by claude as a command line flag.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "scripts/serve.py",
+      "start": 137,
+      "lang": "python",
+      "src": "    def do_POST(self):\n        if not self._same_origin():\n            return self._send(403, {\"error\": \"forbidden\"})\n        if self.path != \"/__lens/ask\":\n            return self._send(404, {\"error\": \"not found\"})\n        if not secrets.compare_digest(self.headers.get(\"X-Lens-Key\") or \"\", self.server.cfg[\"key\"]):\n            return self._send(403, {\"error\": \"This tab has no key for the lens helper. Reopen the lesson from the link serve.py printed.\"})\n        if not (self.headers.get(\"Content-Type\") or \"\").startswith(\"application/json\"):\n            return self._send(415, {\"error\": \"send JSON\"})\n        try:\n            req = json.loads(self.rfile.read(min(int(self.headers.get(\"Content-Length\") or 0), 200_000)))\n        except ValueError:\n            return self._send(400, {\"error\": \"bad JSON\"})\n        if not isinstance(req, dict) or not all(isinstance(req.get(k) or \"\", str) for k in (\"q\", \"model\", \"session\", \"lesson\", \"quote\", \"where\")):\n            return self._send(400, {\"error\": \"bad request\"})\n        model, session = req.get(\"model\") or self.server.cfg[\"model\"], req.get(\"session\")\n        if model not in MODELS:\n            return self._send(400, {\"error\": f\"model must be one of {', '.join(MODELS)}\"})\n        if not (req.get(\"q\") or \"\").strip():\n            return self._send(400, {\"error\": \"empty question\"})\n        if session and not re.fullmatch(r\"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\", session):\n            return self._send(400, {\"error\": \"bad session id\"})",
+      "highlight": [
+       138,
+       142,
+       157
+      ],
+      "notes": {
+       "138": "Host and Origin must be this server's own address. This runs before the key is even looked at.",
+       "142": "Constant-time comparison of the X-Lens-Key header.",
+       "157": "Only a UUID-shaped session id is accepted."
+      }
+     },
+     "predict": {
+      "q": "A web page on another site posts to http://127.0.0.1:4174/__lens/ask with a correct copy of your key. What does the helper answer?",
+      "options": [
+       "403: the Origin is not this server",
+       "200: a correct key is enough",
+       "415: the body is not JSON"
+      ],
+      "answer": 0,
+      "why": "The origin check runs first (scripts/serve.py:138). The browser attaches the other site's Origin, which is not in the allowed set, so the key is never compared. A leaked key alone is not enough from another site."
+     },
+     "state": [
+      {
+       "name": "Host",
+       "value": "\"127.0.0.1:4174\""
+      },
+      {
+       "name": "X-Lens-Key",
+       "value": "equals the token file",
+       "changed": true
+      },
+      {
+       "name": "model",
+       "value": "\"haiku\""
+      }
+     ],
+     "scene": {
+      "name": "gate",
+      "caption": "Origin is checked first, then the key",
+      "items": [
+       "X-Lens-Key",
+       "foreign Origin"
+      ],
+      "props": [
+       {
+        "prop": "server",
+        "label": "serve.py"
+       }
+      ]
+     }
+    },
+    {
+     "node": "helper",
+     "title": "Start claude, read-only",
+     "simple": "The helper starts `claude -p` in the explained repo. The flags give it three read tools and switch off settings, hooks and memory. Your question goes in on stdin.",
+     "deep": "`claude_cmd()` lists the flags (scripts/serve.py:57-66). `build_prompt()` (scripts/serve.py:35) joins the where line, the selected quote in triple quotes and the question. Popen gets `cwd=repo`, stdout piped, stderr to a temp file and `start_new_session=True`, so the whole process tree shares one group (scripts/serve.py:177).",
+     "confidence": "evidenced",
+     "code": {
+      "file": "scripts/serve.py",
+      "start": 57,
+      "lang": "python",
+      "src": "def claude_cmd(model, session, system):\n    cmd = [os.environ.get(\"LENS_CLAUDE\") or shutil.which(\"claude\") or \"claude\", \"-p\", \"--model\", model,\n           # no settings, hooks or MCP from the explained repo (it may be untrusted); no auto-memory, so\n           # answers come from the code, not from your private session notes\n           \"--tools\", \"Read,Grep,Glob\", \"--setting-sources\", \"\", \"--strict-mcp-config\",\n           \"--settings\", '{\"autoMemoryEnabled\": false, \"disableAllHooks\": true}',\n           \"--system-prompt\", system, \"--output-format\", \"stream-json\", \"--verbose\", \"--include-partial-messages\"]\n    if session:\n        cmd += [\"--resume\", session]\n    return cmd",
+      "highlight": [
+       61,
+       62,
+       65
+      ],
+      "notes": {
+       "61": "Three read tools. No Bash, no Edit, no Write.",
+       "62": "No hooks and no auto-memory, so answers come from the code.",
+       "65": "A follow-up continues the same Claude session."
+      }
+     },
+     "state": [
+      {
+       "name": "cmd",
+       "value": "claude -p --model haiku --tools Read,Grep,Glob ...",
+       "changed": true
+      },
+      {
+       "name": "cwd",
+       "value": "the explained repo",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "handoff",
+      "caption": "Popen starts claude -p with three read tools",
+      "items": [
+       "prompt on stdin"
+      ],
+      "props": [
+       {
+        "prop": "server",
+        "label": "serve.py"
+       },
+       {
+        "prop": "terminal",
+        "label": "claude -p"
+       }
+      ]
+     }
+    },
+    {
+     "node": "claude",
+     "title": "Claude reads the code and streams",
+     "simple": "Claude searches and reads the real files to answer, and its words arrive in small pieces. Each file it opens is reported so the panel can say Reading and the file name.",
+     "deep": "The system prompt (TUTOR, scripts/serve.py:26) tells it to answer first, read code instead of guessing, cite path:line, say plainly if the lesson is wrong, and never offer edits. That prompt is the soft layer. The hard layer is the tool list: with only Read, Grep and Glob, Claude has nothing to edit with, whatever it is asked. Partial messages are on, so text arrives as deltas.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "tools",
+       "value": "Read, Grep, Glob"
+      },
+      {
+       "name": "output",
+       "value": "stream-json, one event per line",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "wait",
+      "caption": "claude reads files, then streams text",
+      "items": [
+       "text deltas"
+      ],
+      "props": [
+       {
+        "prop": "terminal",
+        "label": "claude -p"
+       }
+      ]
+     }
+    },
+    {
+     "node": "helper",
+     "title": "Turn the stream into small events",
+     "simple": "The helper converts Claude's detailed stream into five simple event types, one per line. The session id goes out last, once the turn is saved.",
+     "deep": "`events()` (scripts/serve.py:69) yields `text` for each text delta, `tool` for each tool_use block, and from the final `result` an `error` if it failed and the `session`. `emit()` writes one JSON line and flushes it. If claude exits non-zero without having reported an error, the helper adds one (the last stderr line, or the time-limit message), and every stream ends with `done`.",
+     "confidence": "evidenced",
+     "predict": {
+      "q": "Why does the helper send the session id only after Claude has finished the turn, not at the start?",
+      "options": [
+       "So the page can show the id sooner",
+       "So resuming a stopped turn cannot fail",
+       "So the id is never stored on disk"
+      ],
+      "answer": 1,
+      "why": "The comment at scripts/serve.py:94 says it: only once the turn is saved. If you press Stop, no id was sent, so the next question does not try to `--resume` a turn that never finished."
+     },
+     "state": [
+      {
+       "name": "events, in order",
+       "value": "text, tool, text, session, done",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "transform",
+      "caption": "the stream shrinks to five event types",
+      "items": [
+       "stream-json",
+       "NDJSON events"
+      ],
+      "props": [
+       {
+        "prop": "process",
+        "label": "events()"
+       }
+      ]
+     }
+    },
+    {
+     "node": "theme",
+     "title": "Draw the answer, keep the thread",
+     "simple": "The page reads the events line by line and draws the answer as it grows. It remembers the session id, so your next question continues the same chat.",
+     "deep": "The loop splits the response on newlines and handles each event (assets/themes/zine.html:1263). The whole answer text is re-rendered on every chunk (assets/themes/zine.html:1264). A stream that ends without `done` shows \"The answer was cut off\" (assets/themes/zine.html:1271). The session lives only in the page object `ASK.session`, not in localStorage, so reloading starts a fresh chat; the model choice, by contrast, is saved.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "ASK.session",
+       "value": "\"11111111-2222-3333-4444-555555555555\"",
+       "changed": true
+      },
+      {
+       "name": "text",
+       "value": "the whole answer so far",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "watch",
+      "caption": "the answer re-renders on every chunk",
+      "items": [
+       "text, tool, done"
+      ],
+      "props": [
+       {
+        "prop": "browser",
+        "label": "answer panel"
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "title": "A reader presses Stop mid-answer",
+   "trigger": "Claude has been silent for 40 seconds, reading files, and you press Stop or close the tab.",
+   "steps": [
+    {
+     "node": "theme",
+     "title": "Cancel the request",
+     "simple": "Stop cancels the request in the browser. The panel says Stopped. Closing the tab does the same thing.",
+     "deep": "The form handler calls `ASK.busy.abort()` while a question is running (assets/themes/zine.html:1278). The fetch rejects with an AbortError, which is shown as Stopped (assets/themes/zine.html:1274). The browser closes its end of the connection.",
+     "confidence": "evidenced",
+     "scene": {
+      "name": "wall",
+      "caption": "abort() hangs up on the helper",
+      "items": [
+       "abort()"
+      ],
+      "props": [
+       {
+        "prop": "server",
+        "label": "serve.py"
+       }
+      ]
+     }
+    },
+    {
+     "node": "helper",
+     "title": "Notice the hang-up",
+     "simple": "Claude is quiet, so the helper has nothing to write and would never find out. A watcher thread peeks at the connection twice a second instead.",
+     "deep": "`watch()` loops while claude lives (scripts/serve.py:193). `select` waits at most half a second, then `recv(1, MSG_PEEK)` reads one byte without consuming it. An empty result means the client hung up, so it calls `stop()`. A test closes a socket while a fake claude sleeps and checks that claude and its child both die (scripts/test-serve.py, disconnect).",
+     "confidence": "evidenced",
+     "code": {
+      "file": "scripts/serve.py",
+      "start": 193,
+      "lang": "python",
+      "src": "        def watch():  # the reader pressed Stop or closed the tab while claude was quiet (thinking, reading)\n            while proc.poll() is None:\n                if select.select([self.connection], [], [], 0.5)[0]:\n                    try:\n                        gone = self.connection.recv(1, socket.MSG_PEEK) == b\"\"\n                    except OSError:\n                        gone = True\n                    if gone:\n                        return stop()\n\n        threading.Thread(target=watch, daemon=True).start()",
+      "highlight": [
+       195,
+       197,
+       201
+      ],
+      "notes": {
+       "195": "Look at the connection every half second, even while claude says nothing.",
+       "197": "Peek one byte without consuming it. Empty bytes means the browser hung up.",
+       "201": "Kill claude and everything it started."
+      }
+     },
+     "scene": {
+      "name": "watch",
+      "caption": "watch() peeks one byte twice a second",
+      "items": [
+       "MSG_PEEK: b\"\""
+      ],
+      "props": [
+       {
+        "prop": "network",
+        "label": "connection"
+       }
+      ]
+     }
+    },
+    {
+     "node": "helper",
+     "title": "Kill the whole process tree",
+     "simple": "The helper kills Claude and everything Claude started, such as search tools. Claude was launched in its own process group, so one signal reaches all of them.",
+     "deep": "`stop()` sends SIGKILL to the process group (scripts/serve.py:183, 185). The same function serves the time-limit timer (scripts/serve.py:190) and the broken-pipe handler. The `finally` block kills anything still alive and calls `proc.wait()` (scripts/serve.py:222), which reaps it so no zombie entry is left behind.",
+     "confidence": "evidenced",
+     "scene": {
+      "name": "fire",
+      "caption": "killpg ends claude and every tool it started",
+      "items": [
+       "child processes"
+      ],
+      "props": [
+       {
+        "prop": "terminal",
+        "label": "claude -p"
+       }
+      ]
+     }
+    },
+    {
+     "node": "claude",
+     "title": "Nothing is left running",
+     "simple": "Claude and its helpers are gone. The half answer is discarded. The session id was never sent, so the next question will not resume the stopped turn.",
+     "deep": "The `session` event is yielded only after claude's final `result` (scripts/serve.py:94), which never came, so `ASK.session` is whatever it was before this question. A follow-up after Stop therefore resumes the last completed turn, or starts fresh if there was none.",
+     "confidence": "evidenced",
+     "state": [
+      {
+       "name": "claude + its children",
+       "value": "dead and reaped",
+       "changed": true
+      },
+      {
+       "name": "ASK.session",
+       "value": "unchanged by this question"
+      }
+     ],
+     "scene": {
+      "name": "handoff",
+      "caption": "proc.wait() reaps it; no session id sent",
+      "items": [
+       "exit, reaped"
+      ],
+      "props": [
+       {
+        "prop": "terminal",
+        "label": "claude -p"
+       },
+       {
+        "prop": "server",
+        "label": "serve.py"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "invariants": [
+  {
+   "rule": "A snippet shown in a lesson equals the real file at the stated lines, trailing spaces aside.",
+   "evidence": "scripts/build.py:493-498, and only when --check-src is given",
+   "node": "validator",
+   "breaks": "The build exits with \"snippet does not match FILE at lines [...]\" and no page is written. Without --check-src nothing compares, and an invented snippet ships (see Weak spots).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "lookup",
+    "caption": "snippet = real file, only with --check-src",
+    "items": [
+     "snippet"
+    ],
+    "props": [
+     {
+      "prop": "file",
+      "label": "scripts/build.py"
+     }
+    ]
+   }
+  },
+  {
+   "rule": "Lesson text can never act as a template directive.",
+   "evidence": "Includes are expanded in the theme before the lesson is inserted (scripts/build.py:529); title and lesson fill in one pass (scripts/build.py:508); a part may not contain `__TITLE__` or `__LESSON_JSON__` (scripts/build.py:42)",
+   "node": "assembler",
+   "breaks": "A lesson that quotes an include line would have a file pasted into it, or the build would stop on a missing part. scripts/test-build.py pins the order with cli_includes_before_placeholders and the one-pass fill with title_placeholder_cannot_inject_json.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "wall",
+    "caption": "a quoted include line stays plain text",
+    "items": [
+     "lens:include text"
+    ],
+    "props": [
+     {
+      "prop": "package",
+      "label": "theme parts"
+     }
+    ]
+   }
+  },
+  {
+   "rule": "Lesson text cannot end or hide the data script: `</` becomes `<\\/`; `<!--` and `<script` lose their `<`.",
+   "evidence": "scripts/build.py:503-506",
+   "node": "assembler",
+   "breaks": "Unescaped, a step that mentions a closing script tag cuts the JSON off mid-string: the page throws and draws nothing. With only `</` escaped, a step holding `<!--` and later `<script` blanks the page with no error at all. I ran both in headless Chromium. scripts/test-build.py pins the second with comment_open_is_escaped_and_roundtrips.",
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "render() escapes </ in the lesson data",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 4.0,
+      "y": 1.6,
+      "label": "</script>",
+      "c": "red",
+      "id": "raw"
+     },
+     {
+      "op": "packet",
+      "x": 4.0,
+      "y": 6.4,
+      "label": "<\\/script>",
+      "c": "blue",
+      "id": "safe"
+     },
+     {
+      "op": "arrow",
+      "from": "raw",
+      "to": "safe",
+      "bend": 0.2
+     },
+     {
+      "op": "text",
+      "x": 7.8,
+      "y": 1.6,
+      "t": "render()",
+      "c": "blue"
+     },
+     {
+      "op": "blot",
+      "x": 7.6,
+      "y": 4.0,
+      "s": 0.9,
+      "mood": "proud",
+      "arms": [
+       [
+        4.4,
+        3.9
+       ],
+       [
+        9.2,
+        4.6
+       ]
+      ]
+     },
+     {
+      "op": "prop",
+      "name": "browser",
+      "x": 13.6,
+      "y": 5.8,
+      "size": 2.0,
+      "label": "page draws",
+      "id": "pg"
+     },
+     {
+      "op": "arrow",
+      "from": "safe",
+      "to": "pg",
+      "c": "blue",
+      "bend": 0.3
+     }
+    ]
+   }
+  },
+  {
+   "rule": "Only a page served from the helper's own address, holding the key, can ask a question.",
+   "evidence": "Host and Origin must be 127.0.0.1 or localhost on the server port (scripts/serve.py:105-110), then X-Lens-Key must match (scripts/serve.py:142)",
+   "node": "helper",
+   "breaks": "Any website open in your browser could post questions and make your machine run claude in your repo (a cross-site or DNS-rebinding attack). scripts/test-serve.py has one test per rejection.",
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "own Host, then X-Lens-Key; else 403",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 2.4,
+      "y": 3.2,
+      "label": "other site",
+      "c": "red",
+      "tilt": -0.1,
+      "id": "bad"
+     },
+     {
+      "op": "packet",
+      "x": 2.4,
+      "y": 5.8,
+      "label": "127.0.0.1",
+      "c": "blue",
+      "id": "ok"
+     },
+     {
+      "op": "gate",
+      "x": 7.6,
+      "y": 7.6,
+      "h": 3.4,
+      "len": 2.6
+     },
+     {
+      "op": "text",
+      "x": 2.6,
+      "y": 8.4,
+      "t": "403",
+      "c": "red",
+      "size": "l"
+     },
+     {
+      "op": "blot",
+      "x": 10.2,
+      "y": 5.6,
+      "s": 0.9,
+      "mood": "proud",
+      "arms": [
+       [
+        8.6,
+        4.8
+       ],
+       [
+        10.1,
+        3.1
+       ]
+      ]
+     },
+     {
+      "op": "prop",
+      "name": "key",
+      "x": 10.0,
+      "y": 2.2,
+      "size": 1.6,
+      "id": "key"
+     },
+     {
+      "op": "text",
+      "x": 12.8,
+      "y": 2.3,
+      "t": "X-Lens-Key",
+      "c": "blue"
+     },
+     {
+      "op": "prop",
+      "name": "server",
+      "x": 14.2,
+      "y": 5.4,
+      "size": 2.2,
+      "label": "serve.py",
+      "id": "sv"
+     }
+    ]
+   }
+  },
+  {
+   "rule": "claude runs with only Read, Grep and Glob, and without the explained repo's settings, hooks, MCP servers or memory.",
+   "evidence": "scripts/serve.py:57-66",
+   "node": "helper",
+   "breaks": "A repo you are reading may be untrusted: its own hooks could run code while you read a lesson, or a stray edit tool could change files. The comment at scripts/serve.py:59 gives the same reason.",
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "Read, Grep, Glob only: no edit tool",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 2.2,
+      "y": 1.7,
+      "label": "Read",
+      "c": "blue",
+      "id": "t1"
+     },
+     {
+      "op": "packet",
+      "x": 2.2,
+      "y": 3.3,
+      "label": "Grep",
+      "c": "blue",
+      "id": "t2"
+     },
+     {
+      "op": "packet",
+      "x": 2.2,
+      "y": 4.9,
+      "label": "Glob",
+      "c": "blue",
+      "id": "t3"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 8.4,
+      "y": 3.4,
+      "size": 2.4,
+      "label": "claude -p",
+      "id": "cl"
+     },
+     {
+      "op": "arrow",
+      "from": "t1",
+      "to": "cl",
+      "c": "blue",
+      "bend": 0.15
+     },
+     {
+      "op": "arrow",
+      "from": "t2",
+      "to": "cl",
+      "c": "blue"
+     },
+     {
+      "op": "arrow",
+      "from": "t3",
+      "to": "cl",
+      "c": "blue",
+      "bend": -0.15
+     },
+     {
+      "op": "wall",
+      "x": 9.8,
+      "y": 5.8,
+      "w": 0.9,
+      "h": 2.8
+     },
+     {
+      "op": "packet",
+      "x": 13.0,
+      "y": 6.2,
+      "label": "Edit",
+      "c": "red",
+      "id": "e1"
+     },
+     {
+      "op": "packet",
+      "x": 13.0,
+      "y": 7.6,
+      "label": "Write, Bash",
+      "c": "red",
+      "id": "e2"
+     },
+     {
+      "op": "blot",
+      "x": 6.4,
+      "y": 6.9,
+      "s": 0.7,
+      "mood": "proud",
+      "arms": [
+       [
+        5.6,
+        5.8
+       ],
+       [
+        9.7,
+        6.6
+       ]
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "pressure": [
+  {
+   "title": "Every lesson carries its own copy of the theme",
+   "node": "assembler",
+   "limit": "About 108 KB of theme per lesson (zine.html), 111 KB for the jw example. The sketch theme is 113 KB and splices in the icon library (parts/props.js, 17 KB) and the Blot library (parts/scenes.js, 67 KB) on top, so its pages are larger still.",
+   "signal": "The .lens/ folder grows by roughly 100 KB per lesson.",
+   "mitigation": "Nothing is needed at dozens of lessons. Past that, a shared theme file would shrink pages but give up the one-file property.",
+   "severity": "low",
+   "confidence": "inferred",
+   "scene": {
+    "name": "store",
+    "caption": "every lesson file repeats the whole theme",
+    "items": [
+     "zine.html 108 KB"
+    ],
+    "props": [
+     {
+      "prop": "folder",
+      "label": ".lens/ folder"
+     }
+    ]
+   }
+  },
+  {
+   "title": "The map is a fixed grid of fixed-size boxes",
+   "node": "theme",
+   "limit": "4 to 10 nodes read well; the build warns outside 2 to 14 (scripts/build.py:338). Edges are single curves between box sides, so the theme never routes around a box.",
+   "signal": "A build warning, or an edge visibly running through a box on the map.",
+   "mitigation": "Split into an overview lesson plus component lessons (SKILL.md principle 6), or set `col` and `row` by hand until the lines are clear.",
+   "severity": "medium",
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "a fixed grid: build warns outside 2 to 14",
+    "draw": [
+     {
+      "op": "box",
+      "x": 1.0,
+      "y": 1.2,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "writer"
+     },
+     {
+      "op": "box",
+      "x": 4.6,
+      "y": 1.2,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "source"
+     },
+     {
+      "op": "box",
+      "x": 8.2,
+      "y": 1.2,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "validator",
+      "id": "mid"
+     },
+     {
+      "op": "box",
+      "x": 1.0,
+      "y": 5.4,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "assembler",
+      "id": "a"
+     },
+     {
+      "op": "box",
+      "x": 4.6,
+      "y": 5.4,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "theme"
+     },
+     {
+      "op": "box",
+      "x": 8.2,
+      "y": 5.4,
+      "w": 2.6,
+      "h": 1.3,
+      "label": "helper",
+      "id": "b"
+     },
+     {
+      "op": "arrow",
+      "from": [
+       3.7,
+       5.62
+      ],
+      "to": [
+       8.1,
+       5.62
+      ],
+      "c": "red",
+      "bend": 0
+     },
+     {
+      "op": "text",
+      "x": 6.0,
+      "y": 7.8,
+      "t": "the edge runs through a box",
+      "c": "red"
+     },
+     {
+      "op": "blot",
+      "x": 13.4,
+      "y": 5.2,
+      "s": 0.85,
+      "mood": "worried",
+      "arms": [
+       [
+        12.2,
+        4.6
+       ],
+       [
+        14.6,
+        4.4
+       ]
+      ]
+     },
+     {
+      "op": "text",
+      "x": 13.4,
+      "y": 8.2,
+      "t": "warns outside 2 to 14",
+      "c": "blue",
+      "anchor": "middle"
+     }
+    ]
+   }
+  },
+  {
+   "title": "One claude process per question, no global cap",
+   "node": "helper",
+   "limit": "Each tab runs one question at a time (assets/themes/zine.html:1240); serve.py itself has no cap (no semaphore or pool found), only the 300-second time limit (scripts/serve.py:24).",
+   "signal": "Several `claude -p` processes in `ps`, or Claude usage-limit messages arriving as red error lines in the panel.",
+   "mitigation": "Lower LENS_ASK_TIMEOUT. A small semaphore around the ask handler would cap concurrency; it is not built.",
+   "severity": "low",
+   "confidence": "inferred",
+   "scene": {
+    "caption": "one claude -p per question, no cap",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 2.0,
+      "y": 4.4,
+      "label": "question",
+      "id": "q"
+     },
+     {
+      "op": "prop",
+      "name": "server",
+      "x": 6.8,
+      "y": 4.4,
+      "size": 2.4,
+      "label": "serve.py",
+      "id": "sv"
+     },
+     {
+      "op": "arrow",
+      "from": "q",
+      "to": "sv"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 13.8,
+      "y": 1.6,
+      "size": 1.6,
+      "label": "claude -p",
+      "id": "c1"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 13.8,
+      "y": 4.4,
+      "size": 1.6,
+      "label": "claude -p",
+      "id": "c2"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 13.8,
+      "y": 7.2,
+      "size": 1.6,
+      "label": "claude -p",
+      "id": "c3"
+     },
+     {
+      "op": "arrow",
+      "from": "sv",
+      "to": "c1",
+      "bend": -0.2
+     },
+     {
+      "op": "arrow",
+      "from": "sv",
+      "to": "c2"
+     },
+     {
+      "op": "arrow",
+      "from": "sv",
+      "to": "c3",
+      "bend": 0.2
+     },
+     {
+      "op": "text",
+      "x": 10.8,
+      "y": 7.9,
+      "t": "no cap",
+      "c": "red",
+      "size": "l",
+      "rot": -6
+     },
+     {
+      "op": "blot",
+      "x": 3.2,
+      "y": 7.0,
+      "s": 0.7,
+      "mood": "worried",
+      "arms": [
+       [
+        2.5,
+        5.9
+       ],
+       [
+        3.9,
+        5.9
+       ]
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "whatifs": [
+  {
+   "title": "Open the file without the helper",
+   "change": "You double-click the .html, or serve.py is not running.",
+   "outcome": "The page only looks for the helper over http, so asking stays off. The Ask buttons become Copy question and put a ready-made question on the clipboard to paste into Claude yourself (assets/themes/zine.html:1218). The map, flows, quiz and progress all still work. Progress is stored per origin, so the file copy and the http://127.0.0.1 copy keep separate progress (tried in headless Chromium: a stop saved on the file page was absent at http://127.0.0.1).",
+   "lesson": "The helper is an optional layer. A lesson page has to be useful alone.",
+   "node": "helper",
+   "affects": [
+    "theme",
+    "store"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "no helper: Ask becomes Copy question",
+    "draw": [
+     {
+      "op": "prop",
+      "name": "browser",
+      "x": 2.4,
+      "y": 2.2,
+      "size": 2.2,
+      "label": "lesson page",
+      "id": "pg"
+     },
+     {
+      "op": "prop",
+      "name": "server",
+      "x": 13.6,
+      "y": 1.8,
+      "size": 2.2,
+      "label": "serve.py",
+      "id": "sv"
+     },
+     {
+      "op": "line",
+      "pts": [
+       [
+        12.4,
+        0.6000000000000001
+       ],
+       [
+        14.799999999999999,
+        3.0
+       ]
+      ],
+      "c": "red",
+      "w": 3
+     },
+     {
+      "op": "line",
+      "pts": [
+       [
+        14.799999999999999,
+        0.6000000000000001
+       ],
+       [
+        12.4,
+        3.0
+       ]
+      ],
+      "c": "red",
+      "w": 3
+     },
+     {
+      "op": "arrow",
+      "from": "pg",
+      "to": "sv",
+      "c": "red",
+      "dash": true,
+      "label": "POST /__lens/ask"
+     },
+     {
+      "op": "box",
+      "x": 5.8,
+      "y": 4.9,
+      "w": 3.8,
+      "h": 1.4,
+      "label": "Copy question",
+      "id": "cq"
+     },
+     {
+      "op": "arrow",
+      "from": "pg",
+      "to": "cq",
+      "c": "blue",
+      "bend": 0.3
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 14.0,
+      "y": 6.0,
+      "size": 2.0,
+      "label": "claude",
+      "id": "cl"
+     },
+     {
+      "op": "blot",
+      "x": 11.4,
+      "y": 5.6,
+      "s": 0.85,
+      "mood": "happy",
+      "arms": [
+       [
+        10.0,
+        5.6
+       ],
+       [
+        12.8,
+        6.0
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "title": "Claude goes quiet for five minutes",
+   "change": "claude hangs on a slow tool or a bad connection and prints nothing.",
+   "outcome": "The timer fires after 300 seconds (scripts/serve.py:190), kills the process group, and the stream gets one error line, \"No answer within the 300-second limit, so it was stopped.\", then done. The panel shows it in red, the thread is freed, and the next question works. scripts/test-serve.py runs this with a 2-second limit.",
+   "lesson": "Every child process needs its own deadline, not just the request that started it.",
+   "node": "claude",
+   "affects": [
+    "helper",
+    "theme"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "300 s of silence, then claude is killed",
+    "draw": [
+     {
+      "op": "clock",
+      "x": 8.0,
+      "y": 2.4,
+      "s": 1.4,
+      "label": "300 s",
+      "id": "clk"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 2.6,
+      "y": 6.0,
+      "size": 2.0,
+      "label": "claude -p",
+      "id": "cl"
+     },
+     {
+      "op": "text",
+      "x": 2.6,
+      "y": 3.7,
+      "t": "z z z",
+      "c": "blue",
+      "size": "l",
+      "rot": -8
+     },
+     {
+      "op": "arrow",
+      "from": "clk",
+      "to": "cl",
+      "c": "red",
+      "bend": 0.3,
+      "label": "killpg"
+     },
+     {
+      "op": "blot",
+      "x": 12.8,
+      "y": 5.4,
+      "s": 0.9,
+      "mood": "happy",
+      "arms": [
+       [
+        11.4,
+        4.6
+       ],
+       [
+        14.2,
+        4.4
+       ]
+      ]
+     },
+     {
+      "op": "text",
+      "x": 12.6,
+      "y": 8.3,
+      "t": "No answer within the 300-second limit",
+      "c": "red"
+     }
+    ]
+   }
+  },
+  {
+   "title": "The browser blocks localStorage",
+   "change": "A private window, a cleared profile or a locked-down browser makes storage throw.",
+   "outcome": "Reads fall back to defaults and writes are swallowed (assets/themes/zine.html:557), so the lesson works but forgets Plain or Deep, your stop and your quiz. The ask key is kept in memory for that one load (assets/themes/zine.html:1169), so asking works until you reload. After a reload the key is gone and the helper answers 403 with \"Reopen the lesson from the link serve.py printed\".",
+   "lesson": "Treat persistence as a bonus, never as a requirement for the page to work.",
+   "node": "store",
+   "affects": [
+    "theme",
+    "helper"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "storage blocked: progress is forgotten",
+    "draw": [
+     {
+      "op": "prop",
+      "name": "database",
+      "x": 8.0,
+      "y": 2.0,
+      "size": 2.4,
+      "label": "localStorage",
+      "id": "ls"
+     },
+     {
+      "op": "prop",
+      "name": "lock",
+      "x": 9.4,
+      "y": 2.7,
+      "size": 1.0
+     },
+     {
+      "op": "prop",
+      "name": "browser",
+      "x": 2.4,
+      "y": 6.2,
+      "size": 2.0,
+      "label": "lesson page",
+      "id": "pg"
+     },
+     {
+      "op": "arrow",
+      "from": "pg",
+      "to": "ls",
+      "c": "red",
+      "dash": true,
+      "bend": -0.2,
+      "label": "write swallowed"
+     },
+     {
+      "op": "packet",
+      "x": 11.0,
+      "y": 5.0,
+      "label": "ask key",
+      "c": "blue",
+      "id": "key"
+     },
+     {
+      "op": "blot",
+      "x": 13.4,
+      "y": 5.8,
+      "s": 0.9,
+      "mood": "worried",
+      "arms": [
+       [
+        12.3,
+        5.2
+       ],
+       [
+        14.6,
+        5.2
+       ]
+      ]
+     },
+     {
+      "op": "text",
+      "x": 11.8,
+      "y": 8.3,
+      "t": "kept in memory until reload",
+      "c": "blue"
+     }
+    ]
+   }
+  },
+  {
+   "title": "A lesson names an icon the library does not have",
+   "change": "A node says `\"prop\": \"jetpack\"`, or a scene lists a prop with that name, but props.js has no such icon.",
+   "outcome": "The build still succeeds: check_prop() prints `prop 'jetpack' is not in the prop library; a generic box is drawn` (scripts/build.py:78) and exits 0. In the sketch page the library falls back to a plain rounded box with a handle, and a node with the unknown prop gets that box in its context plate. The label is still drawn. I built a two-node lesson with `jetpack` to see the warning; zine ignores `prop`, so that theme shows nothing different.",
+   "lesson": "A soft fallback keeps the page up, but it only helps if someone reads the build warnings.",
+   "node": "validator",
+   "affects": [
+    "theme"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "unknown prop: a plain box is drawn",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 2.4,
+      "y": 1.6,
+      "label": "jetpack",
+      "c": "red",
+      "tilt": -0.08,
+      "id": "jp"
+     },
+     {
+      "op": "cabinet",
+      "x": 3.4,
+      "y": 7.4,
+      "s": 0.8,
+      "label": "props.js",
+      "id": "ps"
+     },
+     {
+      "op": "arrow",
+      "from": "jp",
+      "to": "ps",
+      "dash": true,
+      "label": "not found"
+     },
+     {
+      "op": "blot",
+      "x": 8.2,
+      "y": 5.2,
+      "s": 0.9,
+      "mood": "worried",
+      "look": [
+       -0.3,
+       0.1
+      ],
+      "arms": [
+       [
+        7.0,
+        4.4
+       ],
+       [
+        9.8,
+        4.0
+       ]
+      ]
+     },
+     {
+      "op": "magnifier",
+      "x": 6.2,
+      "y": 4.2,
+      "s": 0.8
+     },
+     {
+      "op": "box",
+      "x": 11.6,
+      "y": 2.6,
+      "w": 3.2,
+      "h": 1.6,
+      "label": "jetpack",
+      "id": "gb"
+     },
+     {
+      "op": "text",
+      "x": 13.2,
+      "y": 5.4,
+      "t": "a generic box",
+      "c": "blue"
+     },
+     {
+      "op": "text",
+      "x": 13.2,
+      "y": 6.2,
+      "t": "build still ok",
+      "c": "blue"
+     }
+    ]
+   }
+  }
+ ],
+ "decisions": [
+  {
+   "title": "Lessons are data, not model-written HTML",
+   "chosen": "Claude writes a JSON file. Fixed theme files turn it into the page.",
+   "simple": "A page the model writes could look different every time and be broken in ways nobody checks. Data can be checked before anything is drawn.",
+   "deep": "SKILL.md says it outright: produce lesson data, the template does the rest. That one split is what lets build.py validate (scripts/build.py:324), lets two themes render the same lesson, and let a lesson be rebuilt in a new theme without touching its content. The reasons here are my reading of the design, not stated in the repo.",
+   "context": "A model is strong on facts and prose and weak on hundreds of lines of interaction code. Readers want the same keys and behaviour in every lesson. The same lesson should work in more than one look and teach in more than one mode.",
+   "consequences": "Every new capability needs three edits: a schema field, validator rules and a renderer change in every theme. That is how modes, scenes, invariants and pressure points were just added. A lesson cannot do anything the schema lacks. In return: checks at build time, swappable themes and old lessons that keep working.",
+   "alternatives": [
+    {
+     "name": "The model writes the whole HTML page",
+     "tradeoff": "Total freedom, but each page is large, unchecked and different, and a bug fix means regenerating every lesson."
+    },
+    {
+     "name": "Markdown plus a static site generator",
+     "tradeoff": "Easy to write and read, but there is no structure to validate and nothing to step through: no flows, state or guess gates."
+    }
+   ],
+   "confidence": "inferred",
+   "scene": {
+    "caption": "Claude writes lesson.json; themes draw",
+    "draw": [
+     {
+      "op": "prop",
+      "name": "model",
+      "x": 2.2,
+      "y": 4.4,
+      "size": 2.2,
+      "label": "Claude",
+      "id": "cl"
+     },
+     {
+      "op": "prop",
+      "name": "braces",
+      "x": 7.2,
+      "y": 4.4,
+      "size": 2.0,
+      "label": "lesson.json",
+      "id": "js"
+     },
+     {
+      "op": "arrow",
+      "from": "cl",
+      "to": "js",
+      "c": "blue"
+     },
+     {
+      "op": "prop",
+      "name": "browser",
+      "x": 13.4,
+      "y": 1.9,
+      "size": 1.8,
+      "label": "zine",
+      "id": "z"
+     },
+     {
+      "op": "prop",
+      "name": "browser",
+      "x": 13.4,
+      "y": 6.4,
+      "size": 1.8,
+      "label": "sketch",
+      "id": "s"
+     },
+     {
+      "op": "arrow",
+      "from": "js",
+      "to": "z",
+      "c": "blue",
+      "bend": -0.2
+     },
+     {
+      "op": "arrow",
+      "from": "js",
+      "to": "s",
+      "c": "blue",
+      "bend": 0.2
+     },
+     {
+      "op": "packet",
+      "x": 4.8,
+      "y": 1.2,
+      "label": "model-made HTML",
+      "c": "red"
+     },
+     {
+      "op": "text",
+      "x": 4.8,
+      "y": 2.1,
+      "t": "not this",
+      "c": "red"
+     },
+     {
+      "op": "blot",
+      "x": 10.4,
+      "y": 4.4,
+      "s": 0.6,
+      "mood": "proud",
+      "arms": [
+       [
+        9.6,
+        3.4
+       ],
+       [
+        10.6,
+        5.2
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "title": "Themes are single files; shared code is spliced in at build time",
+   "chosen": "One self-contained HTML file per theme. build.py replaces include lines with files from assets/themes/parts/ (scripts/build.py:34-45).",
+   "simple": "Each theme is one file, so a lesson opens anywhere. When two themes need the same code, the build copies it in rather than the page loading it later.",
+   "deep": "reference/themes.md describes a theme as one self-contained file and parts as the way themes share code, for example parts/props.js and parts/scenes.js. The splice is plain text replacement, which is why a part may not contain the two placeholders. Why this way is my reading: the page must work from a plain file with no neighbours.",
+   "context": "Lessons should open from a file, be emailable and be publishable as one file. Two themes may want the same large mascot and icon libraries.",
+   "consequences": "Every built page repeats the shared code (pressure point 1). A part is spliced as raw text, so it is not checked as part of any theme. A theme grows large: zine.html alone is 1309 lines.",
+   "alternatives": [
+    {
+     "name": "Load shared scripts at runtime",
+     "tradeoff": "Pages stay small, but a lesson then needs its neighbours to open and cannot travel as one file."
+    },
+    {
+     "name": "Copy the library into each theme",
+     "tradeoff": "No build step needed, but the copies drift apart the first time one is fixed."
+    },
+    {
+     "name": "Use a bundler",
+     "tradeoff": "Real modules, but it adds a dependency and a toolchain to a skill that is two Python files and some HTML."
+    }
+   ],
+   "confidence": "inferred",
+   "scene": {
+    "name": "handoff",
+    "caption": "build.py splices parts/ into the theme",
+    "items": [
+     "scenes.js"
+    ],
+    "props": [
+     {
+      "prop": "package",
+      "label": "parts/"
+     },
+     {
+      "prop": "browser",
+      "label": "sketch.html"
+     }
+    ]
+   }
+  },
+  {
+   "title": "Ask through the user's own `claude -p`, not an API key",
+   "chosen": "serve.py starts the `claude` command for each question, under the reader's own login.",
+   "simple": "Asking about a lesson uses the account you already have. There is no key to paste and no billing to set up in this tool.",
+   "deep": "The docstring states it: questions run through your own Claude Code login, no API key, in the repo the lesson explains, with read-only tools (scripts/serve.py:6-8). Follow-ups use `--resume` with the session id the stream reports.",
+   "context": "Answers should come from this repo's real code, which needs file-reading tools, and the tool should not hold secrets.",
+   "consequences": "The helper parses Claude Code's stream-json by hand (scripts/serve.py:69-95), so a format change in the CLI can empty the answers (see Weak spots). Each question pays process start-up. Safety rests on getting the flags in scripts/serve.py:57-66 right, and the tests run a fake claude (scripts/testdata/fake-claude.py), not the real one.",
+   "alternatives": [
+    {
+     "name": "Call the API with a stored key",
+     "tradeoff": "Direct and fast, but it needs key storage, billing and your own tool loop to read files."
+    },
+    {
+     "name": "Only copy a question to the clipboard",
+     "tradeoff": "Zero risk and zero setup, but manual; it is what the page falls back to without the helper."
+    }
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "claude -p under your login, no API key",
+    "draw": [
+     {
+      "op": "prop",
+      "name": "key",
+      "x": 8.0,
+      "y": 1.6,
+      "size": 1.6,
+      "label": "API key",
+      "id": "ak"
+     },
+     {
+      "op": "line",
+      "pts": [
+       [
+        7.0,
+        0.6000000000000001
+       ],
+       [
+        9.0,
+        2.6
+       ]
+      ],
+      "c": "red",
+      "w": 3
+     },
+     {
+      "op": "line",
+      "pts": [
+       [
+        9.0,
+        0.6000000000000001
+       ],
+       [
+        7.0,
+        2.6
+       ]
+      ],
+      "c": "red",
+      "w": 3
+     },
+     {
+      "op": "prop",
+      "name": "user",
+      "x": 2.4,
+      "y": 5.0,
+      "size": 2.2,
+      "label": "your login",
+      "id": "u"
+     },
+     {
+      "op": "prop",
+      "name": "terminal",
+      "x": 13.4,
+      "y": 5.0,
+      "size": 2.2,
+      "label": "claude -p",
+      "id": "cl"
+     },
+     {
+      "op": "arrow",
+      "from": "u",
+      "to": "cl",
+      "c": "blue",
+      "label": "inherited",
+      "bend": -0.2
+     },
+     {
+      "op": "blot",
+      "x": 8.0,
+      "y": 6.3,
+      "s": 0.8,
+      "mood": "happy",
+      "arms": [
+       [
+        6.8,
+        5.6
+       ],
+       [
+        9.2,
+        5.6
+       ]
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "risks": [
+  {
+   "title": "The snippet check is opt-in",
+   "where": "scripts/build.py:481-483",
+   "what": "Run build.py without --check-src and a wrong or invented snippet builds fine. I tried it: a snippet reading `totally wrong` for scripts/build.py line 1 printed `ok:` and exited 0. The same lesson with --check-src failed with exit 1.",
+   "fix": "Print a warning when a lesson contains snippets but --check-src was not given, or default the repo to the current folder.",
+   "severity": "medium",
+   "confidence": "evidenced",
+   "scene": {
+    "caption": "no --check-src: a wrong snippet passes",
+    "draw": [
+     {
+      "op": "ground",
+      "y": 7.9,
+      "x1": 0.5,
+      "x2": 15.5
+     },
+     {
+      "op": "box",
+      "x": 1.0,
+      "y": 2.0,
+      "w": 3.6,
+      "h": 1.5,
+      "label": "totally wrong",
+      "c": "red",
+      "id": "bad"
+     },
+     {
+      "op": "machine",
+      "x": 6.4,
+      "y": 1.6,
+      "w": 3.0,
+      "h": 3.0,
+      "label": "build.py",
+      "id": "bp"
+     },
+     {
+      "op": "arrow",
+      "from": "bad",
+      "to": "bp",
+      "dash": true
+     },
+     {
+      "op": "packet",
+      "x": 13.4,
+      "y": 3.4,
+      "label": "ok: wrote",
+      "c": "blue",
+      "id": "ok"
+     },
+     {
+      "op": "arrow",
+      "from": "bp",
+      "to": "ok",
+      "c": "blue"
+     },
+     {
+      "op": "blot",
+      "x": 9.0,
+      "y": 6.1,
+      "s": 0.8,
+      "mood": "blank",
+      "look": [
+       0.3,
+       0
+      ],
+      "arms": [
+       [
+        7.8,
+        6.6
+       ],
+       [
+        10.4,
+        5.6
+       ]
+      ]
+     },
+     {
+      "op": "magnifier",
+      "x": 6.4,
+      "y": 6.9,
+      "s": 0.7
+     },
+     {
+      "op": "text",
+      "x": 12.8,
+      "y": 7.2,
+      "t": "--check-src not given",
+      "c": "red",
+      "anchor": "middle"
+     }
+    ]
+   }
+  },
+  {
+   "title": "Line numbers outside a snippet are never checked",
+   "where": "scripts/build.py:340-356",
+   "what": "With --check-src, build.py compares `code` snippets and nothing else. A node's `files` ranges and every file:line written in prose are never read. I built this lesson with a node `files` of scripts/build.py:9000-9999, a missing file scripts/nope.py:1-2 and a prose citation of scripts/build.py:9999: it printed `ok:`, no warning, exit 0. A wrong snippet in the same lesson exited 1. SKILL.md principle 1 warns about this, but nothing enforces it.",
+   "fix": "Have --check-src confirm that each `files` entry names a real file and a range inside it, or at least print a warning that prose citations are unchecked. Until then, derive every number with ln(), as this lesson's generator does.",
+   "severity": "medium",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "lookup",
+    "caption": "file ranges and prose line numbers unread",
+    "items": [
+     "build.py:9999"
+    ],
+    "props": [
+     {
+      "prop": "file",
+      "label": "node files"
+     }
+    ]
+   }
+  },
+  {
+   "title": "The helper reads Claude Code output by hand",
+   "where": "scripts/serve.py:69-95",
+   "what": "`events()` picks fields out of stream-json and skips lines it cannot parse. If a CLI update renames them, answers would arrive empty and the page would say only \"No answer came back\" (assets/themes/zine.html:1272), not the cause. The tests use a fake claude that emits today's shape, so they cannot notice.",
+   "fix": "Log unrecognised event types to stderr, and run one live check against the real CLI after updating it.",
+   "severity": "medium",
+   "confidence": "inferred",
+   "scene": {
+    "caption": "events() parses by hand; a rename breaks it",
+    "draw": [
+     {
+      "op": "packet",
+      "x": 3.4,
+      "y": 0.9,
+      "label": "text",
+      "id": "e1"
+     },
+     {
+      "op": "packet",
+      "x": 6.0,
+      "y": 0.9,
+      "label": "tool",
+      "id": "e2"
+     },
+     {
+      "op": "packet",
+      "x": 11.8,
+      "y": 1.6,
+      "label": "renamed",
+      "c": "red",
+      "tilt": 0.2,
+      "id": "e3"
+     },
+     {
+      "op": "machine",
+      "x": 4.8,
+      "y": 3.5,
+      "w": 3.6,
+      "h": 2.3,
+      "label": "events()",
+      "id": "ev"
+     },
+     {
+      "op": "arrow",
+      "from": "e1",
+      "to": "ev",
+      "bend": 0.2
+     },
+     {
+      "op": "arrow",
+      "from": "e2",
+      "to": "ev"
+     },
+     {
+      "op": "arrow",
+      "from": "e3",
+      "to": [
+       13.8,
+       5.0
+      ],
+      "c": "red",
+      "bend": 0.4,
+      "label": "skipped"
+     },
+     {
+      "op": "box",
+      "x": 5.4,
+      "y": 7.0,
+      "w": 3.6,
+      "h": 1.2,
+      "label": "answer panel",
+      "id": "ap"
+     },
+     {
+      "op": "arrow",
+      "from": "ev",
+      "to": "ap",
+      "c": "blue",
+      "dash": true
+     },
+     {
+      "op": "blot",
+      "x": 1.8,
+      "y": 5.2,
+      "s": 0.8,
+      "mood": "worried",
+      "arms": [
+       [
+        3.0,
+        4.4
+       ],
+       [
+        0.9,
+        6.3
+       ]
+      ]
+     },
+     {
+      "op": "text",
+      "x": 12.4,
+      "y": 8.2,
+      "t": "No answer came back",
+      "c": "red",
+      "anchor": "middle"
+     }
+    ]
+   }
+  },
+  {
+   "title": "build.py learns the icon names by regex over props.js",
+   "where": "scripts/build.py:48-62",
+   "what": "`props_in()` reads `names: [...]` and `alias: {...}` from props.js as text, so no JS runs (assets/themes/parts/props.js:15). I changed a scratch copy to `names: Object.keys(ICONS)`: `camera`, a real icon, drew a false unknown-prop warning. I also emptied `alias`: then `jetpack` built with no warning at all, because an empty set switches the check off. The comment in props.js asks editors to keep both as plain literals, and nothing tests that.",
+   "fix": "Have the build print a warning when the prop library parses to no names, or load the names through node instead of a regex.",
+   "severity": "low",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "watch",
+    "caption": "unparsed names turn the prop warning off",
+    "items": [
+     "names: [...]"
+    ],
+    "props": [
+     {
+      "prop": "braces",
+      "label": "props.js"
+     }
+    ]
+   }
+  }
+ ],
+ "quiz": [
+  {
+   "q": "You rebuild a lesson without --check-src and one snippet was typed wrong. What happens?",
+   "options": [
+    "The build passes and ships the wrong snippet",
+    "The build fails with a snippet mismatch error",
+    "The build passes but warns about that snippet"
+   ],
+   "answer": 0,
+   "why": "The comparison sits inside `if repo and c.get(\"file\")` (scripts/build.py:483). With no repo, only the structure is checked, so the wrong snippet ships silently."
+  },
+  {
+   "q": "Why is every `</` in the lesson JSON rewritten to `<\\/` before it goes into the page?",
+   "options": [
+    "So the file is smaller to download",
+    "So search engines skip the lesson text",
+    "So text cannot end the data script early"
+   ],
+   "answer": 2,
+   "why": "The lesson sits inside a script element, which a browser ends at the first closing script tag. Rewriting `</` (scripts/build.py:503) makes that impossible, and JSON.parse reads `<\\/` as `</` again."
+  },
+  {
+   "q": "You fix a typo in one quiz question and rebuild with the same id. What do returning readers see?",
+   "options": [
+    "Everything is kept; answers match by position",
+    "Their quiz answers reset; the last stop is kept",
+    "The whole lesson restarts, including the stop"
+   ],
+   "answer": 1,
+   "why": "The quiz key includes a hash of the quiz text (assets/themes/zine.html:553), so changed text means a new key and empty answers. Last stop and Plain or Deep are keyed by lesson id only, so they survive."
+  },
+  {
+   "q": "What actually stops the ask helper from letting Claude edit your files?",
+   "options": [
+    "The tutor prompt says Claude cannot change anything",
+    "The browser hides edit buttons in the panel",
+    "The tool list contains only Read, Grep and Glob"
+   ],
+   "answer": 2,
+   "why": "The tool list on the command line (scripts/serve.py:61) is the hard limit: no edit tool exists in that run. The prompt is only a second, soft layer."
+  },
+  {
+   "q": "You close the tab while Claude is thinking and silent. What notices?",
+   "options": [
+    "The timer, five minutes later",
+    "A watcher thread peeking at the socket",
+    "The next write to the page fails"
+   ],
+   "answer": 1,
+   "why": "Claude is silent, so there is no write to fail and the timer is far away. `watch()` (scripts/serve.py:193) peeks at the connection twice a second and kills the process group when it sees the hang-up."
+  },
+  {
+   "q": "You open the sketch page of an architecture lesson and click a node that has no `scene`. What is drawn at the top of its note?",
+   "options": [
+    "Nothing: only nodes with a scene get a picture",
+    "A context plate built from the node's edges and neighbours",
+    "The scene of the node it is connected to"
+   ],
+   "answer": 1,
+   "why": "ctxPlate() runs when the node has no scene (assets/themes/sketch.html:942). It puts the node's own `prop` in the middle, up to two neighbours on each side, and each edge's `payload` on the arrows (assets/themes/sketch.html:655-663)."
+  }
+ ],
+ "glossary": [
+  {
+   "term": "NDJSON",
+   "def": "Newline-delimited JSON: one complete JSON object per line, so a reader can act on each line as it arrives."
+  },
+  {
+   "term": "stream-json",
+   "def": "Claude Code's output mode that prints one JSON event per line while the answer is being produced."
+  },
+  {
+   "term": "localStorage",
+   "def": "Small key-value storage inside the browser, kept per origin, that survives closing the tab."
+  },
+  {
+   "term": "origin",
+   "def": "Scheme, host and port of a page, such as http://127.0.0.1:4174. Browsers keep each origin storage and permissions separate."
+  },
+  {
+   "term": "DNS rebinding",
+   "def": "A trick where a hostile site's name is made to point at 127.0.0.1 so the browser lets its page talk to local servers. A Host check blocks it."
+  },
+  {
+   "term": "process group",
+   "def": "A set of related processes that one signal can reach together. Killing the group also kills helpers that claude started."
+  },
+  {
+   "term": "fragment",
+   "def": "The part of a link after the #. Browsers keep it to themselves and never send it to the server."
+  }
+ ]
+}

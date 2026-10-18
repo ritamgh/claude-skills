@@ -1,0 +1,593 @@
+{
+  "quick": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem, what happens, and what do they do today?",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person and gives every later question something to be checked against.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "open",
+      "lane": "who",
+      "why": "Decides which flows, devices and skill levels the design has to serve.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Just me or my team",
+          "why": "We are the user, so feedback is immediate"
+        },
+        {
+          "key": "b",
+          "label": "Our existing users",
+          "why": "A known group we can ask"
+        },
+        {
+          "key": "c",
+          "label": "A new kind of user",
+          "why": "We have to find them first"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "The appetite is a budget, not an estimate: the solution is shaped to fit it, and scope is cut before time is extended.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": "A small, sharp fix"
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": "One focused slice"
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": "A real feature with a walking skeleton"
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": "A big bet; needs hard scope cuts"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "No-gos stop agents and people from building the tempting extras; a plan without them tends to grow.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "Success must be checkable after shipping, so each criterion needs a measure and a threshold.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    }
+  ],
+  "standard": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem, what happens, and what do they do today?",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person and gives every later question something to be checked against.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "open",
+      "lane": "who",
+      "why": "Decides which flows, devices and skill levels the design has to serve.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Just me or my team",
+          "why": "We are the user, so feedback is immediate"
+        },
+        {
+          "key": "b",
+          "label": "Our existing users",
+          "why": "A known group we can ask"
+        },
+        {
+          "key": "c",
+          "label": "A new kind of user",
+          "why": "We have to find them first"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "The appetite is a budget, not an estimate: the solution is shaped to fit it, and scope is cut before time is extended.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": "A small, sharp fix"
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": "One focused slice"
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": "A real feature with a walking skeleton"
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": "A big bet; needs hard scope cuts"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "No-gos stop agents and people from building the tempting extras; a plan without them tends to grow.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "Success must be checkable after shipping, so each criterion needs a measure and a threshold.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q6",
+      "kind": "question",
+      "label": "Which existing systems, services or code do we reuse?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "Reuse shrinks the work that fits the appetite and keeps the new part consistent with what already runs.",
+      "stage": "frame",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Reuse what is already in the repo",
+          "why": "The session looks it up and names the modules or services"
+        },
+        {
+          "key": "b",
+          "label": "Build it new",
+          "why": "Nothing existing fits"
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q7",
+      "kind": "question",
+      "label": "What hard constraints apply: stack, performance, security, compliance, deadlines?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "Hard limits rule options out early; finding them late means rework.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    }
+  ],
+  "deep": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem, what happens, and what do they do today?",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person and gives every later question something to be checked against.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "open",
+      "lane": "who",
+      "why": "Decides which flows, devices and skill levels the design has to serve.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Just me or my team",
+          "why": "We are the user, so feedback is immediate"
+        },
+        {
+          "key": "b",
+          "label": "Our existing users",
+          "why": "A known group we can ask"
+        },
+        {
+          "key": "c",
+          "label": "A new kind of user",
+          "why": "We have to find them first"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "The appetite is a budget, not an estimate: the solution is shaped to fit it, and scope is cut before time is extended.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": "A small, sharp fix"
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": "One focused slice"
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": "A real feature with a walking skeleton"
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": "A big bet; needs hard scope cuts"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "No-gos stop agents and people from building the tempting extras; a plan without them tends to grow.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "Success must be checkable after shipping, so each criterion needs a measure and a threshold.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q6",
+      "kind": "question",
+      "label": "Which existing systems, services or code do we reuse?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "Reuse shrinks the work that fits the appetite and keeps the new part consistent with what already runs.",
+      "stage": "frame",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Reuse what is already in the repo",
+          "why": "The session looks it up and names the modules or services"
+        },
+        {
+          "key": "b",
+          "label": "Build it new",
+          "why": "Nothing existing fits"
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q7",
+      "kind": "question",
+      "label": "What hard constraints apply: stack, performance, security, compliance, deadlines?",
+      "body": "",
+      "status": "open",
+      "lane": "scope",
+      "why": "Hard limits rule options out early; finding them late means rework.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q8",
+      "kind": "question",
+      "label": "Is this the right problem? What happens if we do nothing?",
+      "body": "",
+      "status": "open",
+      "lane": "why",
+      "why": "A well-built answer to the wrong problem is the most expensive outcome; check the premise before shaping a solution.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Yes: the problem is real and worth solving now",
+          "why": "We have evidence"
+        },
+        {
+          "key": "b",
+          "label": "Unsure: gather evidence first",
+          "why": "A short look before committing"
+        },
+        {
+          "key": "c",
+          "label": "No: reframe the problem",
+          "why": "Go back to the story"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 1,
+      "blocking": true,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    },
+    {
+      "id": "Q9",
+      "kind": "question",
+      "label": "What would the minimal, the ideal and a lateral solution each look like?",
+      "body": "",
+      "status": "open",
+      "lane": "decisions",
+      "why": "Three very different shapes expose trade-offs that a single plan hides.",
+      "stage": "frame",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Minimal: the smallest thing that removes the pain",
+          "why": "Fits the smallest appetite"
+        },
+        {
+          "key": "b",
+          "label": "Ideal: the full solution with no budget limit",
+          "why": "Shows what we are giving up"
+        },
+        {
+          "key": "c",
+          "label": "Lateral: a different approach that avoids the problem",
+          "why": "Sometimes the best fix is not building"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "depends_on": [],
+      "refs": [],
+      "by_default": false
+    }
+  ]
+}

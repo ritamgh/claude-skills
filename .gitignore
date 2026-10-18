@@ -1,0 +1,12 @@
+# Generated dependencies, caches and Claude Code mod type definitions.
+__pycache__/
+*.py[cod]
+node_modules/
+mods/hq/.claude-plugin/types/
+graphify-out/
+.lens/
+# Local configuration and state do not belong in this checkout.
+settings.json
+.env
+.env.*
+.claude-skills-export

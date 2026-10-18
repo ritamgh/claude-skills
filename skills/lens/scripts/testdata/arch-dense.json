@@ -1,0 +1,1201 @@
+{
+ "id": "tasklight-architecture",
+ "mode": "architecture",
+ "title": "How Tasklight turns signals into a reminder",
+ "subtitle": "An architecture deep dive of the Tasklight daemon, an invented example app: nine parts, three flows, and the rules that keep it private. This is a synthetic lesson used as a dense test fixture; the code shown is illustrative and was never run.",
+ "layers": [
+  {
+   "id": "in",
+   "name": "Inputs"
+  },
+  {
+   "id": "core",
+   "name": "Service core"
+  },
+  {
+   "id": "out",
+   "name": "Outputs"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "clients",
+   "label": "CLI and commit shim",
+   "kind": "thin clients: cli.py, hooks/shim.py",
+   "layer": "in",
+   "col": 0,
+   "row": 0,
+   "files": [
+    "src/tasklight/hooks/shim.py:58-63",
+    "src/tasklight/ipc.py:40-62"
+   ],
+   "simple": "The commands you type and the little programs your editor and git run on every event. They never read the database. They send one message to the service and print its answer.",
+   "deep": "`tasklight add|done|snooze|status|answer|ledger` call `ipc.request(cmd, args)` (src/tasklight/ipc.py); `tasklight hook <tool> <event>` (src/tasklight/hooks/shim.py) trims the hook JSON from stdin, adds the parent pid and terminal pane, and sends cmd `hook`. For a confirmation hook that needs an answer it waits up to `SHIM_SOCKET_TIMEOUT_S` = 130 s (src/tasklight/config.py:61); the service gives up at 120 s. The shim fails open: `main()` swallows every exception and returns 0 (src/tasklight/hooks/shim.py:58), so git or the editor falls back to its own prompt if the service is gone.",
+   "analogy": "Like the buzzer panel at an apartment door: press, talk, get an answer, never walk into the manager's office.",
+   "owns": "Nothing durable. The one thing it owns is the exit code and stdout the calling tool sees.",
+   "exposes": "The `tasklight` command line and `tasklight hook <tool> <event>`.",
+   "runs": "A short-lived process per call, in your shell or spawned by the editor.",
+   "scale": "One process per hook event, so cost is process start. The hook path avoids importing the CLI framework (PROJECT_CONTEXT, __main__.py).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "handoff",
+    "caption": "press, ask, leave"
+   }
+  },
+  {
+   "id": "calendar",
+   "label": "Calendar and idle sensors",
+   "kind": "sensors/calendar/*, sensors/idle.py",
+   "layer": "in",
+   "col": 0,
+   "row": 1,
+   "files": [
+    "src/tasklight/sensors/calendar/ics.py:22-26",
+    "src/tasklight/sensors/calendar/ics.py:70-71"
+   ],
+   "simple": "Watches a folder of calendar files, whether you are typing or idle, and whether the screen is locked. It reports when you are busy and what kind of block it is, never what the meeting is called.",
+   "deep": "An asyncio task polls the calendar folder and keeps only the start and end of each `VEVENT` block, dropping `SUMMARY`, attendees and location before anything is queued (src/tasklight/sensors/calendar/ics.py:22). `IdleSensor` follows the session lock signal over D-Bus, and a small timer reports typing versus idle. Each sensor gets the planner's `emit` callback in `start()` (src/tasklight/planner/core.py:120).",
+   "analogy": "A receptionist who notes that the boardroom is booked from nine to ten, not what the meeting is about.",
+   "owns": "The translation from calendar files, lock events and input timers to `busy_block`, `idle` and `lock` events.",
+   "exposes": "The `Sensor` protocol: `start(emit)` and `stop()` (sensors/base.py:11-16).",
+   "runs": "Inside the service process as asyncio tasks plus one D-Bus subscription.",
+   "scale": "Event-driven and tiny. Re-reads the folder every 30 s and backs off up to 60 s when it cannot be read.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "lookup",
+    "caption": "times only"
+   }
+  },
+  {
+   "id": "scanner",
+   "label": "Repository scanner",
+   "kind": "sensors/scanner.py (optional)",
+   "layer": "in",
+   "col": 0,
+   "row": 2,
+   "files": [
+    "src/tasklight/sensors/scanner.py:210-214",
+    "src/tasklight/sensors/scanner.py:260-266"
+   ],
+   "simple": "Walks your watched repositories every few seconds, only during a focus block, and turns each pass into a few facts: which marked TODO comments exist and how old they are. File contents never leave this module.",
+   "deep": "A dedicated daemon thread named `tasklight-scan` runs the file walk and the comment parser (src/tasklight/sensors/scanner.py:210). It hands every event to the asyncio loop with `loop.call_soon_threadsafe` (src/tasklight/sensors/scanner.py:212). It is started by the planner only when a focus block starts and `scanner.enabled` is true (src/tasklight/planner/core.py:240). Default rate is one pass every 5 seconds (src/tasklight/config.py:30).",
+   "analogy": "A night watchman who phones in a count of lit windows and never describes the rooms.",
+   "owns": "File contents: the only place the repository text is opened and parsed.",
+   "exposes": "Events `scan`, `todo_sample`, `stale_sample` delivered through the same `emit` callback.",
+   "runs": "One background thread inside the service, opened only while a focus block is active.",
+   "scale": "Bounded by the five-second default and a 2,000 file cap per pass. Not measured here; no benchmark found in the repo.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "wall",
+    "caption": "text stays inside"
+   }
+  },
+  {
+   "id": "service",
+   "label": "Service and socket",
+   "kind": "service.py: tasklightd",
+   "layer": "core",
+   "col": 1,
+   "row": 0,
+   "files": [
+    "src/tasklight/service.py:90-95",
+    "src/tasklight/service.py:140-155"
+   ],
+   "simple": "The one long-running process. It owns the socket everyone talks to, the database file, and the planner. It translates each incoming command into a call on the planner.",
+   "deep": "`Service._serve` locks a pid file, opens `tasks.db` through a one-thread executor (`tasklight-db`, src/tasklight/service.py:70), builds the `BlockManager` and `Planner`, closes any focus block left open by a crash (src/tasklight/service.py:78), then listens on a chmod 0600 Unix socket (src/tasklight/service.py:90). `_dispatch` is an `if cmd == ...` ladder ending in `unknown_cmd`. A one-second `_flush_loop` (src/tasklight/service.py:120) flushes the store queue.",
+   "analogy": "The building concierge: holds the keys to the archive, answers the buzzer, delegates the real work.",
+   "owns": "The process lifecycle: pid-file lock, socket, DB thread, ordered shutdown.",
+   "exposes": "Newline-delimited JSON on `tasklight.sock`: `{\"cmd\",\"args\",\"id\"}` in, `{\"id\",\"ok\",\"data\",\"error\"}` out (SPEC §Architecture, ipc.py).",
+   "runs": "systemd --user on Linux, LaunchAgent on macOS, per SPEC §Architecture. One asyncio loop.",
+   "scale": "One loop, one DB thread, one process. Focus blocks are state inside it, not processes (SPEC).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "gate",
+    "caption": "one door in"
+   }
+  },
+  {
+   "id": "planner",
+   "label": "Planner",
+   "kind": "planner/core.py, blocks.py, rules.py",
+   "layer": "core",
+   "col": 1,
+   "row": 1,
+   "files": [
+    "src/tasklight/planner/core.py:250-262",
+    "src/tasklight/planner/core.py:1020-1024",
+    "src/tasklight/planner/rules.py:60-66"
+   ],
+   "simple": "The brain. Sensor events and hook calls flow in. Once a second it asks the rules whether anything deserves a reminder or a question, and it hands the finished message to a notifier. It is also the one that writes events to the store.",
+   "deep": "`Planner` routes sensor events (`_ingest`), parses tool hooks through adapters (`hook` -> `_handle`), keeps open confirmation questions as futures, runs the 1 s `tick` (src/tasklight/planner/core.py:1020) which evaluates `Rules.evaluate(Snapshot)` (src/tasklight/planner/rules.py:60) and spawns `_deliver` tasks. Focus block start/stop, mode changes, snooze questions, the nightly job and the process watcher are wired here too. All of it is one class: `Planner` spans lines 96-1410 of core.py with 88 methods (counted with ast).",
+   "analogy": "A dispatcher at a taxi rank: sees every request, decides who gets a call, never drives a car.",
+   "owns": "Pending questions, the focus block state machine, mode state, and the decision to notify.",
+   "exposes": "Async methods the service calls: `start_block`, `stop_block`, `hook`, `answer`, `set_mode`, `status`, `summary`, `ledger`.",
+   "runs": "On the service asyncio loop; store calls hop to the `tasklight-db` thread through `_db()`.",
+   "scale": "Single loop. SPEC sets a rule that nothing blocks it more than 50 ms (SPEC §Architecture, Threading). No loop-lag measurement found in the code.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "fork",
+    "caption": "what deserves a reminder?"
+   }
+  },
+  {
+   "id": "scoring",
+   "label": "Scoring",
+   "kind": "planner/scoring.py",
+   "layer": "core",
+   "col": 1,
+   "row": 2,
+   "files": [
+    "src/tasklight/planner/scoring.py:70-72",
+    "src/tasklight/planner/scoring.py:180-181",
+    "src/tasklight/planner/scoring.py:55-56"
+   ],
+   "simple": "Turns jittery raw readings into a few steady facts: are you busy, is a task overdue, is a question waiting. A flicker of one scan does not change the answer.",
+   "deep": "`Load` maps idle state and calendar category to a busy state when the scanner is off (src/tasklight/planner/scoring.py:70). `ScanScoring` smooths passes: todo-seen turns on at N of the last 5 scans. `Tasks` holds one view per task reference (src/tasklight/planner/scoring.py:30). Scanner-derived changes pass through a `ChangeLog` that holds them in memory before they reach the store (src/tasklight/planner/scoring.py:180).",
+   "analogy": "A line judge who waits for the replay before changing the call.",
+   "owns": "Smoothing and back-dating of derived states (load, todo_seen, stale).",
+   "exposes": "`on_idle`, `on_busy`, `on_scan`, `on_sample`, `snapshot()`; returns `Change` objects, never writes anywhere itself.",
+   "runs": "Plain synchronous Python called by the planner on the loop; no threads, no I/O.",
+   "scale": "Constant per event. The state it holds is a few small deques.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "transform",
+    "caption": "noise in, steady out"
+   }
+  },
+  {
+   "id": "store",
+   "label": "Task store",
+   "kind": "store/db.py, tasks.db",
+   "layer": "out",
+   "col": 2,
+   "row": 0,
+   "files": [
+    "src/tasklight/store/db.py:200-206",
+    "src/tasklight/store/db.py:210-220",
+    "src/tasklight/store/db.py:40-45"
+   ],
+   "simple": "A single SQLite file where every event is appended. Each event is checked against a fixed list of allowed fields before it is accepted. That list is what keeps meeting titles and file text out of the record.",
+   "deep": "`Store.append` calls `validate(event)` (closed list of kinds, allowed sources and exact payload keys, src/tasklight/store/db.py:30) and puts the event in an in-memory list. `flush()` writes the batch in one transaction (src/tasklight/store/db.py:210-226). The connection runs in WAL mode (src/tasklight/store/db.py:150). Block rows are written immediately through `_write`.",
+   "analogy": "A ship's log with pre-printed columns: you cannot write a column that is not there.",
+   "owns": "The append-only history of what happened, and the validator that decides what may be recorded.",
+   "exposes": "`append(event)`, `flush()`, block and summary queries. Only called from the service process.",
+   "runs": "A single connection (`check_same_thread=False`), driven from the one `tasklight-db` thread.",
+   "scale": "One writer, batched once a second. Nightly retention deletes samples after 14 days and other events after 90 (config defaults).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "store",
+    "caption": "filed, never edited"
+   }
+  },
+  {
+   "id": "notify",
+   "label": "Reminders",
+   "kind": "notify/desktop.py, relay.py",
+   "layer": "out",
+   "col": 2,
+   "row": 1,
+   "files": [
+    "src/tasklight/notify/relay.py:90-99",
+    "src/tasklight/notify/desktop.py:60-66"
+   ],
+   "simple": "The only parts that can interrupt you. One shows a banner on your desktop. The other, if you turned it on, publishes to your phone through a push relay you configure. The phone can also send your answer back.",
+   "deep": "`DesktopNotifier` runs `notify-send` with action buttons and waits for a click (src/tasklight/notify/desktop.py:60). `RelayPublisher` POSTs to `{server}/{channel}` with up to 3 retries after 2 s, 5 s and 15 s (src/tasklight/config.py:66). `ReplyWatcher` keeps a long-poll open on the reply channel and turns `<answer>:<question_id>` messages into planner replies (src/tasklight/notify/relay.py:120). Both talk to the planner only through `Message` objects and the `reply_callback`.",
+   "analogy": "A town crier with two megaphones, one in the room, one on the phone.",
+   "owns": "Delivery, retries and the phone payload policy (`detail_allowed`, `scrub`).",
+   "exposes": "The `Notifier` protocol: `channel` and `async send(Message) -> bool` (notify/base.py:30-33).",
+   "runs": "In the service: a subprocess per desktop banner, an httpx client per phone request.",
+   "scale": "Bound by the relay server and its retry budget; the long-poll reconnects with backoff from 1 s up to 60 s.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "carry",
+    "caption": "a message, not content"
+   }
+  },
+  {
+   "id": "ledger",
+   "label": "Outbound ledger",
+   "kind": "ledger.py",
+   "layer": "out",
+   "col": 2,
+   "row": 2,
+   "files": [
+    "src/tasklight/ledger.py:40-44",
+    "src/tasklight/ledger.py:50-56"
+   ],
+   "simple": "Every byte that leaves the machine goes through here. Before each request it writes a line: when, which host, how many bytes, why.",
+   "deep": "`client(ledger, reason)` returns an `httpx.AsyncClient` whose transport (`_LedgerTransport`) calls `Ledger.record(host, nbytes, reason)` before forwarding the request (src/tasklight/ledger.py:42). `reason` must be one of `reminder`, `reply_watch`, `calendar_refresh`. The ledger is a separate SQLite file, `ledger.db`, with a capped row count. `tasklight ledger` reads it back through the service.",
+   "analogy": "The border post: nothing leaves without a stamp and a line in the book.",
+   "owns": "The only HTTP client, and the audit trail of what it sent.",
+   "exposes": "`ledger.client(ledger, reason)` and `Ledger.rows(days)`.",
+   "runs": "Inside the service. The record write happens on a worker thread (`asyncio.to_thread`) before the request is sent.",
+   "scale": "One small insert plus a trim per request; negligible at reminder volumes.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "watch",
+    "caption": "stamped on the way out"
+   }
+  }
+ ],
+ "edges": [
+  {
+   "from": "clients",
+   "to": "service",
+   "label": "command",
+   "protocol": "Unix socket, newline-delimited JSON",
+   "sync": true,
+   "payload": "`{\"cmd\", \"args\", \"id\"}`; for hooks `args` is the trimmed tool payload.",
+   "guarantee": "A confirmation hook that needs an answer holds the connection open until an answer or 120 s; any shim error exits 0 silently (src/tasklight/hooks/shim.py:58)."
+  },
+  {
+   "from": "service",
+   "to": "planner",
+   "label": "dispatch",
+   "protocol": "in-process await",
+   "sync": true,
+   "payload": "cmd and validated args",
+   "guarantee": "Bad args become an `ok: false` reply with an error code, never a crash (service.py `_reply`)."
+  },
+  {
+   "from": "calendar",
+   "to": "planner",
+   "label": "emit",
+   "protocol": "in-process callback (`Emit`)",
+   "sync": true,
+   "payload": "Event: `busy_block`, `idle`, `lock`"
+  },
+  {
+   "from": "scanner",
+   "to": "planner",
+   "label": "passes as events",
+   "protocol": "thread to loop: `call_soon_threadsafe`",
+   "sync": false,
+   "payload": "Event: `scan`, `todo_sample`, `stale_sample` (counts only)"
+  },
+  {
+   "from": "planner",
+   "to": "scoring",
+   "label": "feed",
+   "protocol": "in-process call",
+   "sync": true,
+   "payload": "idle/busy/scan readings in, `Change` objects out"
+  },
+  {
+   "from": "planner",
+   "to": "store",
+   "label": "append",
+   "protocol": "sqlite3 on the `tasklight-db` thread",
+   "sync": false,
+   "payload": "a validated `Event`",
+   "guarantee": "Queued in memory, flushed in one transaction every 1.0 s and at block start/stop and shutdown (src/tasklight/config.py:58, src/tasklight/store/db.py:210)."
+  },
+  {
+   "from": "service",
+   "to": "store",
+   "label": "open, flush",
+   "protocol": "sqlite3 on the `tasklight-db` thread"
+  },
+  {
+   "from": "planner",
+   "to": "notify",
+   "label": "deliver",
+   "protocol": "in-process `await notifier.send(Message)` in a spawned task",
+   "sync": false,
+   "payload": "`Message`: title, body, buttons, question id; `detail` only if the phone policy allows",
+   "guarantee": "Desktop always fires; a failed phone send is recorded as channel `phone_failed` (src/tasklight/planner/core.py:1150)."
+  },
+  {
+   "from": "notify",
+   "to": "planner",
+   "label": "reply",
+   "protocol": "in-process callback (`reply_callback`)",
+   "sync": false,
+   "payload": "answer and question id",
+   "guarantee": "Unknown or expired ids are logged and ignored (src/tasklight/planner/core.py:905)."
+  },
+  {
+   "from": "notify",
+   "to": "ledger",
+   "label": "HTTP via client",
+   "protocol": "httpx AsyncClient: HTTPS POST and long-poll GET to the relay server",
+   "sync": true,
+   "payload": "the phone message, or the reply-channel stream"
+  }
+ ],
+ "traces": [
+  {
+   "title": "A commit hook asks to close a task while you are away from the desk",
+   "trigger": "You commit with `Done: #42` in the message, git fires the Tasklight post-commit hook, and the phone is enabled with you away from the screen.",
+   "steps": [
+    {
+     "node": "clients",
+     "title": "The shim blocks on the socket",
+     "confidence": "evidenced",
+     "simple": "Git runs `tasklight hook git post_commit`. The shim reads the hook JSON, trims it, and sends it to the service. Then it waits.",
+     "deep": "`_run` builds `args` (tool, event, trimmed payload, parent pid, terminal pane). Because the event is in `NEEDS_ANSWER`, it calls `ipc.request(\"hook\", ...)` with the long 130 s timeout and prints the answer as a line of text (src/tasklight/hooks/shim.py:61). Fire-and-forget hooks use a 1 s timeout instead (src/tasklight/hooks/shim.py:52). The commit message the tool offers stays inside this process; only a `can_close` flag goes up.",
+     "code": {
+      "file": "src/tasklight/hooks/shim.py",
+      "start": 60,
+      "lang": "python",
+      "src": "        return\n    answer = ipc.request(\"hook\", args, timeout=config.SHIM_SOCKET_TIMEOUT_S).get(\"answer\")\n    if answer in ANSWERS:\n        sys.stdout.write(_render(tool, answer) + \"\\n\")\n        sys.stdout.flush()\n",
+      "highlight": [
+       61
+      ],
+      "notes": {
+       "61": "The only line that blocks: waits up to 130 s for the service."
+      }
+     },
+     "state": [
+      {
+       "name": "cmd",
+       "value": "\"hook\"",
+       "changed": true
+      },
+      {
+       "name": "args.tool",
+       "value": "\"git\""
+      },
+      {
+       "name": "timeout",
+       "value": "130.0 s"
+      }
+     ],
+     "scene": {
+      "name": "wait",
+      "caption": "asks and waits"
+     }
+    },
+    {
+     "node": "service",
+     "title": "The service holds the line open",
+     "confidence": "evidenced",
+     "simple": "The service passes the request to the planner and quietly watches the connection. If the shim disappears, it knows you answered at the keyboard instead.",
+     "deep": "`_dispatch` routes cmd `hook` to `_hook`, which starts `reader.read(1)` as a background future (src/tasklight/service.py:144). Reading EOF means the shim hung up, so the planner drops the question instead of leaving a stale reminder.",
+     "code": {
+      "file": "src/tasklight/service.py",
+      "start": 140,
+      "lang": "python",
+      "src": "    async def _hook(self, args: dict, reader: asyncio.StreamReader) -> dict:\n        assert self._planner is not None\n        # The shim keeps its connection open while a confirmation is pending; EOF on\n        # it means the tool was answered at the keyboard and the question must be dropped.\n        hung_up = asyncio.ensure_future(reader.read(1))\n        try:\n            return await self._planner.hook(args, hung_up)\n        finally:\n            hung_up.cancel()\n            with contextlib.suppress(asyncio.CancelledError, Exception):",
+      "highlight": [
+       144
+      ],
+      "notes": {
+       "144": "EOF on this read means the tool was answered at the keyboard."
+      }
+     },
+     "scene": {
+      "name": "watch",
+      "caption": "watching the line"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The planner opens a pending question",
+     "confidence": "evidenced",
+     "simple": "The planner notes that this task is now waiting on you, and creates a question with an id that a reply can later resolve. The reply will arrive as a future.",
+     "deep": "`_handle` updates the task board (`self._tasks.touch`, src/tasklight/planner/core.py:700), creates `PendingQuestion(kind=\"confirm\")` with a future and a 120 s expiry, and awaits `_wait_for_answer` (src/tasklight/planner/core.py:710). With no Tasklight focus block running it returns `{\"answer\": None}` at once so the tool's own prompt takes over.",
+     "code": {
+      "file": "src/tasklight/planner/core.py",
+      "start": 700,
+      "lang": "python",
+      "src": "            view = self._tasks.touch(sig, now)\n            asking = sig.needs_answer and view is not None\n            question = self._open_question(sig, now) if asking and self._focus is not None else None\n            if question is not None:\n                view.question_id = question.id\n            await self._db(self._store.upsert_task_ref, sig.task_id, sig.repo, now)\n            await self._append(self._task_event(sig, now, question))\n            if question is None:\n                # No focus block is running, so nothing would ring: let the tool's own prompt take over.\n                return {\"answer\": None} if asking else {}\n            return await self._wait_for_answer(question, hung_up)",
+      "highlight": [
+       702,
+       710
+      ],
+      "notes": {
+       "702": "Only a hook that needs an answer inside a focus block gets a question.",
+       "710": "The hook handler parks here until the future is set."
+      }
+     },
+     "state": [
+      {
+       "name": "view.state",
+       "value": "\"waiting\"",
+       "changed": true
+      },
+      {
+       "name": "question.kind",
+       "value": "\"confirm\"",
+       "changed": true
+      },
+      {
+       "name": "question.future",
+       "value": "pending"
+      }
+     ],
+     "predict": {
+      "q": "No Tasklight focus block is running when the hook arrives. What does the shim print?",
+      "options": [
+       "Nothing: the service returns an empty answer and git carries on",
+       "A yes answer, so the commit is not blocked",
+       "An error, because there is no block to attach to"
+      ],
+      "answer": 0,
+      "why": "Without a focus block `question` stays None and `_handle` returns `{\"answer\": None}` for a hook that needs an answer (core.py `if question is None`). The shim prints nothing for a missing answer."
+     },
+     "scene": {
+      "name": "queue",
+      "caption": "parked until answered"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The tick decides the phone should ring",
+     "confidence": "evidenced",
+     "simple": "A second later the planner's timer runs the rules. A task is waiting and you are away, so the rules produce two reminders: desktop and phone.",
+     "deep": "`tick` builds a `Snapshot` and calls `Rules.evaluate` (src/tasklight/planner/core.py:1020). For a waiting question the desktop reminder always fires; the phone reminder fires when the phone is enabled, you are not at the screen (or in a break mode) and `ask_push_after_s` (default 0) has elapsed (src/tasklight/planner/rules.py:60). Each reminder is turned into a `Message` and spawned as a `_deliver` task (src/tasklight/planner/core.py:1024).",
+     "code": {
+      "file": "src/tasklight/planner/rules.py",
+      "start": 60,
+      "lang": "python",
+      "src": "            if snap.push_enabled and away and push_key:\n                if now - ask.since >= self.limits['ask_push_after_s']:\n                    if self._raise(out, key, 'push', Reminder(kind, 'push', 4,\n                                                              ask.task_id, push_key)):\n                        self._push_at[key] = now\n                if kind == 'confirm' and self._nag_due(key, ask.since, now):\n                    out.append(Reminder(kind, 'push', 5, ask.task_id,",
+      "highlight": [
+       60,
+       62
+      ],
+      "notes": {
+       "60": "Phone only when enabled and the user is away.",
+       "62": "Priority 4 is a normal buzz; the repeat nag below uses 5."
+      }
+     },
+     "state": [
+      {
+       "name": "snap.push_enabled",
+       "value": "True"
+      },
+      {
+       "name": "away",
+       "value": "True"
+      },
+      {
+       "name": "reminders",
+       "value": "[Reminder('confirm','desktop',4), Reminder('confirm','push',4)]",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "fork",
+      "caption": "desk or phone?"
+     }
+    },
+    {
+     "node": "notify",
+     "title": "The phone message is built and sent",
+     "confidence": "evidenced",
+     "simple": "The phone gets the task number, the repo name and a Yes and No button. No commit text is included unless you opted into details.",
+     "deep": "`RelayPublisher._send` posts to `{server}/{channel}` with headers Title, Priority, Tags and Buttons. The detail text is appended only if `detail_allowed` passes (src/tasklight/notify/relay.py:92). On failure it retries after 2 s, 5 s and 15 s (src/tasklight/notify/relay.py:94).",
+     "code": {
+      "file": "src/tasklight/notify/relay.py",
+      "start": 90,
+      "lang": "python",
+      "src": "        headers = self._headers(msg, base)\n        body = msg.body\n        if msg.detail and detail_allowed(self._cfg)[0]:\n            body = f\"{body}\\n{scrub(msg.detail)}\"\n        for attempt in range(len(RELAY_BACKOFF) + 1):\n            if await self._post(url, headers, body.encode(\"utf-8\")):\n                return True\n            if attempt < len(RELAY_BACKOFF):\n                await self._sleep(RELAY_BACKOFF[attempt])\n        return False",
+      "highlight": [
+       92,
+       94
+      ],
+      "notes": {
+       "92": "The content-free default is this one condition.",
+       "94": "Three retries, then give up and return False."
+      }
+     },
+     "scene": {
+      "name": "carry",
+      "caption": "no content inside"
+     }
+    },
+    {
+     "node": "ledger",
+     "title": "The ledger stamps the request first",
+     "confidence": "evidenced",
+     "simple": "Before the message leaves, the wrapper records the host, the size and why it is being sent. Then it forwards the request.",
+     "deep": "`RelayPublisher._post` opens `ledger_mod.client(self._ledger, \"reminder\")` (src/tasklight/notify/relay.py:110); its transport writes the ledger row on a worker thread and then calls the real transport (src/tasklight/ledger.py:40).",
+     "code": {
+      "file": "src/tasklight/ledger.py",
+      "start": 40,
+      "lang": "python",
+      "src": "    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:\n        await asyncio.to_thread(\n            self._ledger.record, request.url.host, _size_of(request), self._reason\n        )\n        return await self._inner.handle_async_request(request)",
+      "highlight": [
+       42
+      ],
+      "notes": {
+       "42": "Record first, send second: a request that happens is always in the ledger."
+      }
+     },
+     "state": [
+      {
+       "name": "host",
+       "value": "\"relay.example.net\"",
+       "changed": true
+      },
+      {
+       "name": "reason",
+       "value": "\"reminder\""
+      }
+     ],
+     "scene": {
+      "name": "lookup",
+      "caption": "write it down"
+     }
+    },
+    {
+     "node": "notify",
+     "title": "You tap Yes on the phone",
+     "confidence": "evidenced",
+     "simple": "Your tap posts `yes:<id>` to a second relay channel. The service is already listening on that channel and turns the message into a reply.",
+     "deep": "`ReplyWatcher` holds one long-poll connection to `{server}/{reply_channel}/poll` through the ledger client (src/tasklight/notify/relay.py:140). `_handle_line` matches the text against `_REPLY` and calls `self._on_reply(answer, question_id)` (src/tasklight/notify/relay.py:132), which is `Planner.reply_callback(\"phone\")`. No inbound port is open.",
+     "code": {
+      "file": "src/tasklight/notify/relay.py",
+      "start": 120,
+      "lang": "python",
+      "src": "    def _handle_line(self, line: str) -> None:\n        try:\n            data = json.loads(line)\n        except ValueError:\n            return\n        if not isinstance(data, dict) or data.get(\"type\") != \"reply\":\n            return\n        text = data.get(\"text\")\n        found = _REPLY.fullmatch(text) if isinstance(text, str) else None\n        if found is None:\n            return\n        try:\n            self._on_reply(found.group(1), found.group(2))\n        except Exception:\n            pass",
+      "highlight": [
+       132
+      ],
+      "notes": {
+       "132": "The only thing that crosses back: an answer word and a question id."
+      }
+     },
+     "scene": {
+      "name": "handoff",
+      "caption": "yes:<id> comes back"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The reply resolves the future",
+     "confidence": "evidenced",
+     "simple": "The planner looks up the question id. If it is still open, it sets the answer on the waiting future and logs a reply event.",
+     "deep": "`_external_reply` picks the question; an unknown or expired id is logged and ignored (src/tasklight/planner/core.py:905). `_resolve` sets `question.future` (src/tasklight/planner/core.py:910) and appends a `reply` event with `via=\"phone\"`.",
+     "code": {
+      "file": "src/tasklight/planner/core.py",
+      "start": 905,
+      "lang": "python",
+      "src": "    async def _external_reply(self, answer: str, question_id: str, via: str) -> None:\n        question = self._questions.get(question_id)\n        if question is None or question.expired(self._clock()):\n            log.info(\"ignored %s reply for %s\", via, question_id)\n            return\n        await self._resolve(question, answer, via)",
+      "highlight": [],
+      "notes": {}
+     },
+     "state": [
+      {
+       "name": "answer",
+       "value": "\"yes\"",
+       "changed": true
+      },
+      {
+       "name": "question.future",
+       "value": "done: \"yes\"",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "gate",
+      "caption": "is this id still open?"
+     }
+    },
+    {
+     "node": "service",
+     "title": "The answer travels back to the shim",
+     "confidence": "inferred",
+     "simple": "The parked hook handler wakes up, returns the answer, and the service writes it to the shim's connection. The shim prints it and git finishes the commit.",
+     "deep": "`_wait_for_answer` returns `{\"answer\": \"yes\"}` (src/tasklight/planner/core.py:812), `_reply` wraps it in `ipc.ok(...)`, and `_handle_connection` writes the line. The shim then calls `_render(tool, answer)` to print the line git expects. I read each hop but did not run the full path; the final print is inferred from `shim.py` lines 58-66.",
+     "scene": {
+      "name": "handoff",
+      "caption": "answer back to the shim"
+     }
+    }
+   ]
+  },
+  {
+   "title": "A TODO comment becomes a reminder on your desktop",
+   "trigger": "A focus block is running with the scanner on, and a marked TODO comment sits unresolved in a watched repository for a few minutes.",
+   "steps": [
+    {
+     "node": "scanner",
+     "title": "The scan thread posts counts",
+     "confidence": "evidenced",
+     "simple": "Every few seconds the scanner thread walks the repository and sends the loop a small event. It never sends the file text.",
+     "deep": "`_post` wraps `loop.call_soon_threadsafe(self._deliver, run_id, event)` (src/tasklight/sensors/scanner.py:212). The event is a `todo_sample` with `open`, `oldest_age_s`, `marked`, `ignored`, preceded by a `scan` event for the same pass (src/tasklight/planner/core.py:300).",
+     "code": {
+      "file": "src/tasklight/sensors/scanner.py",
+      "start": 210,
+      "lang": "python",
+      "src": "    def _post(self, loop: asyncio.AbstractEventLoop, run_id: object, event: Event) -> None:\n        try:\n            loop.call_soon_threadsafe(self._deliver, run_id, event)\n        except RuntimeError:\n            pass  # loop already closed during shutdown",
+      "highlight": [
+       212
+      ],
+      "notes": {
+       "212": "The one bridge from the scan thread to the loop."
+      }
+     },
+     "state": [
+      {
+       "name": "event.kind",
+       "value": "\"todo_sample\"",
+       "changed": true
+      },
+      {
+       "name": "payload",
+       "value": "{open: 3, oldest_age_s: 410, marked: 1, ignored: 0}"
+      }
+     ],
+     "scene": {
+      "name": "carry",
+      "caption": "counts, not code"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The run-scoped emit stores and scores it",
+     "confidence": "evidenced",
+     "simple": "The planner appends the event to the store queue and, if this scan run still belongs to the active focus block, feeds it to scoring.",
+     "deep": "`_scan_emit` returns a closure bound to one focus block and one scan run. It spawns an append to the store, then `_score(event)` only if the run token, the scoring object and the active block all match (src/tasklight/planner/core.py:296-308). A stale thread from a stopped block cannot move the next block's state.",
+     "code": {
+      "file": "src/tasklight/planner/core.py",
+      "start": 300,
+      "lang": "python",
+      "src": "        def emit(event: Event) -> None:\n            try:\n                self._note_scan_event(event)\n                self._spawn(self._append(replace(event, block_id=block_id)))\n                active = self._blocks.active\n                if (run is self._scan_run and self._scoring is not None and active is not None\n                        and active.id == block_id == self._scored_block):\n                    self._score(event)",
+      "highlight": [
+       307
+      ],
+      "notes": {
+       "307": "Three checks decide whether a pass may move state."
+      }
+     },
+     "scene": {
+      "name": "gate",
+      "caption": "is this pass still yours?"
+     }
+    },
+    {
+     "node": "scoring",
+     "title": "Scoring waits for enough agreeing passes",
+     "confidence": "evidenced",
+     "simple": "One pass that sees a marked comment proves nothing, because the file may be half-edited. Scoring keeps the last five and only says todo-seen once enough of them agree.",
+     "deep": "`TodoSeen.update` appends to a 5-pass deque and returns `True` once at least `seen_on_scans` passes show a marked comment (src/tasklight/planner/scoring.py:66). `on_scan` (src/tasklight/planner/scoring.py:210) returns a list of `Change` objects, dated back to the first pass of the run.",
+     "code": {
+      "file": "src/tasklight/planner/scoring.py",
+      "start": 55,
+      "lang": "python",
+      "src": "class TodoSeen:\n    \"\"\"todo_seen: on at seen_on_scans of the last 5 scans, off after seen_off_scans consecutive misses.\"\"\"\n\n    def __init__(self, smoothing: dict) -> None:\n        self._on_scans = int(smoothing['seen_on_scans'])\n        self._off_scans = int(smoothing['seen_off_scans'])\n        self._window: deque[tuple[float, bool]] = deque(maxlen=SEEN_WINDOW)\n        self.state = False\n        self.since: float | None = None\n        self._misses = 0\n\n    def update(self, seen: bool, ts: float) -> bool | None:\n        self._window.append((ts, seen))\n        if not self.state:\n            hits = [t for t, s in self._window if s]\n            if len(hits) < self._on_scans:\n                return None",
+      "highlight": [],
+      "notes": {}
+     },
+     "state": [
+      {
+       "name": "window",
+       "value": "[(t, True), (t+5, True), (t+10, True)]",
+       "changed": true
+      },
+      {
+       "name": "state",
+       "value": "True (since = first hit)",
+       "changed": true
+      }
+     ],
+     "predict": {
+      "q": "A marked comment is visible for exactly one pass and then disappears. What does the store eventually contain?",
+      "options": [
+       "A todo_seen on and off pair, five seconds apart",
+       "Nothing: the single hit never reaches the on-threshold",
+       "One todo_seen on event with no matching off event"
+      ],
+      "answer": 1,
+      "why": "Scoring needs `seen_on_scans` of the last 5 passes to agree before it returns True. A single hit returns None, so no Change is created and no event is stored."
+     },
+     "scene": {
+      "name": "transform",
+      "caption": "3 of 5 passes"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The change is held, then the tick judges it",
+     "confidence": "evidenced",
+     "simple": "The planner does not write the change at once. It holds scanner-derived changes for about 20 seconds so it can still correct them. Meanwhile the tick keeps asking the rules.",
+     "deep": "`_take` records Changes into a `ChangeLog` with a hold of `max(stale_after_s, to_idle_s, to_busy_s, to_free_s, SETTLE_S) + 2/rate` (src/tasklight/planner/core.py:340). The 1 s `tick` builds a `Snapshot` including `todo_seen_since` and calls `Rules.evaluate`; a comment left beyond `todo_nudge_s` yields a `Nudge` for the desktop (or the phone when it is enabled and the threshold is later) (src/tasklight/planner/core.py:1020).",
+     "code": {
+      "file": "src/tasklight/planner/core.py",
+      "start": 340,
+      "lang": "python",
+      "src": "    def _take(self, changes: Sequence[Change]) -> None:\n        \"\"\"Scoring Changes into the store path: anchors at once, the rest through the ChangeLog.\"\"\"\n        for change in changes:\n            if change.kind == \"scan_anchor\":  # dated at its pass, never superseded\n                self._spawn(self._append(Event(change.ts, \"scan_anchor\", \"planner\", change.payload,\n                                               self._scored_block)))\n                continue\n            if change.kind == \"load\":\n                self._scan_judged = self._scan_judged or self._scan_open\n                self.note_scan_load(change.payload[\"state\"], change.since)\n            self._derived.record(change.kind, change.since, change.payload)\n",
+      "highlight": [],
+      "notes": {}
+     },
+     "scene": {
+      "name": "wait",
+      "caption": "held a moment"
+     }
+    },
+    {
+     "node": "notify",
+     "title": "A desktop banner with a one-tap reply",
+     "confidence": "evidenced",
+     "simple": "The nudge states a fact and offers buttons. It is shown with notify-send. Your tap comes back to the planner as a reply.",
+     "deep": "`_nudge_message` creates a `PendingQuestion(kind=\"nudge\")` with the allowed buttons for desktop nudges, and `_deliver` calls the desktop notifier (src/tasklight/planner/core.py:1150). `DesktopNotifier.send` builds a `notify-send -a tasklight -u <urgency> -p --action=id=label title body` argv (src/tasklight/notify/desktop.py:62).",
+     "code": {
+      "file": "src/tasklight/notify/desktop.py",
+      "start": 60,
+      "lang": "python",
+      "src": "    async def send(self, msg: Message) -> bool:\n        with_actions = bool(msg.buttons) and bool(self.actions_supported)\n        argv = [self._binary, \"-a\", \"tasklight\", \"-u\", urgency(msg.priority)]\n        if with_actions:\n            argv += [\"-p\", *(f\"--action={b.id}={b.label}\" for b in msg.buttons)]\n        argv += [msg.title, msg.body]\n        if not with_actions:\n            result = await _run(argv)",
+      "highlight": [
+       62
+      ],
+      "notes": {
+       "62": "Buttons are notify-send actions; the click is read from its stdout."
+      }
+     },
+     "scene": {
+      "name": "carry",
+      "caption": "a fact and two buttons"
+     }
+    }
+   ]
+  },
+  {
+   "title": "A meeting starts on your calendar",
+   "trigger": "A calendar file in the watched folder gains an event that starts now, with a title, a guest list and a room. A focus block is active.",
+   "steps": [
+    {
+     "node": "calendar",
+     "title": "The title is dropped at the parser",
+     "confidence": "evidenced",
+     "simple": "The calendar file announces the event with a title, guests, a room and two times. The sensor keeps the two times and throws everything else away on the spot.",
+     "deep": "The sensor reads the folder on each poll; `parse_busy` splits each `VEVENT` block into fields and returns only the start and end timestamps (src/tasklight/sensors/calendar/ics.py:22). A test feeds it a block with `SUMMARY:SECRET` and checks the secret never appears (tests/test_calendar_ics.py `test_parse_drops_summary`).",
+     "code": {
+      "file": "src/tasklight/sensors/calendar/ics.py",
+      "start": 22,
+      "lang": "python",
+      "src": "def parse_busy(block: str) -> tuple[float, float] | None:\n    fields = dict(line.split(\":\", 1) for line in block.splitlines() if \":\" in line)\n    if \"DTSTART\" not in fields or \"DTEND\" not in fields:\n        return None\n    return _to_ts(fields[\"DTSTART\"]), _to_ts(fields[\"DTEND\"])",
+      "highlight": [
+       26
+      ],
+      "notes": {
+       "26": "Summary, guests and room are never read past this line."
+      }
+     },
+     "state": [
+      {
+       "name": "block",
+       "value": "\"DTSTART:20261019T090000 ... SUMMARY:Budget review\"",
+       "changed": true
+      },
+      {
+       "name": "busy",
+       "value": "(09:00, 10:00)",
+       "changed": true
+      }
+     ],
+     "scene": {
+      "name": "transform",
+      "caption": "times in, title gone"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "Ingest updates load and stores the event",
+     "confidence": "evidenced",
+     "simple": "The planner tells scoring about the new busy block and, because a focus block is active, queues the event for the database.",
+     "deep": "`_ingest` handles `busy_block`: `self._load.on_busy(category, ts)` then remembers the label (src/tasklight/planner/core.py:250). If no focus block is active it returns before the store append (src/tasklight/planner/core.py:259): nothing outside a focus block is recorded.",
+     "code": {
+      "file": "src/tasklight/planner/core.py",
+      "start": 250,
+      "lang": "python",
+      "src": "        elif event.kind == \"busy_block\":\n            self._load.on_busy(event.payload[\"category\"], event.ts)\n            self._busy_label = event.payload[\"category\"]\n            self._note_busy(self._busy_label, event.ts)\n        elif event.kind == \"idle\":\n            self._idle = (event.payload[\"state\"], event.payload[\"source\"])\n        block = self._blocks.active\n        moved = self._load.state != self._last_load\n        self._last_load = self._load.state\n        if block is None:\n            return\n        self._spawn(self._append(replace(event, block_id=block.id)))\n        if moved and not self._scan_usable():  # while the scanner sees, its load is the record",
+      "highlight": [
+       259
+      ],
+      "notes": {
+       "259": "No focus block, no record."
+      }
+     },
+     "scene": {
+      "name": "gate",
+      "caption": "only inside a block"
+     }
+    },
+    {
+     "node": "scoring",
+     "title": "The block becomes a category",
+     "confidence": "evidenced",
+     "simple": "The sensor already mapped the event to a category such as meeting. Scoring combines that with whether you are typing to produce a load state.",
+     "deep": "`Load.on_busy` stores the category and recomputes `state = load_without_scan(input_state, category)` (src/tasklight/planner/scoring.py:70). With the scanner usable, the scanner decides load instead and this state is only the fallback.",
+     "code": {
+      "file": "src/tasklight/planner/scoring.py",
+      "start": 70,
+      "lang": "python",
+      "src": "    def on_busy(self, category: str, ts: float) -> None:\n        self.category = category\n        self.state = load_without_scan(self.input_state, category)",
+      "highlight": [
+       72
+      ],
+      "notes": {}
+     },
+     "scene": {
+      "name": "lookup",
+      "caption": "meeting while typing"
+     }
+    },
+    {
+     "node": "planner",
+     "title": "The next tick reads it, nothing fires",
+     "confidence": "inferred",
+     "simple": "The rules look at the snapshot. A single busy block alone is not a reason to interrupt you, so no reminder is created.",
+     "deep": "`tick` builds the snapshot from `self._load` and runs `Rules.evaluate`. Whether a meeting eventually becomes a reminder depends on due dates and thresholds I did not trace end to end, so this step is inferred.",
+     "scene": {
+      "name": "watch",
+      "caption": "no reason to interrupt"
+     }
+    },
+    {
+     "node": "store",
+     "title": "The validator accepts exactly two keys",
+     "confidence": "evidenced",
+     "simple": "The queued event is checked against the allowed fields for `busy_block`. Only the category and the duration pass.",
+     "deep": "`Store.append` calls `validate`; `PAYLOAD_KEYS[\"busy_block\"] = {category, minutes}` (src/tasklight/store/db.py:40). Any other key raises `EventValidationError` (src/tasklight/store/db.py:45). The batch reaches the file at the next flush.",
+     "code": {
+      "file": "src/tasklight/store/db.py",
+      "start": 40,
+      "lang": "python",
+      "src": "    keys = set(event.payload)\n    expected = PAYLOAD_KEYS[kind]\n    for key in sorted(expected - keys):\n        raise EventValidationError(f\"{kind}: missing payload key {key!r}\")\n    for key in sorted(keys - expected):\n        raise EventValidationError(f\"{kind}: unknown payload key {key!r}\")",
+      "highlight": [
+       45
+      ],
+      "notes": {
+       "45": "A key that is not on the list is rejected, not stored."
+      }
+     },
+     "state": [
+      {
+       "name": "event",
+       "value": "busy_block {category: \"meeting\", minutes: 60}",
+       "changed": true
+      },
+      {
+       "name": "pending",
+       "value": "1 queued, flushed within 1 s"
+      }
+     ],
+     "scene": {
+      "name": "store",
+      "caption": "two fields, nothing else"
+     }
+    }
+   ]
+  }
+ ],
+ "invariants": [
+  {
+   "rule": "File contents are read only in `sensors/scanner.py`, so repository text cannot leak into any other module. Enforced by an AST scan that bans `open` and `pathlib` reads of watched paths in every `.py` under `src/tasklight` except the scanner (tests/test_invariants.py).",
+   "node": "scanner",
+   "breaks": "A snippet of source could reach the planner, the store or a notifier. The scan fails CI with the offending file path. It checks calls, not data flow, so a string passed in from scanner.py is not caught.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "wall",
+    "caption": "text stays in one file"
+   }
+  },
+  {
+   "rule": "Every outbound HTTP request goes through the ledger-wrapped httpx client. Only `ledger.py` may import httpx, no other HTTP stack may be imported, and `create_connection` appears only in `ipc.py` (tests/test_invariants_http.py).",
+   "node": "ledger",
+   "breaks": "A call could leave the machine without a ledger row and without `tasklight ledger` showing it. A static scan: it cannot see a subprocess such as `curl`.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "lookup",
+    "caption": "stamp every exit"
+   }
+  },
+  {
+   "rule": "No event can carry a meeting title, file path, task text or keystroke. Each kind has a closed list of payload keys and any other key is rejected on append (store/db.py `validate`); a test bans key names containing title, path, text or keystroke.",
+   "node": "store",
+   "breaks": "A new sensor could persist content by adding a key; the validator refuses it at runtime. The test checks key names only. A permitted free-text value such as `category` could still hold anything the calendar reports (inferred risk, not observed).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "gate",
+    "caption": "closed list of keys"
+   }
+  },
+  {
+   "rule": "Phone payloads are content-free unless `phone.details` is true, a token is set, and the server is not the shared demo relay. One function, `detail_allowed`, decides, and a test asserts the detail is appended only when all three hold.",
+   "node": "notify",
+   "breaks": "Task text (a title or a commit message) would reach a third-party server. If any condition is unmet, details silently stay off.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "gate",
+    "caption": "three keys to open"
+   }
+  },
+  {
+   "rule": "Only the service process opens `tasks.db`. The CLI, shim and status-bar module reach it through the socket. Evidence: a grep for `Store.open` and `sqlite3.connect` finds the service and ledger only; I found no test that enforces it.",
+   "node": "store",
+   "breaks": "Two writers would race the in-memory batch and the single `tasklight-db` thread would no longer serialise all access.",
+   "confidence": "inferred",
+   "scene": {
+    "name": "wall",
+    "caption": "one door to the file"
+   }
+  }
+ ],
+ "pressure": [
+  {
+   "title": "One loop, one DB thread, one big class",
+   "node": "planner",
+   "limit": "No measured limit. All routing, block, scanner, mode, question and nudge logic is one `Planner` class (lines 96-1410, 88 methods) on a single asyncio loop; SPEC says nothing may block the loop longer than 50 ms.",
+   "signal": "A confirmation reply that takes seconds to resolve, or a late tick. I found no loop-lag metric in the code, so you would notice only by symptom.",
+   "mitigation": "Keep the pattern already used for `lifecycle.py`, `questions.py` and `nightly.py`: move a concern out of `core.py` with its own tests before adding another.",
+   "severity": "medium",
+   "confidence": "inferred",
+   "scene": {
+    "name": "queue",
+    "caption": "everything in one line"
+   }
+  },
+  {
+   "title": "A crash loses the unflushed tail",
+   "node": "store",
+   "limit": "Events wait in memory up to 1 s for the batch flush, and scanner-derived changes are held about 20 s longer (`_hold_s`) before they are even queued.",
+   "signal": "After an unclean service exit the last seconds of the focus block are missing from the summary. Not reproduced here.",
+   "mitigation": "Accept it (the data is behavioural, not financial) or flush on state edges, as block start and stop already do.",
+   "severity": "low",
+   "confidence": "inferred",
+   "scene": {
+    "name": "fire",
+    "caption": "last seconds vanish"
+   }
+  },
+  {
+   "title": "Phone path depends on a third-party relay",
+   "node": "notify",
+   "limit": "Three retries after 2 s, 5 s and 15 s, each with a 10 s timeout, per message; the long-poll reply watcher reconnects with backoff from 1 s to 60 s.",
+   "signal": "Reminder events with channel `phone_failed` in the store; `tasklight status` phone line (SPEC); `tasklight ledger` shows the attempts.",
+   "mitigation": "Self-host the relay (SPEC supports changing `phone.server`); the desktop channel always fires regardless.",
+   "severity": "medium",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "wait",
+    "caption": "relay is down"
+   }
+  }
+ ],
+ "whatifs": [
+  {
+   "title": "The service is killed while git waits for a confirmation",
+   "change": "Send SIGKILL to `tasklightd` after a confirmation hook has reached the planner.",
+   "outcome": "The shim's socket read fails; `main()` swallows the error and exits 0 with no output, so git finishes the commit without asking. The pending question, up to one second of queued events and the held scanner changes are gone. On the next start `recover()` closes the unfinished focus block.",
+   "lesson": "Fail open: a reminder tool must never be the reason a commit is stuck.",
+   "node": "service",
+   "affects": [
+    "clients",
+    "planner",
+    "store"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "name": "fire",
+    "caption": "git falls back"
+   }
+  },
+  {
+   "title": "The relay is unreachable while you are away",
+   "change": "Block the relay host and let a confirmation question wait.",
+   "outcome": "The publisher retries after 2 s, 5 s and 15 s, returns False, and the reminder is recorded as `phone_failed`. The desktop banner was already shown, but you are away, so the question waits until the 120 s timeout and then the commit goes ahead unconfirmed.",
+   "lesson": "A fallback you cannot see is not a fallback: redundancy only helps when the second channel reaches you.",
+   "node": "notify",
+   "affects": [
+    "planner",
+    "ledger"
+   ],
+   "confidence": "evidenced",
+   "scene": {
+    "name": "fire",
+    "caption": "nobody hears it"
+   }
+  },
+  {
+   "title": "The payload-key validator is deleted",
+   "change": "Remove the loop that rejects unknown payload keys (src/tasklight/store/db.py:45).",
+   "outcome": "Nothing at runtime stops a sensor from adding a `title` key and persisting it. Only the key-name test and code review remain. The privacy rule shifts from enforced to remembered.",
+   "lesson": "Put the guarantee where the data crosses the boundary, not in each producer.",
+   "node": "store",
+   "affects": [
+    "calendar",
+    "planner"
+   ],
+   "confidence": "inferred",
+   "scene": {
+    "name": "fire",
+    "caption": "the rule is just a habit"
+   }
+  }
+ ],
+ "decisions": [
+  {
+   "title": "One service, thin clients over a Unix socket",
+   "chosen": "A single always-on service owns the sensors, the planner and the database. The CLI, hook shims and status bar talk to it over a socket.",
+   "simple": "Hooks run constantly and must be quick. One process that already holds everything in memory can answer fast and is the only writer.",
+   "deep": "SPEC §Architecture states it: sensors feed the store, the planner is the only writer and the only caller of the notifier, clients never touch the store. The shim imports little and fails open (src/tasklight/hooks/shim.py:58). A pending question is just an open connection (src/tasklight/service.py:144).",
+   "alternatives": [
+    {
+     "name": "Each client opens the SQLite file",
+     "tradeoff": "Simpler to build, but several writers, and the planner would have no single place to hold pending questions and mode state."
+    },
+    {
+     "name": "One process per sensor",
+     "tradeoff": "Crash isolation, but you need your own IPC and a supervisor; the spec chose a single loop with one scanner thread."
+    }
+   ],
+   "context": "Hook calls arrive from other processes, some must block for minutes, and the user wants one thing to install and uninstall.",
+   "consequences": "If the service is down nothing is tracked. Everything shares one loop (see Pressure points).",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "fork",
+    "caption": "one process, many doors"
+   }
+  },
+  {
+   "title": "Append raw events, derive states in scoring",
+   "chosen": "The store keeps an append-only event log; smoothing happens in `scoring.py` and results are stored as derived events.",
+   "simple": "Raw readings are noisy. Keeping the log lets a summary be recomputed and a replay reproduce a day.",
+   "deep": "SPEC §Event store: append-only, nothing edits an event except `tasklight purge`. `ChangeLog` exists because the log cannot be corrected after the fact, so derived changes are held until they are settled (src/tasklight/planner/scoring.py:180). A replay harness feeds recorded passes through `ScanScoring` the same way as the live sensor.",
+   "alternatives": [
+    {
+     "name": "Store only current state and counters",
+     "tradeoff": "Small and fast, but no summaries by bucket and no way to re-judge with better thresholds."
+    }
+   ],
+   "context": "Summaries, calibration and acceptance tests all need history, and decisions must be explainable after the fact.",
+   "consequences": "Back-dated corrections need the hold buffer, which costs about 20 seconds of latency and memory-only state.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "store",
+    "caption": "log first, judge later"
+   }
+  },
+  {
+   "title": "A relay with a reply channel, no inbound port",
+   "chosen": "Publish reminders to a relay channel and receive replies by holding a long-poll on a second channel.",
+   "simple": "The service only makes outgoing connections, so nothing at home has to be exposed to the internet.",
+   "deep": "SPEC §Notifications: buttons POST `<answer>:<question_id>` to `{channel}-r`; the service resolves the pending question by id. Question ids are random and single-use. Both directions go through the ledger client (src/tasklight/notify/relay.py:110, src/tasklight/notify/relay.py:140).",
+   "alternatives": [
+    {
+     "name": "Inbound webhook or a VPN",
+     "tradeoff": "Direct replies, but needs a reachable port or a private network on the phone."
+    },
+    {
+     "name": "A companion app with push",
+     "tradeoff": "Richer UI (ring, previews); the spec defers it to tier 3."
+    }
+   ],
+   "context": "The user has a phone, the dev machine is behind NAT, and the spec rules out inbound ports.",
+   "consequences": "A third-party relay sits in the loop (hence content-free payloads by default), and there is no real ring on the phone.",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "handoff",
+    "caption": "the phone calls back"
+   }
+  }
+ ],
+ "risks": [
+  {
+   "title": "The service touches the store directly",
+   "where": "src/tasklight/service.py:120",
+   "what": "SPEC says the planner is the only writer, but `Service._flush_loop` and `_stop_active_block` call the store and block manager themselves. The writes are bookkeeping (flush, closing a block), so it is a small drift, not a leak.",
+   "fix": "Move flush and shutdown-stop behind a planner method, or reword the spec to say the service owns persistence.",
+   "severity": "low",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "watch",
+    "caption": "two hands on the log"
+   }
+  },
+  {
+   "title": "Spec layout ahead of the code",
+   "where": "docs/SPEC.md §Architecture, module layout",
+   "what": "The layout lists `planner/patterns.py` and `review/` (Tier 2), which do not exist, and omits `events.py`, `ipc.py`, `ledger.py` and `planner/lifecycle.py`/`questions.py`, which do. Anyone navigating by the spec will look for files that are not there.",
+   "fix": "Mark the Tier 2 files as planned in the layout and add the files that were added (PROJECT_CONTEXT.md already tracks them).",
+   "severity": "low",
+   "confidence": "evidenced",
+   "scene": {
+    "name": "lookup",
+    "caption": "map vs territory"
+   }
+  }
+ ],
+ "quiz": [
+  {
+   "q": "Why does the confirmation hook handler in the service read one byte from the connection while it waits?",
+   "options": [
+    "To notice the shim hung up, so the tool was answered at the keyboard",
+    "To measure how long the shim has been waiting for a reply",
+    "To receive the user's answer directly from the shim itself"
+   ],
+   "answer": 0,
+   "why": "EOF on the reader means the shim is gone, so the planner drops the question instead of leaving a stale reminder (service.py `_hook`)."
+  },
+  {
+   "q": "A pass arrives from a scanner thread that belongs to a focus block that has already stopped. What happens?",
+   "options": [
+    "It moves the new block's state, as passes are trusted",
+    "It is stored under its own block, never scored into the new one",
+    "It is dropped before it can reach the store queue at all"
+   ],
+   "answer": 1,
+   "why": "`_scan_emit` always appends the event to the block that started the run, but only calls `_score` when the run token and active block match."
+  },
+  {
+   "q": "Which single place makes phone reminders content-free by default?",
+   "options": [
+    "The task titles have no commit text in them",
+    "`detail_allowed`, which needs details on, a token and a non-demo server",
+    "The ledger strips message bodies before sending"
+   ],
+   "answer": 1,
+   "why": "The ledger only records host and size. `RelayPublisher._send` appends the detail only when `detail_allowed` passes, and the planner checks it too."
+  },
+  {
+   "q": "Why can a bug in a new sensor not quietly persist a meeting title?",
+   "options": [
+    "Sensors run in a sandbox without the title",
+    "The store rejects any payload key not on the per-kind list",
+    "The planner strips titles before every append"
+   ],
+   "answer": 1,
+   "why": "`validate()` raises for unknown payload keys on append. The guarantee sits at the store boundary, not in each sensor."
+  },
+  {
+   "q": "The service is killed mid confirmation. Which outcome is the design aiming for?",
+   "options": [
+    "The commit stays blocked until the service restarts",
+    "The shim fails open and git carries on with its own flow",
+    "The shim retries forever until the service answers"
+   ],
+   "answer": 1,
+   "why": "`shim.main()` swallows errors and exits 0 with no output; git then finishes the commit as usual."
+  }
+ ],
+ "glossary": [
+  {
+   "term": "relay",
+   "def": "A small push-notification service. You publish to a channel with an HTTP POST and a phone subscribed to the channel shows it."
+  },
+  {
+   "term": "long-poll",
+   "def": "One long-lived HTTP GET that the server holds open until it has something to say. Used here to receive replies without opening a port."
+  },
+  {
+   "term": "WAL",
+   "def": "SQLite write-ahead log mode: readers do not block the writer and a write is a sequential append."
+  },
+  {
+   "term": "commit shim",
+   "def": "The tiny `tasklight hook` command that git or the editor runs on an event; it forwards the event to the service."
+  },
+  {
+   "term": "scoring",
+   "def": "Combining and smoothing raw sensor readings into a few steady states such as load and todo-seen."
+  },
+  {
+   "term": "invariant",
+   "def": "A rule that must hold at all times, so a test or validator enforces it."
+  }
+ ]
+}

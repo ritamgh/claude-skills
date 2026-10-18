@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Open an HTML report with the Ask panel, served locally so questions are answered by `claude -p`
+# (your own login), not by the session that made the report.
+#
+#   ask-open REPORT.html [--repo DIR]
+#
+# Injects the panel into REPORT.html in place (a second run changes nothing), then runs the lens
+# server on it and opens the browser. The server runs until Ctrl-C, so a Claude session starts it as a
+# background command. It serves only REPORT, on its own port; --repo is the folder Claude may read
+# when answering (default: REPORT's folder).
+set -euo pipefail
+
+here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+report="${1:-}"
+[ -n "$report" ] && [ -f "$report" ] || { echo "usage: ask-open REPORT.html [--repo DIR]" >&2; exit 2; }
+shift
+
+python3 "$here/inject.py" "$report"
+exec python3 "$here/../../lens/scripts/serve.py" "$report" "$@" --open

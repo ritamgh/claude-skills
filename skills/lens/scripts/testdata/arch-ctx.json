@@ -1,0 +1,90 @@
+{
+  "id": "arch-ctx",
+  "mode": "architecture",
+  "title": "How a focus daemon decides you drifted",
+  "subtitle": "Three sensors, one engine, two outputs, and a note nobody wired up",
+  "layers": [
+    {"id": "sense", "name": "Sensors"},
+    {"id": "core", "name": "Engine"},
+    {"id": "out", "name": "Outputs"}
+  ],
+  "nodes": [
+    {
+      "id": "camera", "label": "camera.py", "kind": "camera sensor thread", "layer": "sense", "row": 0, "prop": "camera",
+      "simple": "Watches the webcam in its own thread and reports whether a person is at the desk.",
+      "confidence": "evidenced"
+    },
+    {
+      "id": "mic", "label": "mic.py", "kind": "microphone sensor", "layer": "sense", "row": 1, "prop": "mic",
+      "simple": "Reports whether the microphone is in use, so a call is not mistaken for drifting.",
+      "confidence": "evidenced"
+    },
+    {
+      "id": "desktop", "label": "desktop.py", "kind": "desktop sensor", "layer": "sense", "row": 2, "prop": "monitor",
+      "simple": "Reports the class of the focused app and how active the desk is. Never a window title.",
+      "confidence": "evidenced"
+    },
+    {
+      "id": "engine", "label": "engine", "kind": "session state machine", "layer": "core", "row": 1, "prop": "process",
+      "simple": "Takes every sensor reading and decides: focused, delegated, waiting on you or elsewhere.",
+      "deep": "One asyncio loop folds presence, app class and call state into a single session state and writes a row whenever it changes.",
+      "confidence": "evidenced",
+      "owns": "The current session state.",
+      "exposes": "State changes to the store and the notifier."
+    },
+    {
+      "id": "store", "label": "events.db", "kind": "SQLite file", "layer": "out", "row": 0, "prop": "database",
+      "simple": "The local record of every state change, written once and read by the receipt.",
+      "confidence": "evidenced",
+      "scene": {"name": "store", "caption": "one row per change", "items": ["state change"], "props": [{"prop": "database", "label": "events.db"}]}
+    },
+    {
+      "id": "notifier", "label": "notifier", "kind": "phone push", "layer": "out", "row": 1, "prop": "phone",
+      "simple": "Taps your phone when an agent is waiting on you.",
+      "confidence": "inferred"
+    },
+    {
+      "id": "notes", "label": "NOTES.md", "kind": "loose file", "layer": "out", "row": 2, "prop": "file",
+      "simple": "A file that nothing else in the system reads or writes.",
+      "confidence": "uncertain"
+    }
+  ],
+  "edges": [
+    {"from": "camera", "to": "engine", "label": "frames", "protocol": "in-process queue", "sync": false, "payload": "presence", "guarantee": "latest wins"},
+    {"from": "mic", "to": "engine", "label": "mic events", "protocol": "in-process queue", "sync": false, "payload": "mic in use", "guarantee": "ordered"},
+    {"from": "desktop", "to": "engine", "label": "app class", "protocol": "in-process queue", "sync": false, "payload": "app class and idle", "guarantee": "latest wins"},
+    {"from": "engine", "to": "store", "label": "state change", "protocol": "SQLite insert", "sync": true, "payload": "one state-change row per transition", "guarantee": "durable"},
+    {"from": "engine", "to": "notifier", "label": "alert", "protocol": "HTTPS push", "sync": false, "payload": "agent waiting", "guarantee": "best-effort"}
+  ],
+  "traces": [
+    {
+      "title": "You step away",
+      "trigger": "The camera stops seeing you.",
+      "steps": [
+        {
+          "node": "camera", "title": "The camera loses you",
+          "simple": "Three empty frames in a row and the sensor says nobody is at the desk.",
+          "confidence": "evidenced",
+          "scene": {"name": "carry", "caption": "presence goes to the engine", "items": ["presence: away"], "props": [{"prop": "camera", "label": "camera.py"}, {"prop": "process", "label": "engine"}]}
+        },
+        {
+          "node": "engine", "title": "The engine changes state",
+          "simple": "Away with no call and no agent running means elsewhere.",
+          "confidence": "evidenced"
+        },
+        {
+          "node": "store", "title": "The change is recorded",
+          "simple": "One row is written so the receipt can show when you left.",
+          "confidence": "evidenced"
+        }
+      ]
+    }
+  ],
+  "whatifs": [
+    {"title": "The camera thread dies", "change": "camera.py raises and its thread exits.", "outcome": "The engine keeps the last presence reading and slowly drifts to a wrong state.", "node": "camera", "affects": ["engine", "store"], "confidence": "inferred"}
+  ],
+  "quiz": [
+    {"q": "Which part decides the session state?", "options": ["camera.py", "engine", "events.db"], "answer": 1, "why": "Sensors only report readings; the engine folds them into a state."},
+    {"q": "Where is every state change kept?", "options": ["notifier", "mic.py", "events.db"], "answer": 2, "why": "events.db holds one row per state change."}
+  ]
+}

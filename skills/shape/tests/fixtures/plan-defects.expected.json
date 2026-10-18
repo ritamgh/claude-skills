@@ -1,0 +1,30 @@
+[
+  {
+    "rule": "empty-section",
+    "node": null
+  },
+  {
+    "rule": "blocking-question",
+    "node": "Q11"
+  },
+  {
+    "rule": "fr-no-scenario",
+    "node": "FR-005"
+  },
+  {
+    "rule": "uncovered",
+    "node": "FR-006"
+  },
+  {
+    "rule": "task-no-check",
+    "node": "T-005"
+  },
+  {
+    "rule": "no-nongoals",
+    "node": null
+  },
+  {
+    "rule": "vague",
+    "node": "FR-007"
+  }
+]

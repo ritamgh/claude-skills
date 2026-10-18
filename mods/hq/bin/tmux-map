@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Prints one line per live claude session (pid alive, /proc/<pid>/comm is claude or, for a background session, its version):
+#   name<TAB>tmux target<TAB>window name<TAB>full cwd<TAB>status<TAB>seconds since its last update<TAB>transcript<TAB>link
+# The target (session:window.pane) and window name are empty when the session is not in a tmux pane,
+# or there is no tmux server. The transcript is the session's .jsonl under ~/.claude/projects (the cwd with every
+# "/" and "." turned into "-", then the session id), empty when it is not there. The link is
+# https://claude.ai/code/<bridgeSessionId>, empty when Remote Control is off for the session. Reads only the *.json files of the sessions dir (the *.key files beside
+# them are secrets).
+dir=${CREW_SESSIONS:-$HOME/.claude/sessions}
+panes=""
+if command -v tmux >/dev/null; then
+  # -u: without a UTF-8 locale (and no $TMUX) tmux turns the tabs of -F output into "_"
+  panes=$(tmux -u list-panes -a -F '#{pane_pid}	#{session_name}:#{window_index}.#{pane_index}	#{window_name}' 2>/dev/null || true)
+fi
+now=$(date +%s)
+shopt -s nullglob
+for f in "$dir"/*.json; do
+  IFS=$'\t' read -r pid name cwd status upd sid job bridge < <(jq -r '[.pid, (if (.name // "") == "" then "?" else .name end), (if (.cwd // "") == "" then "?" else .cwd end), (.status // "?"), ((.statusUpdatedAt // .updatedAt // 0) | floor), (.sessionId // "-"), (.jobId // "-"), (.bridgeSessionId // "-")] | @tsv' "$f" 2>/dev/null) || continue
+  [[ "$pid" =~ ^[0-9]+$ ]] || continue
+  # A background session (kind "bg", run by the claude daemon) runs the versioned binary, whose comm is its version.
+  comm=$(cat "/proc/$pid/comm" 2>/dev/null || true)
+  [[ "$comm" = claude || "$comm" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+  age=$((now - upd / 1000))
+  [ "$age" -ge 0 ] || age=0
+  target="" window=""
+  if [ -n "$panes" ]; then
+    p=$pid
+    # A background session is not a child of the pane; the pane runs `claude attach <jobId>`.
+    if [[ "$job" =~ ^[A-Za-z0-9]+$ ]]; then p=$(pgrep -f -- "^([^ ]*/)?claude attach $job\$" | head -n 1 || true); p=${p:-$pid}; fi
+    while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+      hit=$(awk -F'\t' -v p="$p" '$1 == p { print $2 "\t" $3; exit }' <<<"$panes")
+      if [ -n "$hit" ]; then target=${hit%%$'\t'*} window=${hit#*$'\t'}; break; fi
+      p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+    done
+  fi
+  transcript=""
+  if [[ "$sid" =~ ^[A-Za-z0-9-]+$ ]]; then
+    transcript="$HOME/.claude/projects/${cwd//[\/.]/-}/$sid.jsonl"
+    [ -f "$transcript" ] || transcript=""
+  fi
+  link=""
+  [[ "$bridge" =~ ^[A-Za-z0-9_-]+$ && "$bridge" != - ]] && link="https://claude.ai/code/$bridge"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$target" "$window" "$cwd" "$status" "$age" "$transcript" "$link"
+done

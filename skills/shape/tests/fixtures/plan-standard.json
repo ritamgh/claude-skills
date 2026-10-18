@@ -1,0 +1,1874 @@
+{
+  "schema": 1,
+  "id": "1017-offline-sync",
+  "slug": "offline-sync",
+  "title": "Offline sync for a notes app",
+  "owner": "user",
+  "size": "standard",
+  "stage": "decide",
+  "rev": 95,
+  "created": "2026-10-14T09:12:00Z",
+  "updated": "2026-10-17T02:07:00Z",
+  "repo": "/home/user/Developer/notes",
+  "published": null,
+  "approved": null,
+  "tldr": "Solo users who edit notes on a phone and a laptop lose edits made without a connection. We add offline editing with an operation log that syncs with the existing REST API. It works when sync finishes in under 2 s after reconnect and no edit is lost across two devices.",
+  "frontier": [
+    "Q7",
+    "Q22",
+    "Q8",
+    "Q11",
+    "Q17",
+    "Q21"
+  ],
+  "progress": {
+    "settled": 14,
+    "total": 22
+  },
+  "requests": [
+    {
+      "ref": "e-3f9a1c2b7d10",
+      "type": "ask",
+      "node": "Q7",
+      "lane": null,
+      "text": "What happens to the version that loses?",
+      "at": "2026-10-17T01:26:00Z"
+    },
+    {
+      "ref": "e-8c04d5e1a2b9",
+      "type": "note",
+      "node": null,
+      "lane": "scope",
+      "text": "Should pinned notes sync first?",
+      "at": "2026-10-17T00:45:00Z"
+    }
+  ],
+  "recent": [
+    {
+      "rev": 95,
+      "at": "2026-10-17T02:07:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "prioritize",
+      "node": "Q7",
+      "summary": "prioritized Q7"
+    },
+    {
+      "rev": 94,
+      "at": "2026-10-17T01:26:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "ask",
+      "node": "Q7",
+      "summary": "asked about Q7"
+    },
+    {
+      "rev": 93,
+      "at": "2026-10-17T00:45:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "note",
+      "node": null,
+      "summary": "note on scope"
+    },
+    {
+      "rev": 92,
+      "at": "2026-10-17T00:04:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "Q22",
+      "summary": "updated Q22"
+    },
+    {
+      "rev": 91,
+      "at": "2026-10-16T23:23:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "E-2",
+      "summary": "added E-2: Tombstone expired while a device is offline"
+    },
+    {
+      "rev": 90,
+      "at": "2026-10-16T22:42:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "R-3",
+      "summary": "added R-3: Tombstones grow without bound"
+    },
+    {
+      "rev": 89,
+      "at": "2026-10-16T22:01:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "park",
+      "node": "Q20",
+      "summary": "parked Q20"
+    },
+    {
+      "rev": 88,
+      "at": "2026-10-16T21:20:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q19",
+      "summary": "answered Q19: Jest"
+    },
+    {
+      "rev": 87,
+      "at": "2026-10-16T20:39:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "Q21",
+      "summary": "added Q21: Which sync metrics do we log?"
+    },
+    {
+      "rev": 86,
+      "at": "2026-10-16T19:58:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "B-3",
+      "summary": "added B-3: npx jest"
+    },
+    {
+      "rev": 85,
+      "at": "2026-10-16T19:17:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "set",
+      "node": null,
+      "summary": "set stage to decide"
+    },
+    {
+      "rev": 84,
+      "at": "2026-10-16T18:36:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q18",
+      "summary": "answered Q18: Server"
+    },
+    {
+      "rev": 83,
+      "at": "2026-10-16T17:55:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "edit_label",
+      "node": "S2",
+      "summary": "renamed S2: Background sync"
+    },
+    {
+      "rev": 82,
+      "at": "2026-10-16T17:14:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "S2",
+      "summary": "updated S2"
+    },
+    {
+      "rev": 81,
+      "at": "2026-10-16T16:33:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "FR-005",
+      "summary": "added FR-005: Sync after reconnect completes in under 2 s (p95) for 500 notes"
+    },
+    {
+      "rev": 80,
+      "at": "2026-10-16T15:52:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q15",
+      "summary": "answered Q15: 500 notes"
+    },
+    {
+      "rev": 79,
+      "at": "2026-10-16T15:11:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q16",
+      "summary": "answered Q16: A retry banner"
+    },
+    {
+      "rev": 78,
+      "at": "2026-10-16T14:30:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "X-1",
+      "summary": "added X-1: The REST API pages notes at 100 per page"
+    },
+    {
+      "rev": 77,
+      "at": "2026-10-16T13:49:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q14",
+      "summary": "answered Q14: Yes"
+    },
+    {
+      "rev": 76,
+      "at": "2026-10-16T13:08:00Z",
+      "by": "session",
+      "source": "build",
+      "type": "task_status",
+      "node": "T-001",
+      "summary": "T-001 done"
+    },
+    {
+      "rev": 75,
+      "at": "2026-10-16T12:27:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-004",
+      "summary": "added T-004: Sync worker"
+    },
+    {
+      "rev": 74,
+      "at": "2026-10-16T11:46:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-003",
+      "summary": "added T-003: Manual sync action"
+    },
+    {
+      "rev": 73,
+      "at": "2026-10-16T11:05:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-002",
+      "summary": "added T-002: Offline edit queue"
+    },
+    {
+      "rev": 72,
+      "at": "2026-10-16T10:24:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-001",
+      "summary": "added T-001: SQLite schema and migrations"
+    },
+    {
+      "rev": 71,
+      "at": "2026-10-16T09:43:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q13",
+      "summary": "answered Q13: Offline edit and manual sync"
+    },
+    {
+      "rev": 70,
+      "at": "2026-10-16T09:02:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "AS-3",
+      "summary": "added AS-3: OS disk encryption is on by default on supported phones"
+    },
+    {
+      "rev": 69,
+      "at": "2026-10-16T08:21:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q12",
+      "summary": "answered Q12: Op-log"
+    },
+    {
+      "rev": 68,
+      "at": "2026-10-16T07:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "N-1",
+      "summary": "added N-1: Ask the backend owner about rate limits for the sync endpoint"
+    },
+    {
+      "rev": 67,
+      "at": "2026-10-16T06:59:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "strike",
+      "node": "AS-4",
+      "summary": "struck AS-4"
+    },
+    {
+      "rev": 66,
+      "at": "2026-10-16T06:18:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "Q23",
+      "summary": "killed Q23"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem and what do they do today?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "Maya edits a shopping list on her phone on the train, loses signal, and the edit is gone when the laptop syncs.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T11:56:00Z",
+        "rev": 4
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "P1"
+      ],
+      "rev": 4,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "who",
+      "why": "Decides which devices and flows matter.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "Solo users with a phone and a laptop. No teams.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T12:37:00Z",
+        "rev": 5
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "U1"
+      ],
+      "rev": 5,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "The appetite is a budget; scope bends to it.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": "Enough for a real slice, not a platform"
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": ""
+        }
+      ],
+      "recommended": null,
+      "answer": {
+        "choice": "c",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T13:18:00Z",
+        "rev": 6
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "C-1"
+      ],
+      "rev": 6,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "No-gos keep agents from building the tempting extras.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "No CRDT or real-time co-editing. No note sharing between accounts.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T13:59:00Z",
+        "rev": 7
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "NG-1",
+        "NG-2"
+      ],
+      "rev": 7,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "why",
+      "why": "Success must be checkable.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "Sync finishes in under 2 s (p95, 500 notes) after reconnect, and no edit is lost across two offline devices.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T14:40:00Z",
+        "rev": 8
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "G-1",
+        "SC-001",
+        "SC-002"
+      ],
+      "rev": 8,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q6",
+      "kind": "question",
+      "label": "Which existing systems do we reuse?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Reuse shrinks the appetite needed.",
+      "stage": "frame",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Reuse the existing REST API",
+          "why": "It already has accounts and notes"
+        },
+        {
+          "key": "b",
+          "label": "Add a new sync endpoint",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Greenfield backend",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "session",
+        "source": "terminal",
+        "at": "2026-10-14T15:21:00Z",
+        "rev": 9
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "DEC-3"
+      ],
+      "rev": 9,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q7",
+      "kind": "question",
+      "label": "Conflict policy when two devices edit the same note",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "DEC-2",
+        "SC-002"
+      ],
+      "refs": [
+        "AS-1"
+      ],
+      "lane": "decisions",
+      "why": "Decides the data model and two slices",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Last-write-wins",
+          "why": "solo users, 2-week appetite"
+        },
+        {
+          "key": "b",
+          "label": "Field-level merge",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Ask the user on a clash",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 1,
+      "blocking": true,
+      "fills": [
+        "DEC-4"
+      ],
+      "rev": 95,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q8",
+      "kind": "question",
+      "label": "How long are tombstones kept?",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "DEC-1"
+      ],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Bounds storage growth against how late a device may reconnect.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "30 days",
+          "why": "Covers a long holiday"
+        },
+        {
+          "key": "b",
+          "label": "7 days",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Forever",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "DEC-5"
+      ],
+      "rev": 31,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q9",
+      "kind": "question",
+      "label": "Retry policy on a failed sync",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q7"
+      ],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Sets sync behaviour on a flaky network and the check for T-004.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Exponential backoff, capped at 60 s",
+          "why": "Standard and easy to test with a fake clock"
+        },
+        {
+          "key": "b",
+          "label": "Fixed 5 s interval",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Manual retry only",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "rev": 32,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q10",
+      "kind": "question",
+      "label": "Which local store holds notes?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Fixes the schema every slice builds on.",
+      "stage": "explore",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "SQLite",
+          "why": "Same schema on phone and web"
+        },
+        {
+          "key": "b",
+          "label": "IndexedDB",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "localStorage",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-14T17:24:00Z",
+        "rev": 12
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "DEC-1"
+      ],
+      "rev": 12,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q11",
+      "kind": "question",
+      "label": "Encryption at rest",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "DEC-1"
+      ],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Affects the first slice; costly to retrofit.",
+      "stage": "decide",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Rely on OS disk encryption",
+          "why": "No key management; matches the appetite"
+        },
+        {
+          "key": "b",
+          "label": "App-level (SQLCipher)",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Decide after launch",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "rev": 33,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q12",
+      "kind": "question",
+      "label": "Which sync model?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [
+        "NG-1"
+      ],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Decides what the server stores and how clients catch up.",
+      "stage": "explore",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Op-log",
+          "why": "Fits NG-1 and the appetite"
+        },
+        {
+          "key": "b",
+          "label": "CRDT",
+          "why": "Ruled out by NG-1"
+        },
+        {
+          "key": "c",
+          "label": "Full-state snapshot",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T08:21:00Z",
+        "rev": 69
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "DEC-2",
+        "A-1"
+      ],
+      "rev": 69,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q13",
+      "kind": "question",
+      "label": "What goes in the walking skeleton?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "slices",
+      "why": "S1 must prove the store and the op-log end to end.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Offline edit and manual sync",
+          "why": "Smallest path through every layer"
+        },
+        {
+          "key": "b",
+          "label": "Background sync only",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T09:43:00Z",
+        "rev": 71
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "S1"
+      ],
+      "rev": 71,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q14",
+      "kind": "question",
+      "label": "Is the web build in scope for v1?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Doubles the test matrix if yes.",
+      "stage": "explore",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Yes",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "No",
+          "why": ""
+        }
+      ],
+      "recommended": null,
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T13:49:00Z",
+        "rev": 77
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 77,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q15",
+      "kind": "question",
+      "label": "How many notes must sync within the time budget?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Turns the NFR into a number.",
+      "stage": "decide",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "500 notes",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T15:52:00Z",
+        "rev": 80
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "FR-005"
+      ],
+      "rev": 80,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q16",
+      "kind": "question",
+      "label": "What does the user see when a sync fails?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Shapes the interrupted-sync edge case.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "A retry banner",
+          "why": "Visible and dismissible"
+        },
+        {
+          "key": "b",
+          "label": "Nothing until they open Settings",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T15:11:00Z",
+        "rev": 79
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "E-1"
+      ],
+      "rev": 79,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q17",
+      "kind": "question",
+      "label": "How do the sync checks run in CI?",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "S1"
+      ],
+      "refs": [],
+      "lane": "tasks",
+      "why": "Decides whether T-004 can have a runnable check.",
+      "stage": "shape",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Fake clock and in-memory SQLite",
+          "why": "Fast and deterministic"
+        },
+        {
+          "key": "b",
+          "label": "Real device farm",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 34,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q18",
+      "kind": "question",
+      "label": "Who orders operations: server or client?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [
+        "Q12"
+      ],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Needed before the op-log format is frozen.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "Server",
+          "why": "Single order for every device"
+        },
+        {
+          "key": "b",
+          "label": "Client",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T18:36:00Z",
+        "rev": 84
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 84,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q19",
+      "kind": "question",
+      "label": "Which test runner runs the checks?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "tasks",
+      "why": "Every task check names it.",
+      "stage": "shape",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Jest",
+          "why": "Already in the repo"
+        },
+        {
+          "key": "b",
+          "label": "Vitest",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T21:20:00Z",
+        "rev": 88
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "B-3"
+      ],
+      "rev": 88,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q20",
+      "kind": "question",
+      "label": "Do attachments sync in v1?",
+      "body": "",
+      "status": "parked",
+      "depends_on": [
+        "Q11"
+      ],
+      "refs": [],
+      "lane": "scope",
+      "why": "Large files blow the appetite.",
+      "stage": "decide",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Yes",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "No, v2",
+          "why": "Past the appetite"
+        }
+      ],
+      "recommended": "b",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 89,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q21",
+      "kind": "question",
+      "label": "Which sync metrics do we log?",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q6",
+        "Q23"
+      ],
+      "refs": [],
+      "lane": "tasks",
+      "why": "Needed to verify SC-001 in production.",
+      "stage": "shape",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "Duration and op count",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 87,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q22",
+      "kind": "question",
+      "label": "Does the server API support a `since` cursor for incremental pulls?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "lane": "risks",
+      "why": "Blocks background sync (S2).",
+      "stage": "explore",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Yes",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "No",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "Unknown, ask the backend owner",
+          "why": ""
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "rev": 92,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q23",
+      "kind": "question",
+      "label": "Should notes support Markdown import?",
+      "body": "",
+      "status": "killed",
+      "depends_on": [
+        "Q11"
+      ],
+      "refs": [],
+      "lane": "scope",
+      "why": "Was raised in Explore; nobody needs it.",
+      "stage": "explore",
+      "class": "taste",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": false,
+      "fills": [],
+      "rev": 66,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "P1",
+      "kind": "story",
+      "label": "Edits made offline on the train are lost when the laptop syncs",
+      "body": "Maya edits a shopping list on her phone without signal. The laptop later overwrites it.",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "evidence": "Three support threads in the last month (#412, #430, #447)",
+      "rev": 4,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "U1",
+      "kind": "user",
+      "label": "Solo users with a phone and a laptop",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "context": "Edit on the go; one account; one device at a time.",
+      "rev": 5,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "G-1",
+      "kind": "goal",
+      "label": "Notes stay editable and in sync without a connection",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 8,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "SC-001",
+      "kind": "criterion",
+      "label": "Sync finishes in under 2 s (p95) after reconnect",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "verify": "Sync benchmark with 500 notes on a throttled link",
+      "evidence": "",
+      "goal": "G-1",
+      "rev": 8,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "SC-002",
+      "kind": "criterion",
+      "label": "No edit is lost when two devices edit offline and reconnect",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "verify": "Two-device scenario test",
+      "evidence": "",
+      "goal": "G-1",
+      "rev": 8,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "NG-1",
+      "kind": "nongoal",
+      "label": "No CRDT or real-time co-editing",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "why": "An op-log is enough for solo users and fits the appetite.",
+      "rev": 7,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "NG-2",
+      "kind": "nongoal",
+      "label": "No note sharing between accounts",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "why": "One account per user; sharing needs permissions we do not have.",
+      "rev": 7,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "C-1",
+      "kind": "constraint",
+      "label": "Appetite: 2 weeks",
+      "body": "A budget, not an estimate. If it runs over, cut scope, not time.",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tag": "appetite",
+      "rev": 6,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "C-2",
+      "kind": "constraint",
+      "label": "Keep the existing REST API; no new endpoints before the sync slice",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tag": "stack",
+      "rev": 10,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "AS-1",
+      "kind": "assumption",
+      "label": "One developer for the whole 2 weeks",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "validate_by": "Confirm at the readiness gate",
+      "impact": "S2 would not fit with half a developer",
+      "rev": 10,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "AS-2",
+      "kind": "assumption",
+      "label": "Device clocks are within 5 s of server time",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "validate_by": "Compared 20 devices against the server",
+      "impact": "Timestamp ordering of ops stays valid",
+      "rev": 11,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "AS-3",
+      "kind": "assumption",
+      "label": "OS disk encryption is on by default on supported phones",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q11"
+      ],
+      "refs": [],
+      "validate_by": "Check Android 10+ and iOS 15+ documentation",
+      "impact": "Decides whether Q11 can rely on the OS",
+      "rev": 70,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "AS-4",
+      "kind": "assumption",
+      "label": "Users want end-to-end encryption in v1",
+      "body": "",
+      "status": "killed",
+      "depends_on": [],
+      "refs": [],
+      "validate_by": "Ask five users",
+      "impact": "Would add key management to the appetite",
+      "rev": 67,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "S1",
+      "kind": "slice",
+      "label": "Walking skeleton: edit offline, sync manually",
+      "body": "",
+      "status": "settled",
+      "depends_on": [
+        "DEC-1"
+      ],
+      "refs": [
+        "FR-001",
+        "FR-002",
+        "FR-003"
+      ],
+      "order": 1,
+      "why_priority": "Proves the store and the op-log end to end",
+      "independent_test": "Edit a note in airplane mode, tap Sync, see it on the laptop",
+      "scenarios": [
+        "Given a note and no connection, When the user edits it, Then the edit is saved locally",
+        "Given queued edits and a connection, When the user taps Sync, Then the server holds the edit"
+      ],
+      "exit": "Manual sync of one note works between two devices",
+      "rev": 71,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "S2",
+      "kind": "slice",
+      "label": "Background sync",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q7",
+        "Q22",
+        "S1"
+      ],
+      "refs": [
+        "FR-004",
+        "FR-005"
+      ],
+      "order": 2,
+      "why_priority": "Removes the Sync button",
+      "independent_test": "Reconnect a device and watch the other one update",
+      "scenarios": [],
+      "exit": "",
+      "rev": 83,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-001",
+      "kind": "requirement",
+      "label": "Users can create and edit notes while offline",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 23,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-002",
+      "kind": "requirement",
+      "label": "Edits made offline are queued as operations and kept across app restarts",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 24,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-003",
+      "kind": "requirement",
+      "label": "The Sync button pushes queued operations and pulls remote ones",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 25,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-004",
+      "kind": "requirement",
+      "label": "Sync retries automatically after a failure",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q9"
+      ],
+      "refs": [],
+      "nfr": false,
+      "rev": 26,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-005",
+      "kind": "requirement",
+      "label": "Sync after reconnect completes in under 2 s (p95) for 500 notes",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": true,
+      "rev": 81,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "E-1",
+      "kind": "edge",
+      "label": "Sync interrupted halfway",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "Q16"
+      ],
+      "expect": "Operations already pushed are not re-applied; the rest are re-sent, because operations carry ids.",
+      "rev": 79,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "E-2",
+      "kind": "edge",
+      "label": "Tombstone expired while a device is offline",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q8"
+      ],
+      "refs": [
+        "Q8"
+      ],
+      "expect": "",
+      "rev": 91,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "R-1",
+      "kind": "risk",
+      "label": "Clock skew reorders edits",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q7"
+      ],
+      "refs": [],
+      "approach": "",
+      "rev": 29,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "R-2",
+      "kind": "risk",
+      "label": "Large attachments",
+      "body": "",
+      "status": "parked",
+      "depends_on": [],
+      "refs": [],
+      "approach": "Past the appetite; revisit after launch.",
+      "rev": 29,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "R-3",
+      "kind": "risk",
+      "label": "Tombstones grow without bound",
+      "body": "",
+      "status": "open",
+      "depends_on": [
+        "Q8"
+      ],
+      "refs": [],
+      "approach": "",
+      "rev": 90,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "A-1",
+      "kind": "approach",
+      "label": "Op-log over SQLite with a server-assigned order",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "alternatives": [
+        "CRDT",
+        "Full-state snapshot"
+      ],
+      "rev": 69,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-1",
+      "kind": "boundary",
+      "label": "Never add a CRDT library",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "NG-1"
+      ],
+      "tier": "never",
+      "rev": 41,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-2",
+      "kind": "boundary",
+      "label": "Run the task's check before marking it done",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "always",
+      "rev": 41,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-3",
+      "kind": "boundary",
+      "label": "npx jest",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "command",
+      "rev": 88,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-4",
+      "kind": "boundary",
+      "label": "Ask before changing the REST API contract",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "ask",
+      "rev": 41,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-001",
+      "kind": "task",
+      "label": "SQLite schema and migrations",
+      "body": "",
+      "status": "done",
+      "depends_on": [],
+      "refs": [
+        "FR-001"
+      ],
+      "slice": "S1",
+      "files": [
+        "app/db/schema.ts",
+        "app/db/migrate.ts"
+      ],
+      "parallel": false,
+      "check": "npx jest app/db",
+      "result": {
+        "ok": true,
+        "at": "2026-10-16T13:08:00Z",
+        "note": "schema applies cleanly"
+      },
+      "crew": null,
+      "rev": 76,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-002",
+      "kind": "task",
+      "label": "Offline edit queue",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-001"
+      ],
+      "refs": [
+        "FR-002"
+      ],
+      "slice": "S1",
+      "files": [
+        "app/queue.ts"
+      ],
+      "parallel": false,
+      "check": "npx jest app/queue",
+      "result": null,
+      "crew": null,
+      "rev": 73,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-003",
+      "kind": "task",
+      "label": "Manual sync action",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-002"
+      ],
+      "refs": [
+        "FR-003"
+      ],
+      "slice": "S1",
+      "files": [
+        "app/sync.ts"
+      ],
+      "parallel": false,
+      "check": "npx jest app/sync",
+      "result": null,
+      "crew": null,
+      "rev": 74,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-004",
+      "kind": "task",
+      "label": "Sync worker",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-003"
+      ],
+      "refs": [
+        "FR-004",
+        "FR-005",
+        "SC-001"
+      ],
+      "slice": "S2",
+      "files": [
+        "app/worker.ts"
+      ],
+      "parallel": false,
+      "check": "",
+      "result": null,
+      "crew": null,
+      "rev": 75,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-1",
+      "kind": "decision",
+      "label": "SQLite over IndexedDB",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "Q10"
+      ],
+      "chose": "SQLite",
+      "alternatives": [
+        "IndexedDB",
+        "localStorage"
+      ],
+      "why": "Same schema on phone and web; the op-log stays queryable.",
+      "rev": 12,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-2",
+      "kind": "decision",
+      "label": "Op-log sync, no CRDT",
+      "body": "",
+      "status": "settled",
+      "depends_on": [
+        "NG-1"
+      ],
+      "refs": [
+        "Q12"
+      ],
+      "chose": "Op-log",
+      "alternatives": [
+        "CRDT",
+        "Full-state snapshot"
+      ],
+      "why": "NG-1 and the 2-week appetite.",
+      "rev": 69,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-3",
+      "kind": "decision",
+      "label": "Server stays the source of truth",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "Q6"
+      ],
+      "chose": "Server",
+      "alternatives": [
+        "Peer-to-peer"
+      ],
+      "why": "Existing REST API, one account per user.",
+      "rev": 9,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "DEC-4",
+      "kind": "decision",
+      "label": "Conflict policy",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [
+        "Q7"
+      ],
+      "chose": "",
+      "alternatives": [],
+      "why": "",
+      "rev": 46,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-5",
+      "kind": "decision",
+      "label": "Tombstone retention",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [
+        "Q8"
+      ],
+      "chose": "",
+      "alternatives": [],
+      "why": "",
+      "rev": 47,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "X-1",
+      "kind": "discovery",
+      "label": "The REST API pages notes at 100 per page",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "evidence": "GET /notes returns next_page; checked against staging.",
+      "rev": 78,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "N-1",
+      "kind": "note",
+      "label": "Ask the backend owner about rate limits for the sync endpoint",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "lane": "risks",
+      "rev": 68,
+      "by": "user",
+      "by_default": false
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "id": "arch-draw",
+  "mode": "architecture",
+  "title": "How a rate limiter protects an API",
+  "subtitle": "Four parts, drawn picture by picture instead of from the stock scenes",
+  "layers": [
+    {"id": "edge", "name": "Edge"},
+    {"id": "core", "name": "Core"}
+  ],
+  "nodes": [
+    {
+      "id": "client", "label": "Client", "kind": "mobile app", "layer": "edge", "row": 0,
+      "simple": "Sends requests, sometimes far too many of them at once.",
+      "confidence": "evidenced"
+    },
+    {
+      "id": "limiter", "label": "Rate limiter", "kind": "middleware", "layer": "edge", "row": 1,
+      "simple": "Counts requests per client and turns the extra ones away with a 429.",
+      "deep": "A token bucket per client key: each request takes a token, tokens refill at a fixed rate, and an empty bucket means 429 with a Retry-After header.",
+      "confidence": "evidenced",
+      "owns": "The decision to let a request through or turn it away.",
+      "scene": {
+        "caption": "tokens in, requests out",
+        "draw": [
+          {"op": "ground", "y": 7.5},
+          {"op": "blot", "x": 3, "y": 6, "mood": "proud", "look": [1, 0], "id": "guard"},
+          {"op": "box", "x": 6, "y": 3.2, "w": 3.6, "h": 2.2, "label": "token bucket", "id": "bucket"},
+          {"op": "packet", "x": 13, "y": 4.2, "label": "429 slow down", "c": "red", "tilt": 0.08, "id": "reject"},
+          {"op": "packet", "x": 13, "y": 6.6, "label": "200 ok", "c": "blue", "id": "accept"},
+          {"op": "arrow", "from": "guard", "to": "bucket", "label": "takes one"},
+          {"op": "arrow", "from": "bucket", "to": "reject", "label": "empty", "c": "red", "bend": -0.3},
+          {"op": "arrow", "from": "bucket", "to": "accept", "label": "has one", "c": "blue", "bend": 0.3},
+          {"op": "text", "x": 8, "y": 1.4, "t": "refills at 10 tokens a second", "anchor": "middle"}
+        ]
+      }
+    },
+    {
+      "id": "api", "label": "Orders API", "kind": "stateless web service", "layer": "core", "row": 0,
+      "simple": "Does the real work for requests the limiter lets through.",
+      "confidence": "evidenced",
+      "scene": {
+        "name": "gate",
+        "caption": "only allowed requests arrive",
+        "draw": [
+          {"op": "gate", "x": 8, "y": 7, "h": 3, "open": true},
+          {"op": "prop", "name": "server", "x": 12.5, "y": 5, "size": 3, "label": "orders"},
+          {"op": "arrow", "from": [3, 5.5], "to": [7, 5.5], "label": "allowed"}
+        ]
+      }
+    },
+    {
+      "id": "counters", "label": "Counter store", "kind": "in-memory cache", "layer": "core", "row": 1,
+      "simple": "Remembers how many tokens each client has left.",
+      "confidence": "inferred"
+    }
+  ],
+  "edges": [
+    {"from": "client", "to": "limiter", "label": "requests", "protocol": "HTTPS", "sync": true, "payload": "API call", "guarantee": "none"},
+    {"from": "limiter", "to": "counters", "label": "token check", "protocol": "Redis", "sync": true, "payload": "key + count", "guarantee": "atomic"},
+    {"from": "limiter", "to": "api", "label": "allowed", "protocol": "HTTP", "sync": true, "payload": "request", "guarantee": "in order"}
+  ],
+  "traces": [
+    {
+      "title": "A burst of requests",
+      "trigger": "A client sends 30 requests in one second.",
+      "steps": [
+        {
+          "node": "client", "title": "The burst arrives",
+          "simple": "Thirty calls land at once, far above the ten a second the client is allowed.",
+          "confidence": "evidenced",
+          "scene": {
+            "caption": "thirty calls, one door",
+            "draw": [
+              {"op": "blot", "x": 3, "y": 5.5, "mood": "worried", "arms": [[5.5, 3.5], [5.5, 6]]},
+              {"op": "stack", "x": 8, "y": 5.6, "n": 5, "label": "30 calls"},
+              {"op": "ticks", "x": 8, "y": 2.6, "n": 3, "c": "orange"},
+              {"op": "text", "x": 13, "y": 4, "t": "one second", "rot": -6}
+            ]
+          }
+        },
+        {
+          "node": "limiter", "title": "The bucket runs dry",
+          "simple": "Ten requests take a token each. The other twenty find the bucket empty and get a 429.",
+          "confidence": "evidenced",
+          "predict": {"q": "What happens to the eleventh request in that second?", "options": ["It waits in line", "It gets a 429", "It is dropped quietly"], "answer": 1, "why": "An empty bucket means an immediate 429 with Retry-After, never a silent drop."},
+          "scene": {
+            "caption": "ten pass, twenty wait",
+            "draw": [
+              {"op": "oval", "x": 5, "y": 4.5, "rx": 2.4, "ry": 1.6, "label": "10 tokens", "c": "blue", "id": "tok"},
+              {"op": "oval", "x": 11.5, "y": 4.5, "rx": 2.4, "ry": 1.6, "label": "0 tokens", "c": "red", "id": "none"},
+              {"op": "arrow", "from": "tok", "to": "none", "label": "after 10 calls", "dash": true},
+              {"op": "line", "pts": [[1, 7.5], [5, 8], [10, 7.6], [15, 8]], "w": 2, "dash": true}
+            ]
+          }
+        },
+        {
+          "node": "api", "title": "Only ten reach the API",
+          "simple": "The API sees a steady ten requests, exactly as it was sized for.",
+          "confidence": "evidenced"
+        }
+      ]
+    }
+  ],
+  "whatifs": [
+    {
+      "title": "The counter store is down",
+      "change": "The cache that holds the tokens stops answering.",
+      "outcome": "The limiter must choose: let everything through and risk the API, or refuse everything and take the site down.",
+      "node": "counters",
+      "affects": ["limiter", "api"],
+      "confidence": "inferred",
+      "scene": {
+        "caption": "no counts, no verdict",
+        "draw": [
+          {"op": "machine", "x": 6, "y": 2.5, "w": 4, "h": 3, "label": "limiter"},
+          {"op": "cabinet", "x": 13, "y": 6, "s": 1, "label": "counters"},
+          {"op": "arrow", "from": [9, 5], "to": [12, 5.5], "label": "no answer", "c": "red", "dash": true},
+          {"op": "flame", "x": 13.2, "y": 4.2}
+        ]
+      }
+    }
+  ],
+  "risks": [
+    {
+      "title": "One shared bucket for every client",
+      "severity": "medium",
+      "where": "limiter key choice",
+      "what": "If the bucket key is the IP address, everyone behind one office network shares a single allowance.",
+      "fix": "Key the bucket on the account id, falling back to the address only for anonymous calls.",
+      "confidence": "inferred",
+      "scene": {
+        "caption": "many people, one allowance",
+        "draw": [
+          {"op": "blot", "x": 3, "y": 5.5, "s": 0.8, "mood": "worried"},
+          {"op": "blot", "x": 5.5, "y": 5.5, "s": 0.8, "mood": "worried"},
+          {"op": "dial", "x": 11, "y": 4.5, "s": 1.3, "label": "10 a second"},
+          {"op": "arrow", "from": [7, 5.2], "to": [9, 4.8], "label": "same key"}
+        ]
+      }
+    }
+  ],
+  "quiz": [
+    {"q": "What does the limiter send back when the bucket is empty?", "options": ["200", "429", "503"], "answer": 1, "why": "429 means too many requests, and Retry-After says when to come back."}
+  ]
+}

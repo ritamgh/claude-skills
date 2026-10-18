@@ -1,0 +1,1996 @@
+#!/usr/bin/env bash
+# crew — task registry for the dispatcher main session (skill: crew).
+# One folder per task under $CREW_ROOT/<id>/:
+#   meta       key=value lines, last one wins (shape, repo, worker, agent, branch...)
+#   intent.md  the user's request, verbatim
+#   brief.md   the worker brief (written by the main session)
+#   status     append-only event log: "<iso-ts>\t<STATE>\t<note>"; current state = last line
+#   hold.md    open question for the user (state held); answer.md once answered
+#   ask.md     open question that leaves the state alone (e.g. "merge go?" on a review task)
+#   decision   the id (D<n>) of the open question, present only while it is open
+#   report.md  the worker's full output (findings, draft text, evidence)
+#   summary.md what the lead told the user about the result (first non-empty line = the verdict)
+# Nothing here launches or stops agents; it only records. Every write is to the task's own
+# files (status writes are single small appends), except the decision counter, which is global
+# and handed out under flock.
+set -euo pipefail
+
+CREW_ROOT="${CREW_ROOT:-$HOME/.claude/crew}"
+CREW_SESSIONS="${CREW_SESSIONS:-$HOME/.claude/sessions}"
+CREW_BIN=$(dirname "$(readlink -f "$0")")
+STALL_SECS=1800   # a running task with no status line this long is "stalled?"
+STATES="queued running waiting held answered review done landed failed dropped"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  crew new SLUG --shape ship|scout|draft [--repo DIR] "intent (user's words)"
+                                 records the owning lead session (lead=, lead_pid= in meta) when run
+                                 and lead_sid=/sub_sid= (identity survives renames and restarts) when run
+                                 from a claude session; crew meta ID lead=<name> overrides it
+  crew join LEAD                 report to a live session LEAD (a chain of command): tasks made here count
+                                 under LEAD (lead=LEAD, sub=<this session>). Explicit only; refuses itself,
+                                 unknown/dead sessions and cycles. Survives renames (kept by sessionId).
+  crew leave                     undo join
+  crew whoami                    this session's name, its parent (live|gone) and its live subs
+  crew subs [--lead NAME]        sessions joined to NAME (default: this session), live or gone. Prints the
+                                 `Action items` block first (as digest): closes landed subs, verify X?, owner sleep/wake.
+  crew relink                    after a restart/resume (new sessionId): follow this session's earlier ids
+                                 from its transcript, move its chain link and subs' links to the new id.
+                                 Idempotent; new/whoami/digest/ls also do it once per session.
+  crew meta-migrate [--apply]    give open tasks with only lead=/sub= names a lead_sid/sub_sid when the name
+                                 is one live session (dry run unless --apply)
+  crew spawn SLUG [--repo DIR] [--model M] [--shape ship|scout] "brief" | --brief FILE
+                                 a lead starts a sub-lead for a complex task in its own tmux window (session
+                                 $CREW_SPAWN_TMUX, default claude): makes the task, writes the brief, launches
+                                 `claude -n <you>/<slug>`, and joins the new session to you when it first runs crew.
+                                 Lead sessions only; at most 3 live sub-leads per lead, nesting at most 2 deep;
+                                 low RAM queues it instead (crew next, then crew spawn --resume ID).
+  crew spawn --resume ID         launch a spawn that was queued for RAM (from the lead that made it)
+  crew spawn --top SLUG --repo DIR [--model M] "first message" | --brief FILE
+                                 start a top-level lead (no chain link; reports to the user via HQ). For the user and
+                                 HQ, not for leads. From any context; window claude:<slug>, `claude -n <slug>`;
+                                 at most 5 live ones; DIR must be a git repo or under ~/Developer, not ~/.claude.
+  crew log ID STATE ["note"]     STATE: queued running waiting held answered review done landed failed dropped
+  crew meta ID key=value ...     record worker, agent id, branch, worktree, check...
+  crew hold ID "question"        state held + hold.md; prints the decision id (D<n>). held/review/
+                                 sends a phone alert (<lead>: D<n>, the question) through crew-notify
+                                 (if installed). Holding again keeps the same D-id.
+  crew ask ID "question"         an open decision without a state change (e.g. "merge go?" on a
+                                 review task): ask.md + a D-id, printed, and a phone alert like hold.
+                                 Asking again replaces the text.
+  crew answer ID|D<n> "answer"   closes the decision. Held task: state answered + answer.md (relaunch/
+                                 resume the worker next). Ask on any other task: answer.md and a status
+                                 note, state unchanged. D-ids are global, never renumbered or reused.
+  crew digest [--lead NAME] [--peek]
+                                 the end-of-reply block for a lead (default: this session): "Since last
+                                 message" (tasks that entered review/held/answered/done/landed/failed
+                                 since the lead's last digest) and "Needs you" (open D-ids). Prints
+                                 nothing when both are empty. --peek leaves the marker alone.
+                                 An `Action items` block comes first: closes landed subs, verify X?, owner sleep/wake.
+  crew compact --auto [SUB]      lead only. Compacts a sub of this session that is due, at a boundary, with no prompt
+                                 from the model: idle, no prompt open, not compacted in the last 20 min, and either
+                                 ctx >= ${CREW_COMPACT_SOFT:-200000} with a milestone (any `crew log` entry or a
+                                 `crew summary` of its open task) since the last compaction, or ctx >= ${CREW_COMPACT_HARD:-400000}.
+                                 One line per sub: `compacted X (ctx 250k)`, `skip X: busy|prompt|recent|ctx 150k|no
+                                 milestone (ctx 250k)|no task|no tmux pane`, `wait X: busy at 420k`, `close X? (done, ctx
+                                 310k)` (all its tasks are finished: never compacted). With SUB (before sending it new
+                                 work): no milestone needed (ctx >= SOFT), then waits <= 120 s until it is idle again.
+                                 The /compact focus is built from the sub's own crew log note, summary, task ids, brief
+                                 paths and open D-ids. digest and subs run the sweep silently (one line when it compacts).
+  crew compact SUB ["focus"]     one-off: /compact in SUB's pane now, if it is idle with no prompt open (exit 3 and the
+                                 reason otherwise; SUB must be a live session joined under this one). Ctx = input +
+                                 cache tokens of the sub's latest turn; `crew subs` shows it as `ctx 142k  idle`.
+  crew ls [--all] [--days N] [--open] [--repo DIR] [--leads]
+                                 tasks grouped: NEEDS YOU (held, failed, or any task with an open ask) / RUNNING (incl. review without an ask) / WAITING ON OTHERS (state waiting:
+                                 someone else must act, e.g. merge a PR) / RUNNING ELSEWHERE (live claude
+                                 sessions and jcode/jw/claude -p processes) / PARKED / DONE (last N
+                                 days, default 2); --open leaves out DONE and filters PARKED to the
+                                 cwd's repo; --repo DIR filters PARKED to that repo; --leads adds a column
+                                 with each task's lead under its current name
+  crew mem                       print MemAvailable/SwapFree (MB); exit 1 when MemAvailable is under
+                                 ${CREW_MEM_MIN_MB:-2500} MB
+  crew next                      list queued tasks (oldest first); "ok to start: <id>" for the oldest
+                                 one queued for RAM when memory allows. Starting it is the lead's job.
+  crew watch                     phone-notify once per stalled running task (no status line >30 min)
+                                 and once when memory frees for a RAM-queued task (systemd timer).
+                                 Silent unless CREW_NOTIFY_WATCH=1.
+  crew park [--repo DIR] "text"  park a suggestion the user did not act on (repo defaults to cwd's)
+  crew unpark P<n> [done|dropped]
+  crew summary ID -|"text"       save the user-facing result of a task as summary.md (replaces the old one;
+                                 "-" reads stdin, for a heredoc). First non-empty line = the verdict.
+                                 From a top-level lead (no live parent) it also sends the phone alert
+                                 "<lead>: <task>" with that line; a sub-lead or a plain shell sends none,
+                                 and the same text never alerts twice.
+  crew show ID|D<n>              the summary (if saved), then meta, intent, open decision, hold/answer, last
+                                 status lines, file paths
+  crew dir ID                    print the task folder
+  crew owner add FEATURE --paths 'GLOB'... [--sub SESSION] [--repo DIR]
+                                 register a feature owner: the session (default: this one; --sub: a live sub of
+                                 yours), its lead, the repo (default cwd's) and repo-relative globs (`*` `?` in one
+                                 segment, `**` across, `dir/` = everything under it). Notes: crew owners --notes F.
+  crew owner rm FEATURE          unregister (its lead or itself); the folder moves to .owners/.removed/
+  crew owners [--repo DIR] [--for FILE...] [--for-diff REF] [--notes FEATURE]
+                                 list owners (feature, awake|asleep age, session, globs); --for/--for-diff: only the
+                                 owners whose globs match those files (git diff --name-only REF), plus the unowned
+                                 ones. Path matching only. --notes prints the notes file path.
+  crew owners --record-wake REF --change TEXT [--repo DIR]
+                                 (merge-card calls it) every ASLEEP owner whose globs match git diff REF gets TEXT
+                                 as a pending wake; its lead's digest/subs show `wake F: <change>?` until
+                                 `crew wake F` or `crew owners --dismiss F` (its lead; also HQ/the user).
+  crew sleep FEATURE             (its lead, or the owner itself: deferred until its turn ends) refuses unless the
+                                 owner is idle with an empty composer, its notes are newer than its last task log,
+                                 its window holds only its Claude pane and nobody is viewing that window; then
+                                 /compact (keep notes and open threads), wait for idle, close only that window,
+                                 record it asleep. Exit 3 + the reason when refused.
+  crew wake FEATURE [--] "task"  (its lead, or the user: CREW_AS_USER=1 or no claude session; never a sibling) RAM
+                                 check + spawn lock + sub-lead limit, a task for the work, then window claude:<name>
+                                 running `claude --resume <sid> -n <name>` with the task as its first prompt. Low
+                                 RAM queues it (crew next; crew wake --resume ID).
+  crew wake --resume ID          launch a wake that was queued for RAM
+  crew close SUB [--force-draft]  close SUB's tmux window by its id. Only SUB's direct lead (not a grandparent or a
+                                 sibling) or HQ (CREW_AS_USER=1, set only by HQ and the user) may; others are refused
+                                 with who can (exit 3). Also refused when the window holds other panes than SUB's,
+                                 SUB is busy or has a prompt open, or its composer holds a draft (--force-draft closes
+                                 it anyway). The close is logged on SUB's open tasks. Never use tmux kill-window.
+  crew talk TO "topic" [--] "message"
+                                 an owner asks a sibling owner (same lead) an interface question: logged to the
+                                 thread, capped at ${CREW_TALK_CAP:-6} messages, refused when TO is asleep (ask the
+                                 lead). Prints the line to send with SendMessage.
+  crew talk --done TO "topic"    close the thread;  crew talk --list [--lead NAME]: the threads
+  crew save ID [K]               write report.md (or report-K.md) from the worker's transcript:
+                                 the last SubagentHandback message, else the last assistant text.
+                                 Worker = meta agent (or agent_K). Claude workers can't write report files.
+  crew worktree ID [--base REF] [--branch NAME]
+                                 git worktree <repo>/.claude/worktrees/crew-ID on branch crew/ID (base: the repo's
+                                 current branch) for a ship task; records worktree= branch= base= port= (a free
+                                 dev-server PORT in 20000-32000) and runs the repo's executable .crew/setup (cwd =
+                                 worktree, env CREW_TASK CREW_WORKTREE CREW_REPO CREW_PORT, CREW_SETUP_TIMEOUT s,
+                                 default 120). Idempotent. Last stdout line = the worktree path. Exit 4: setup
+                                 failed (worktree kept); 5: git failed.
+  crew check ID                  run <worktree or repo>/.crew/check (executable; cwd there; env CREW_TASK
+                                 CREW_WORKTREE CREW_REPO CREW_PORT; CREW_CHECK_TIMEOUT s, default 600). Last 200
+                                 lines -> <task>/check.log; records check=pass|fail|timeout|none + check_at=; prints
+                                 `check: pass (3.2s)`. Exit 0 pass, 1 fail/timeout, 2 usage, 3 no .crew/check.
+                                 `crew log ID review "note"` then appends [check: <value>]; `crew show` prints it.
+  crew gc [REPO]                 LIST git worktrees of REPO (default cwd): merged / dirty / unpushed / size,
+                                 plus the `git worktree remove` commands for merged+clean ones. Deletes nothing.
+  crew diff ID [--focus] [--print]
+                                 show the task's changes (<base>...<branch>, else uncommitted) in nvim with diffview.nvim,
+                                 in a tmux pane right of its lead's Claude pane (reused on the next call; a window
+                                 diff-ID when the lead has no pane). --focus selects it; --print only prints the plan.
+EOF
+}
+
+die() { echo "crew: $*" >&2; exit 2; }
+now() { printf '%s\n' "${CREW_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"; }   # CREW_NOW: tests only
+tdir() { # a task id is a plain folder name under the crew root: no path parts
+  case "$1" in "" | . | .. | */*) die "bad task id '$1'" ;; esac
+  local d="$CREW_ROOT/$1"; [ -d "$d" ] || die "no task '$1'"; printf '%s' "$d"
+}
+state_of() { tail -n 1 "$1/status" 2>/dev/null | cut -f2; }
+meta_get() { grep -E "^$2=" "$1/meta" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+valid_state() { case " $STATES " in *" $1 "*) return 0 ;; esac; return 1; }
+is_did() { [[ "$1" =~ ^[Dd][0-9]+$ ]]; }
+
+# --- decisions: a question for the user with a global id (D1, D2...), open while $d/decision exists ---
+open_decision() { cat "$1/decision" 2>/dev/null || true; }
+# the file holding the open question: hold.md while the task is held, else ask.md
+question_file() { if [ "$(state_of "$1")" = held ]; then printf '%s/hold.md' "$1"; else printf '%s/ask.md' "$1"; fi; }
+first_line() { awk 'NF {sub(/^[ \t]+/, ""); print; exit}' "$1" 2>/dev/null || true; }
+
+# The task's open decision id, or a new one if it has none. The check and the install are one step under the
+# lock, so two asks at once on a task get the same id; the counter never goes back, so an id is never handed out twice.
+claim_decision() {
+  mkdir -p "$CREW_ROOT"
+  (
+    flock 9
+    local id n; id=$(open_decision "$1")
+    if [ -z "$id" ]; then
+      n=$(cat "$CREW_ROOT/.dseq" 2>/dev/null || true)
+      [[ "$n" =~ ^[0-9]+$ ]] || n=0
+      n=$((n + 1))
+      printf '%s\n' "$n" >"$CREW_ROOT/.dseq"
+      id="D$n"
+      printf '%s\n' "$id" >"$1/decision"
+    fi
+    printf '%s\n' "$id"
+  ) 9>"$CREW_ROOT/.dseq.lock"
+}
+
+# the task folder whose open decision is $1 (D<n>)
+decision_dir() {
+  local want="D${1#[Dd]}" f
+  for f in "$CREW_ROOT"/*/decision; do
+    [ -f "$f" ] || continue
+    if [ "$(cat "$f")" = "$want" ]; then dirname "$f"; return 0; fi
+  done
+  return 1
+}
+
+# a task id, or the D-id of an open decision, -> task folder
+tdir_or_decision() {
+  if is_did "$1"; then decision_dir "$1" || die "no open decision $1"; else tdir "$1"; fi
+}
+
+# Phone alert; never fails the caller. crew-notify comes from PATH, else from this script's folder.
+notify() {
+  local n; n=$(command -v crew-notify 2>/dev/null || true)
+  if [ -z "$n" ] && [ -x "$CREW_BIN/crew-notify" ]; then n="$CREW_BIN/crew-notify"; fi
+  if [ -n "$n" ]; then timeout 10 "$n" "$1" "$2" </dev/null >/dev/null 2>&1 || true; fi
+}
+
+fmt_age() { # seconds -> 5m / 3h / 2d
+  local a=$1
+  if [ "$a" -lt 3600 ]; then echo "$((a / 60))m"; elif [ "$a" -lt 172800 ]; then echo "$((a / 3600))h"; else echo "$((a / 86400))d"; fi
+}
+
+# git toplevel of DIR (default cwd), else DIR itself; empty when DIR is cwd and not a repo.
+repo_of() {
+  local dir=${1:-}
+  if [ -z "$dir" ]; then git rev-parse --show-toplevel 2>/dev/null || true; return; fi
+  ( cd "$dir" 2>/dev/null && { git rev-parse --show-toplevel 2>/dev/null || pwd -P; } ) || die "repo not found: $dir"
+}
+
+# --- memory guard and queue ---
+cmd_mem() {
+  local min=${CREW_MEM_MIN_MB:-2500} avail swap
+  read -r avail swap < <(awk '/^MemAvailable:/ {a=int($2/1024)} /^SwapFree:/ {s=int($2/1024)} END {print a+0, s+0}' /proc/meminfo)
+  if [ "$avail" -ge "$min" ]; then
+    echo "mem ok: ${avail} MB available, ${swap} MB swap free (min ${min})"
+  else
+    echo "mem low: ${avail} MB available < ${min} MB needed, ${swap} MB swap free"
+    return 1
+  fi
+}
+mem_ok() { cmd_mem >/dev/null; }
+
+# "<queued-ts>\t<dir>" per queued task, oldest first
+queued_list() {
+  local d
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}
+    [ -f "$d/status" ] || continue
+    [ "$(state_of "$d")" = queued ] || continue
+    printf '%s\t%s\n' "$(tail -n 1 "$d/status" | cut -f1)" "$d"
+  done | sort
+}
+
+# id of the oldest task queued for RAM (its last note starts with "RAM"), else nothing
+ram_candidate() {
+  local ts d note
+  while IFS=$'\t' read -r ts d; do
+    note=$(tail -n 1 "$d/status" | cut -f3)
+    if [[ "${note,,}" == ram* || "${note,,}" == *"waiting for ram"* ]]; then basename "$d"; return 0; fi
+  done < <(queued_list)
+  return 0
+}
+
+cmd_next() {
+  [ -d "$CREW_ROOT" ] || exit 0
+  local ts d any="" cand
+  while IFS=$'\t' read -r ts d; do
+    [ -n "$any" ] || { echo QUEUED; any=1; }
+    row "$d"
+  done < <(queued_list)
+  cand=$(ram_candidate)
+  [ -n "$cand" ] || return 0
+  if mem_ok; then
+    if [ -n "$(meta_get "$CREW_ROOT/$cand" owner)" ]; then echo "ok to start: $cand (crew wake --resume $cand)"
+    elif [ "$(meta_get "$CREW_ROOT/$cand" spawned)" = 1 ]; then echo "ok to start: $cand (crew spawn --resume $cand)"; else echo "ok to start: $cand"; fi
+  else echo "waiting for RAM: $(cmd_mem || true)"; fi
+}
+
+# Run from a timer: alert once per stall and once when RAM frees up for a queued task.
+# Off unless CREW_NOTIFY_WATCH=1: the user only wants phone alerts from leads (summaries, decisions).
+cmd_watch() {
+  [ -d "$CREW_ROOT" ] || exit 0
+  [ "${CREW_NOTIFY_WATCH:-}" = 1 ] || exit 0
+  local d id last ts age mk cand
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}
+    [ -f "$d/status" ] || continue
+    [ "$(state_of "$d")" = running ] || continue
+    last=$(tail -n 1 "$d/status"); ts=$(cut -f1 <<<"$last")
+    age=$(($(date +%s) - $(date -d "$ts" +%s)))
+    [ $age -ge $STALL_SECS ] || continue
+    mk=$d/alerted-stalled   # holds the ts of the status line already alerted for
+    [ "$(cat "$mk" 2>/dev/null || true)" != "$ts" ] || continue
+    id=$(basename "$d")
+    notify "$id: stalled?" "running, no status line for $((age / 60)) min: $(cut -f3 <<<"$last")"
+    printf '%s\n' "$ts" >"$mk"
+  done
+  mk=$CREW_ROOT/.watch-mem
+  cand=$(ram_candidate)
+  if [ -n "$cand" ] && mem_ok; then
+    if [ "$(cat "$mk" 2>/dev/null || true)" != "$cand" ]; then
+      notify "$cand: RAM free" "memory is free again; the queued task can start"
+      printf '%s\n' "$cand" >"$mk"
+    fi
+  else
+    rm -f "$mk"
+  fi
+}
+
+# --- parking lot: suggestions the user did not act on ---
+# parked.tsv (open): date, P<n>, repo ("-" = none), text. unpark moves a line to parked-closed.tsv.
+cmd_park() {
+  local repo="" text="" have=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --repo) repo=${2:-}; have=1; shift 2 ;;
+      -*) die "unknown flag $1" ;;
+      *) text="${text:+$text }$1"; shift ;;
+    esac
+  done
+  [ -n "$text" ] || die 'park needs "text"'
+  if [ $have = 1 ]; then repo=$(repo_of "$repo"); else repo=$(repo_of); fi
+  text=$(printf '%s' "$text" | tr '\t\n' '  ')
+  mkdir -p "$CREW_ROOT"
+  local n
+  n=$({ cat "$CREW_ROOT/parked.tsv" "$CREW_ROOT/parked-closed.tsv" 2>/dev/null || true; } |
+    awk -F'\t' '{sub(/^P/, "", $2); if ($2 + 0 > m) m = $2 + 0} END {print m + 1}')
+  printf '%s\tP%s\t%s\t%s\n' "$(date +%F)" "$n" "${repo:--}" "$text" >>"$CREW_ROOT/parked.tsv"
+  echo "parked P$n"
+}
+
+cmd_unpark() {
+  [ $# -ge 1 ] && [ $# -le 2 ] || die "unpark needs P<n> [done|dropped]"
+  local id=${1#[Pp]} outcome=${2:-done} f=$CREW_ROOT/parked.tsv line
+  id="P$id"
+  case "$outcome" in done | dropped) ;; *) die "outcome: done or dropped" ;; esac
+  line=$(awk -F'\t' -v id="$id" '$2 == id' "$f" 2>/dev/null || true)
+  [ -n "$line" ] || die "no parked item $id"
+  awk -F'\t' -v id="$id" '$2 != id' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
+  printf '%s\t%s\t%s\t%s\n' "$(date +%F)" "$id" "$outcome" "$(cut -f3- <<<"$line")" >>"$CREW_ROOT/parked-closed.tsv"
+  echo "$id $outcome"
+}
+
+# PARKED lines; $1 = 1 to filter to repo $2 (items without a repo always show). Max 8 lines.
+parked_section() {
+  local f=$CREW_ROOT/parked.tsv lines n
+  [ -s "$f" ] || return 0
+  lines=$(awk -F'\t' -v flt="$1" -v repo="$2" 'flt != 1 || $3 == repo || $3 == "-" {
+    r = $3; sub(/.*\//, "", r); t = substr($4, 1, 70)
+    printf "  %-4s %s  %-12s %s\n", $2, substr($1, 6), r, t }' "$f")
+  [ -n "$lines" ] || return 0
+  n=$(wc -l <<<"$lines")
+  echo PARKED
+  if [ "$n" -gt 8 ]; then head -n 7 <<<"$lines"; echo "  +$((n - 7)) more"; else echo "$lines"; fi
+}
+
+# --- other work on this machine: live claude sessions and agent processes ---
+# Is the process a claude session? Its comm is claude (or $2), or, for a background session run by the claude
+# daemon, the version of the binary (2.1.301).
+is_claude() {
+  local c; c=$(cat "/proc/$1/comm" 2>/dev/null || true)
+  [ "$c" = "${2:-claude}" ] || [[ "$c" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+ancestors() { # this shell and every parent, one pid per line
+  local p=$$
+  while [ -n "$p" ] && [ "$p" -gt 1 ]; do
+    echo "$p"
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ' || true)
+  done
+}
+
+elsewhere() {
+  local anc f pid name cwd st upd age pri lines="" nowts args et
+  anc=" $(ancestors | tr '\n' ' ')"
+  nowts=$(date +%s)
+  for f in "$CREW_SESSIONS"/*.json; do
+    [ -f "$f" ] || continue
+    IFS=$'\t' read -r pid name cwd st upd < <(jq -r '[.pid, (.name // "?"), (.cwd // "?"), (.status // "?"), (.statusUpdatedAt // .updatedAt // 0)] | @tsv' "$f" 2>/dev/null) || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    is_claude "$pid" || continue
+    case "$anc" in *" $pid "*) continue ;; esac
+    age=$((nowts - upd / 1000)); [ $age -ge 0 ] || age=0
+    pri=0; [ "$st" != idle ] || pri=1
+    lines+=$(printf '%s\t  claude %-20.20s %-7s %4s  %s' "$pri" "$name" "$st" "$(fmt_age $age)" "$(sed "s|^$HOME|~|" <<<"$cwd" | cut -c1-40)")$'\n'
+  done
+  while read -r pid et args; do
+    case "$anc" in *" $pid "*) continue ;; esac
+    if [[ "$args" =~ ^([^\ ]*/)?(jcode|jw)(\ |$) ]] ||
+      [[ "$args" =~ ^[^\ ]*(bash|sh|python3?|node)\ ([^\ ]*/)?(jcode|jw)(\ |$) ]] ||
+      [[ "$args" =~ ^([^\ ]*/)?claude(\ .*)?\ (-p|--print)(\ |$) ]]; then
+      lines+=$(printf '0\t  proc   %-20s %-7s %4s  %s' "pid $pid" run "$(fmt_age "$et")" "${args:0:60}")$'\n'
+    fi
+  done < <(ps -eo pid=,etimes=,args= 2>/dev/null)
+  [ -n "$lines" ] || return 0
+  lines=$(printf '%s' "$lines" | sort -s -k1,1 | cut -f2-)
+  local n; n=$(wc -l <<<"$lines")
+  echo "RUNNING ELSEWHERE"
+  if [ "$n" -gt 8 ]; then head -n 7 <<<"$lines"; echo "  +$((n - 7)) more"; else echo "$lines"; fi
+}
+
+# The Claude session that ran this command: the nearest ancestor pid that has a sessions/*.json and is a
+# claude process. Prints "name<TAB>pid<TAB>sessionId" (sessionId "-" when the json has none), or nothing
+# (plain shell). Reads only *.json: the folder also holds *.key secrets. CREW_LEAD_COMM overrides the
+# process name (tests only).
+lead_session() {
+  local anc f pid name sid p
+  declare -A sess=()
+  for f in "$CREW_SESSIONS"/*.json; do
+    [ -f "$f" ] || continue
+    IFS=$'\x1f' read -r pid name sid < <(jq -r '[.pid, (.name // ""), (.sessionId // "-")] | map(tostring) | join("\u001f")' "$f" 2>/dev/null) || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "$name" ] || continue
+    sess[$pid]="$name"$'\t'"$pid"$'\t'"$sid"
+  done
+  for p in $(ancestors); do
+    [ -n "${sess[$p]:-}" ] || continue
+    is_claude "$p" "${CREW_LEAD_COMM:-claude}" || continue
+    printf '%s\n' "${sess[$p]}"
+    return 0
+  done
+  return 0
+}
+
+# --- chain of command: a session that joined a lead reports up to it ---
+# $CREW_ROOT/.links/<sub sessionId> holds sub_name, parent_name, parent_sid (key=value). Names change across
+# restarts, sessionIds do not: the parent is found by sessionId first, then by name.
+link_path() { printf '%s/.links/%s' "$CREW_ROOT" "$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' _)"; }
+link_get() { grep -E "^$2=" "$1" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+
+# live claude session whose json field FIELD (sessionId|name) equals VALUE -> "name<TAB>pid<TAB>sessionId"
+live_session() {
+  local f pid name sid
+  [ -n "$2" ] && [ "$2" != - ] || return 0
+  for f in "$CREW_SESSIONS"/*.json; do
+    [ -f "$f" ] || continue
+    IFS=$'\x1f' read -r pid name sid < <(jq -r '[.pid, (.name // ""), (.sessionId // "-")] | map(tostring) | join("\u001f")' "$f" 2>/dev/null) || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "$name" ] || continue
+    if [ "$1" = name ]; then [ "$name" = "$2" ] || continue; else [ "$sid" = "$2" ] || continue; fi
+    is_claude "$pid" "${CREW_LEAD_COMM:-claude}" || continue
+    printf '%s\t%s\t%s\n' "$name" "$pid" "$sid"
+    return 0
+  done
+  return 0
+}
+
+# --- identity: sessions are known by sessionId, names are labels ---
+# The live claude sessions, "name<TAB>pid<TAB>sessionId" per line, read once per process (call sess_load from the
+# top level of a command: a call inside $(...) cannot keep the cache). Reads only *.json: the folder also holds
+# *.key secrets.
+SESS_TABLE=""; SESS_LOADED=0
+sess_load() {
+  [ $SESS_LOADED = 0 ] || return 0
+  SESS_LOADED=1
+  local f pid name sid
+  for f in "$CREW_SESSIONS"/*.json; do
+    [ -f "$f" ] || continue
+    IFS=$'\x1f' read -r pid name sid < <(jq -r '[.pid, (.name // ""), (.sessionId // "-")] | map(tostring) | join("\u001f")' "$f" 2>/dev/null) || continue
+    [[ "$pid" =~ ^[0-9]+$ ]] && [ -n "$name" ] || continue
+    is_claude "$pid" "${CREW_LEAD_COMM:-claude}" || continue
+    SESS_TABLE+="$name"$'\t'"$pid"$'\t'"$sid"$'\n'
+  done
+}
+sid_key() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' _; }
+
+# The live session that is (or continues) session SID, else the one named NAME -> "name<TAB>pid<TAB>sessionId".
+# Continues: its $CREW_ROOT/.prev/<its sessionId> file (written by `crew relink`) lists SID.
+resolve_session() {
+  local sid=${1:-} name=${2:-} row="" n p s
+  sess_load
+  if [ -n "$sid" ] && [ "$sid" != - ]; then
+    while IFS=$'\t' read -r n p s; do
+      if [ "$s" = "$sid" ]; then row="$n"$'\t'"$p"$'\t'"$s"; break; fi
+    done <<<"$SESS_TABLE"
+    if [ -z "$row" ]; then
+      while IFS=$'\t' read -r n p s; do
+        [ -n "$s" ] && [ -f "$CREW_ROOT/.prev/$(sid_key "$s")" ] || continue
+        if grep -qxF -- "$sid" "$CREW_ROOT/.prev/$(sid_key "$s")"; then row="$n"$'\t'"$p"$'\t'"$s"; break; fi
+      done <<<"$SESS_TABLE"
+    fi
+  fi
+  if [ -z "$row" ] && [ -n "$name" ]; then
+    while IFS=$'\t' read -r n p s; do
+      if [ "$n" = "$name" ]; then row="$n"$'\t'"$p"$'\t'"$s"; break; fi
+    done <<<"$SESS_TABLE"
+  fi
+  printf '%s' "$row"
+}
+
+# the sessionId of the only live session named NAME, else nothing
+unique_sid_of() {
+  local rows; sess_load
+  rows=$(N=$1 awk -F'\t' '$1 == ENVIRON["N"] {print $3}' <<<"$SESS_TABLE" | sort -u)
+  if [ -n "$rows" ] && [ "$(wc -l <<<"$rows")" -eq 1 ]; then printf '%s' "$rows"; fi
+}
+
+# Bring a task's lead=/sub= (and lead_pid, lead_sid, sub_sid) up to date with the live session that now holds its
+# lead_sid/sub_sid, keeping the old name as lead_was=/sub_was=. Meta stays append-only, last line wins. This is
+# what lets readers that match by name (HQ) follow a rename. Only a sessionId match (or a recorded continuation)
+# counts: a session that merely reuses the name never takes over a task, and a task without a *_sid is left alone.
+# The write is one step under the task's lock after re-reading, so an explicit `crew meta lead=` that lands first wins.
+refresh_names() {
+  local d=$1 l has=0 k sid cur r nm add
+  while IFS= read -r l || [ -n "$l" ]; do
+    case $l in lead_sid=?* | sub_sid=?*) has=1 ;; esac
+  done <"$d/meta" 2>/dev/null || return 0
+  [ $has = 1 ] || return 0
+  for k in lead sub; do
+    sid=$(meta_get "$d" "${k}_sid"); [ -n "$sid" ] || continue
+    cur=$(meta_get "$d" "$k")
+    r=$(resolve_session "$sid" ""); [ -n "$r" ] || continue
+    nm=$(cut -f1 <<<"$r")
+    if [ "$nm" = "$cur" ] && [ "$(cut -f3 <<<"$r")" = "$sid" ]; then continue; fi
+    mkdir -p "$CREW_ROOT/.locks" 2>/dev/null || continue
+    (
+      flock 9
+      [ "$(meta_get "$d" "${k}_sid")" = "$sid" ] && [ "$(meta_get "$d" "$k")" = "$cur" ] || exit 0
+      add=""
+      [ "$nm" = "$cur" ] || add+="${k}_was=$cur"$'\n'
+      add+="$k=$nm"$'\n'
+      [ "$k" != lead ] || add+="lead_pid=$(cut -f2 <<<"$r")"$'\n'
+      add+="${k}_sid=$(cut -f3 <<<"$r")"$'\n'
+      printf '%s' "$add" >>"$d/meta"
+    ) 9>"$CREW_ROOT/.locks/$(basename "$d")" 2>/dev/null || true
+  done
+}
+
+link_write() { # file sub_name parent_name parent_sid; atomic. Fails (non-zero) when the file cannot be written
+  local tmp=$1.tmp.$$
+  { printf 'sub_name=%s\nparent_name=%s\nparent_sid=%s\n' "$2" "$3" "$4" >"$tmp" && mv "$tmp" "$1"; } 2>/dev/null || { rm -f "$tmp" 2>/dev/null; return 1; }
+}
+
+# the live parent of link file $1 -> "name<TAB>pid<TAB>sessionId", or nothing when it is gone. The parent is found by its
+# sessionId or one it continues (.prev), never by name: a new session that took a dead parent's name is not the parent
+# (it would otherwise get the link re-pointed to it, and the rights that come with being the lead). When the parent
+# was renamed or restarted (relinked) the stored link is refreshed.
+link_parent() {
+  local psid pname r; psid=$(link_get "$1" parent_sid); pname=$(link_get "$1" parent_name)
+  r=$(resolve_session "$psid" "")
+  if [ -n "$r" ] && { [ "$(cut -f3 <<<"$r")" != "$psid" ] || [ "$(cut -f1 <<<"$r")" != "$pname" ]; }; then
+    link_write "$1" "$(link_get "$1" sub_name)" "$(cut -f1 <<<"$r")" "$(cut -f3 <<<"$r")" || true
+  fi
+  printf '%s' "$r"
+}
+
+# "name<TAB>live|gone<TAB>sessionId" per session joined to lead (name, sessionId): live sessions under their current name
+subs_of() {
+  local f sid r sname
+  sess_load
+  for f in "$CREW_ROOT"/.links/*; do
+    [ -f "$f" ] || continue
+    [[ "$f" != *.tmp.* ]] || continue
+    r=$(link_parent "$f")
+    if [ -n "$r" ]; then [ "$(cut -f3 <<<"$r")" = "$2" ] || continue; else [ "$(link_get "$f" parent_name)" = "$1" ] || continue; fi
+    sid=$(basename "$f"); sname=$(link_get "$f" sub_name)
+    r=$(resolve_session "$sid" "$sname")
+    if [ -n "$r" ]; then
+      if [ "$(cut -f1 <<<"$r")" != "$sname" ]; then
+        link_write "$f" "$(cut -f1 <<<"$r")" "$(link_get "$f" parent_name)" "$(link_get "$f" parent_sid)" || true
+      fi
+      printf '%s\tlive\t%s\n' "$(cut -f1 <<<"$r")" "$(cut -f3 <<<"$r")"
+    else
+      printf '%s\tgone\t%s\n' "$sname" "$sid"
+    fi
+  done
+}
+
+self_session() { # name, pid, sessionId of this session, or die
+  local s; s=$(lead_session)
+  [ -n "$s" ] || die "not inside a claude session"
+  [ "$(cut -f3 <<<"$s")" != - ] || die "this session has no sessionId in $CREW_SESSIONS"
+  printf '%s' "$s"
+}
+
+cmd_join() {
+  [ $# -eq 1 ] && [ -n "$1" ] || die "join needs LEAD (a live session name)"
+  local me; me=$(self_session)
+  mkdir -p "$CREW_ROOT/.links"
+  # the cycle check and the link install are one step under the lock: two joins at once cannot both pass
+  ( flock 9; join_locked "$1" "$(cut -f1 <<<"$me")" "$(cut -f3 <<<"$me")" ) 9>"$CREW_ROOT/.links.lock"
+}
+
+# Walk up from the lead (sid TSID, name TNAME) until the chain ends: meeting session MSID (or any session twice) is a
+# loop. Prints the reason and returns 1 on a loop.
+chain_check() {
+  local cur=$1 tname=$2 msid=$3 seen=" " lf r
+  while :; do
+    [ "$cur" != "$msid" ] || { echo "cycle: '$tname' already reports to you"; return 1; }
+    case "$seen" in *" $cur "*) echo "cycle: the links above '$tname' loop"; return 1 ;; esac
+    seen+="$cur "
+    lf=$(link_path "$cur"); [ -f "$lf" ] || break
+    r=$(link_parent "$lf")
+    if [ -n "$r" ]; then cur=$(cut -f3 <<<"$r"); else cur=$(link_get "$lf" parent_sid); fi
+    [ -n "$cur" ] || break
+  done
+}
+
+join_locked() { # lead-name my-name my-sid
+  local mname=$2 msid=$3 t tname tsid
+  t=$(live_session name "$1")
+  [ -n "$t" ] || die "no live session named '$1' (crew ls shows the live ones)"
+  tname=$(cut -f1 <<<"$t"); tsid=$(cut -f3 <<<"$t")
+  [ "$tsid" != "$msid" ] || die "cannot join yourself"
+  local reason; reason=$(chain_check "$tsid" "$tname" "$msid") || die "$reason"
+  link_write "$(link_path "$msid")" "$mname" "$tname" "$tsid" || die "cannot write the link"
+  echo "joined: $mname reports to $tname"
+}
+
+cmd_leave() {
+  [ $# -eq 0 ] || die "leave takes no arguments"
+  local me lf; me=$(self_session); lf=$(link_path "$(cut -f3 <<<"$me")")
+  if [ -f "$lf" ]; then rm -f "$lf"; echo "left: $(cut -f1 <<<"$me") reports to no one"; else echo "not joined"; fi
+}
+
+cmd_whoami() {
+  [ $# -eq 0 ] || die "whoami takes no arguments"
+  local me msid lf r subs
+  me=$(self_session); msid=$(cut -f3 <<<"$me")
+  relink_once
+  echo "name: $(cut -f1 <<<"$me")"
+  lf=$(link_path "$msid")
+  if [ -f "$lf" ]; then
+    r=$(link_parent "$lf")
+    if [ -n "$r" ]; then echo "parent: $(cut -f1 <<<"$r") (live)"; else echo "parent: $(link_get "$lf" parent_name) (gone; reporting in this pane)"; fi
+  else
+    echo "parent: none"
+  fi
+  subs=$(subs_of "$(cut -f1 <<<"$me")" "$msid" | awk -F'\t' '{printf "%s%s (%s)", sep, $1, $2; sep = ", "}')
+  echo "subs: ${subs:-none}"
+}
+
+# "ctx 142k  idle" for a live sub: its context (from its transcript) and its pane state (idle|busy|prompt); a part is
+# left out when it cannot be told (no transcript, not in a tmux pane)
+sub_context() {
+  local out="" target
+  if ctx_read "$2"; then out="ctx $(fmt_k "$C_CTX")"; fi
+  target=$(pane_target "$1" "$2")
+  if [ -n "$target" ] && pane_read "$target"; then out+="${out:+  }$P_STATE"; fi
+  printf '%s' "$out"
+}
+
+cmd_subs() {
+  local lead="" lsid=-
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --lead) lead=${2:-}; [ -n "$lead" ] || die "--lead needs a name"; shift 2 ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  local own=0
+  if [ -z "$lead" ]; then
+    local me; me=$(self_session); lead=$(cut -f1 <<<"$me"); lsid=$(cut -f3 <<<"$me"); own=1
+  else
+    local r; r=$(resolve_session "" "$lead"); [ -z "$r" ] || lsid=$(cut -f3 <<<"$r")
+  fi
+  sess_load
+  lifecycle_block "$lead" "$lsid" $own || true   # action items first; only the lead's own `crew subs` acts (closes a landed sub)
+  [ $own = 0 ] || compact_sweep "$lead" "$lsid" q || true   # compacts a sub that is due; says so in one line
+  [ $own = 0 ] || { answers_sweep "$lsid"; pane_ask_sweep "$lead" "$lsid"; }   # queued answers; a sub's in-pane question
+  local n s sid w ctx
+  local rows; rows=$(subs_of "$lead" "$lsid")
+  if grep -q $'\tlive\t' <<<"$rows"; then tmap_load; fi   # at the top level: the cache cannot be kept inside $(...)
+  while IFS=$'\t' read -r n s sid; do
+    [ -n "$n" ] || continue
+    w=$(window_of_sid "$sid")   # a spawned sub-lead: where its window is
+    ctx=""
+    [ "$s" != live ] || ctx=$(sub_context "$n" "$sid")
+    printf '%-24s %s%s%s\n' "$n" "$s" "${w:+  $w}" "${ctx:+  $ctx}"
+  done <<<"$rows"
+}
+
+# --- restart continuity: a restarted or resumed session gets a NEW sessionId, but its transcript starts with the
+# earlier records, which still carry the old ids. `crew relink` reads the first 200 lines of this session's own
+# transcript, takes those ids as "the same session" (kept in .prev/<sessionId>, which resolve_session follows),
+# moves the chain link filed under an old id to the new one, and repoints links whose parent was an old id.
+# Idempotent and cheap. Other commands call relink_once, which skips once the transcript has settled.
+relink_self() { # $1 = 1: say what happened. Returns 1 when the links could not be updated (nothing marked, so it retries)
+  local me sid name trf="" f olds="" o live changed=0 cands="" pdir out rc
+  me=$(lead_session); [ -n "$me" ] || { [ "$1" != 1 ] || echo "relink: not inside a claude session"; return 0; }
+  name=$(cut -f1 <<<"$me"); sid=$(cut -f3 <<<"$me")
+  [ "$sid" != - ] || return 0
+  [ -d "$CREW_ROOT" ] || return 0
+  for f in "${CREW_PROJECTS:-$HOME/.claude/projects}"/*/"$sid".jsonl; do [ -f "$f" ] && { trf=$f; break; }; done
+  [ -n "$trf" ] || { [ "$1" != 1 ] || echo "relink: no transcript for $sid"; return 0; }
+  pdir=${trf%/*}
+  sess_load
+  live=$(cut -f3 <<<"$SESS_TABLE")
+  # Candidates: every other sessionId in this transcript, newest life first. A life is adopted only when its own
+  # transcript is in the same project folder and its last record is in this one (this transcript holds its whole
+  # history: a resume, not a fork that copied part of it), and it is not live.
+  while IFS= read -r o; do
+    [[ "$o" =~ ^[A-Za-z0-9._-]+$ ]] && [ "$o" != "$sid" ] || continue
+    if grep -qxF -- "$o" <<<"$live"; then continue; fi
+    [ -f "$pdir/$o.jsonl" ] || continue
+    f=$(tail -n 50 "$pdir/$o.jsonl" | { grep -o '"uuid" *: *"[^"]*"' || true; } | tail -n 1 | cut -d'"' -f4)
+    { [ -n "$f" ] && grep -qF -- "\"$f\"" "$trf"; } || continue
+    cands+="$o"$'\n'
+  done < <({ grep -o '"sessionId" *: *"[^"]*"' "$trf" || true; } | cut -d'"' -f4 | awk '!s[$0]++' | tac)
+  out=$CREW_ROOT/.relink.out.$$
+  if [ -n "$cands" ]; then
+    # claims, the link moves and .prev are one step under the links lock: a life belongs to the first session that
+    # claims it, so two resumes of the same life cannot both take its link
+    (
+      flock 9
+      bad=0
+      mkdir -p "$CREW_ROOT/.prev" "$CREW_ROOT/.claims" "$CREW_ROOT/.links" || exit 1
+      prev=$(cat "$CREW_ROOT/.prev/$(sid_key "$sid")" 2>/dev/null || true)
+      mine=""
+      while IFS= read -r o; do
+        [ -n "$o" ] || continue
+        cl=$(cat "$CREW_ROOT/.claims/$(sid_key "$o")" 2>/dev/null || true)
+        if [ -z "$cl" ]; then
+          printf '%s\n' "$sid" >"$CREW_ROOT/.claims/$(sid_key "$o").tmp.$$" && mv "$CREW_ROOT/.claims/$(sid_key "$o").tmp.$$" "$CREW_ROOT/.claims/$(sid_key "$o")" || { bad=1; continue; }
+          echo changed
+        elif [ "$cl" != "$sid" ]; then continue; fi
+        mine+="$o"$'\n'; echo "adopt $o"
+        # this session's own link, filed under that life, moves to the new id (an existing new link wins)
+        lf=$(link_path "$o")
+        if [ -f "$lf" ]; then
+          if [ ! -f "$(link_path "$sid")" ]; then
+            link_write "$(link_path "$sid")" "$name" "$(link_get "$lf" parent_name)" "$(link_get "$lf" parent_sid)" || { bad=1; continue; }
+          fi
+          rm -f "$lf" || bad=1
+          echo changed
+        fi
+      done <<<"$cands"
+      # links whose parent was one of those lives now point at the new id
+      for f in "$CREW_ROOT"/.links/*; do
+        [ -f "$f" ] || continue
+        [[ "$f" != *.tmp.* ]] || continue
+        if grep -qxF -- "$(link_get "$f" parent_sid)" <<<"$mine"; then
+          link_write "$f" "$(link_get "$f" sub_name)" "$name" "$sid" || { bad=1; continue; }
+          echo changed
+        fi
+      done
+      n=$(printf '%s\n%s' "$prev" "$mine" | awk 'NF && !s[$0]++' | sort)
+      if [ "$n" != "$(sort <<<"$prev")" ]; then
+        printf '%s\n' "$n" >"$CREW_ROOT/.prev/$(sid_key "$sid").tmp.$$" && mv "$CREW_ROOT/.prev/$(sid_key "$sid").tmp.$$" "$CREW_ROOT/.prev/$(sid_key "$sid")" || bad=1
+        echo changed
+      fi
+      exit $bad
+    ) 9>"$CREW_ROOT/.links.lock" >"$out" 2>/dev/null
+    rc=$?
+    olds=$(sed -n 's/^adopt //p' "$out" 2>/dev/null || true)
+    grep -qx changed "$out" 2>/dev/null && changed=1
+    rm -f "$out"
+    if [ $rc != 0 ]; then
+      [ "$1" != 1 ] || echo "crew: relink: cannot update the links (will retry)" >&2
+      return 1
+    fi
+  fi
+  # settled: earlier lives adopted, or a transcript long enough to have shown them
+  if [ -n "$olds" ] || [ "$(wc -l <"$trf")" -ge 200 ]; then
+    mkdir -p "$CREW_ROOT/.relinked" 2>/dev/null && : >"$CREW_ROOT/.relinked/$(sid_key "$sid")" 2>/dev/null || true
+  fi
+  if [ "$1" = 1 ]; then
+    if [ -n "$olds" ]; then echo "relink: $name continues $(printf '%s' "${olds%$'\n'}" | paste -sd' ')$([ $changed = 1 ] || echo ' (already recorded)')"
+    else echo "relink: $name has no earlier session id in its transcript"; fi
+  fi
+}
+relink_once() { # lazy: a session that has relinked (or whose transcript has settled) is not read again
+  local s; consume_spawn
+  s=$(lead_session) || return 0
+  [ -n "$s" ] && [ "$(cut -f3 <<<"$s")" != - ] || return 0
+  [ ! -e "$CREW_ROOT/.relinked/$(sid_key "$(cut -f3 <<<"$s")")" ] || return 0
+  relink_self 0 || true
+}
+cmd_relink() { [ $# -eq 0 ] || die "relink takes no arguments"; consume_spawn; relink_self 1 || exit 2; }
+
+# Backfill: give open tasks whose lead=/sub= names exactly one live session the matching *_sid. Dry run unless --apply.
+cmd_meta_migrate() {
+  local apply=0 d id st k name cur sid n=0 todo=0
+  case "${1:-}" in "") ;; --apply) apply=1 ;; *) die "meta-migrate takes --apply or nothing" ;; esac
+  [ -d "$CREW_ROOT" ] || return 0
+  sess_load
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}; [ -f "$d/status" ] && [ -f "$d/meta" ] || continue
+    st=$(state_of "$d"); case "$st" in done | landed | dropped) continue ;; esac
+    id=$(basename "$d")
+    for k in lead sub; do
+      name=$(meta_get "$d" "$k"); [ -n "$name" ] || continue
+      [ -z "$(meta_get "$d" "${k}_sid")" ] || continue
+      n=$(N=$name awk -F'\t' '$1 == ENVIRON["N"] {print $3}' <<<"$SESS_TABLE" | sort -u | grep -c . || true)
+      if [ "$n" = 1 ]; then
+        sid=$(unique_sid_of "$name")
+        if [ $apply = 1 ]; then printf '%s_sid=%s\n' "$k" "$sid" >>"$d/meta"; echo "set    $id: ${k}_sid=$sid ($k=$name)"
+        else echo "would  $id: ${k}_sid=$sid ($k=$name)"; fi
+        todo=$((todo + 1))
+      elif [ "$n" = 0 ]; then echo "skip   $id: $k=$name has no live session"
+      else echo "skip   $id: $k=$name is ambiguous ($n live sessions)"; fi
+    done
+  done
+  if [ $apply = 1 ]; then echo "migrated $todo field(s)"; else echo "dry run: $todo field(s) to migrate (crew meta-migrate --apply)"; fi
+}
+
+# --- spawn: a lead starts a sub-lead in its own tmux window ---
+# `crew spawn` makes the task, writes the brief, records .pending/<task> (parent, child name) and launches
+# `claude -n <lead>/<window>` with CREW_SPAWN_TASK=<task> and a random CREW_SPAWN_TOKEN in its environment. The new
+# session's sessionId is not known before it starts, so its first crew call (consume_spawn, via relink_once/relink)
+# finds .pending/<task> (the reservation: parent, token, tmux window id, pane pid), checks that it carries the token
+# and runs under that pane, re-checks cycle, depth and count, and turns it into a normal .links/<its sid> link.
+# A reservation counts toward the sub-lead limit while its window and pane process are alive, and is dropped when
+# they are gone. Launching, counting and consuming all run under $CREW_ROOT/.spawn.lock. Nothing is ever closed here.
+SPAWN_MAX_SUBS=3      # live sub-leads (joined, or launched and not yet joined) per lead
+SPAWN_MAX_DEPTH=2     # levels below the top lead
+
+# hops from session SID up to the top of its chain (the top lead is 0)
+chain_depth() {
+  local cur=$1 n=0 lf r
+  while :; do
+    lf=$(link_path "$cur"); [ -f "$lf" ] || break
+    r=$(link_parent "$lf")
+    if [ -n "$r" ]; then cur=$(cut -f3 <<<"$r"); else cur=$(link_get "$lf" parent_sid); fi
+    [ -n "$cur" ] || break
+    n=$((n + 1)); [ $n -lt 50 ] || break
+  done
+  echo "$n"
+}
+
+# Is the reservation file $1 live? Its tmux window (id among $2, the ids of all windows; $3 = 0 when tmux could not
+# be asked, then only the pane process counts) exists and its pane process runs.
+reservation_alive() {
+  local wid pp; wid=$(link_get "$1" window_id); pp=$(link_get "$1" pane_pid)
+  [[ "$wid" =~ ^@[0-9]+$ ]] && [[ "$pp" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pp" 2>/dev/null || return 1
+  [ "${3:-1}" = 0 ] || grep -qxF -- "$wid" <<<"$2"
+}
+
+# launched sub-leads of lead sid $1 that have not joined yet, except task $2. Reservations whose window or pane is
+# gone are dropped on the way.
+pending_count() {
+  local f id n=0 ids tmuxok=1
+  ids=$(tmux list-windows -a -F '#{window_id}' 2>/dev/null) || tmuxok=0
+  for f in "$CREW_ROOT"/.pending/*; do
+    [ -f "$f" ] || continue
+    [[ "$f" != *.tmp.* ]] || continue
+    id=${f##*/}
+    if ! reservation_alive "$f" "$ids" "$tmuxok"; then rm -f "$f"; continue; fi
+    [ "$id" != "${2:-}" ] || continue
+    if [ "$(link_get "$f" parent_sid)" = "$1" ]; then n=$((n + 1)); fi
+  done
+  echo "$n"
+}
+
+# May lead NAME (sid SID) have another sub-lead (not counting task $3 nor the sessions listed in $4)? Prints the reason
+# and returns 1 when not. $4: space-separated sessionIds that are already that one sub-lead (a woken owner).
+spawn_limits() {
+  local depth live pend
+  depth=$(chain_depth "$2")
+  if [ "$depth" -ge "$SPAWN_MAX_DEPTH" ]; then
+    echo "depth limit: you are $depth levels below the top lead and sub-leads nest at most $SPAWN_MAX_DEPTH levels. Dispatch a worker instead."
+    return 1
+  fi
+  sess_load
+  live=$(subs_of "$1" "$2" | X=" ${4:-} " awk -F'\t' '$2 == "live" && index(ENVIRON["X"], " " $3 " ") == 0' | wc -l)
+  pend=$(pending_count "$2" "${3:-}")
+  if [ $((live + pend)) -ge $SPAWN_MAX_SUBS ]; then
+    echo "$1 already has $((live + pend)) live sub-leads (max $SPAWN_MAX_SUBS). Wait for one to finish or dispatch a worker."
+    return 1
+  fi
+}
+
+window_of_sid() { # the tmux window of the spawned sub-lead with session SID, else nothing
+  local d
+  [ -n "${1:-}" ] || return 0
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}
+    if [ "$(meta_get "$d" sub_sid)" = "$1" ] && [ "$(meta_get "$d" spawned)" = 1 ]; then meta_get "$d" window; fi
+  done | tail -n 1
+}
+
+SPAWN_MAX_TOP=5       # live top-level leads started by `crew spawn --top`
+
+# live top-level leads started by `crew spawn --top`, except task $1: launched ones that have not run crew yet (a live
+# reservation) and ones whose session is live
+top_live_count() {
+  local d id n=0 ids tmuxok=1 sid
+  ids=$(tmux list-windows -a -F '#{window_id}' 2>/dev/null) || tmuxok=0
+  sess_load
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}; id=$(basename "$d")
+    [ "$(meta_get "$d" top)" = 1 ] && [ "$id" != "${1:-}" ] || continue
+    if [ -f "$CREW_ROOT/.pending/$id" ]; then
+      if reservation_alive "$CREW_ROOT/.pending/$id" "$ids" "$tmuxok"; then n=$((n + 1)); fi
+      continue
+    fi
+    sid=$(meta_get "$d" lead_sid)
+    if [ -n "$sid" ] && [ -n "$(resolve_session "$sid" "")" ]; then n=$((n + 1)); fi
+  done
+  echo "$n"
+}
+
+top_limit() { # task-id: prints the reason and returns 1 when another top-level lead may not start
+  local n; n=$(top_live_count "${1:-}")
+  if [ "$n" -ge $SPAWN_MAX_TOP ]; then
+    echo "$n live top-level leads started with spawn --top (max $SPAWN_MAX_TOP). Close one first."
+    return 1
+  fi
+}
+
+# DIR for a top-level lead: must exist, must not be ~/.claude, must be a git repo or under ~/Developer. Prints the real path.
+top_repo() {
+  local dir=${1:-} real home top cdir
+  [ -n "$dir" ] || die "spawn --top needs --repo DIR"
+  [ -d "$dir" ] || die "repo not found: $dir"
+  real=$(cd "$dir" && pwd -P) || die "repo not found: $dir"
+  home=$(cd "$HOME" 2>/dev/null && pwd -P) || home=$HOME
+  # ~/.claude as typed and as it resolves (it may be a symlink into ~/Developer)
+  cdir=$(cd "$HOME/.claude" 2>/dev/null && pwd -P) || cdir=$home/.claude
+  case "$real/" in "$home/.claude/"* | "$cdir/"*) die "refused: $real is inside ~/.claude" ;; esac
+  case "$real/" in
+    "$home/Developer/"*) ;;
+    *) top=$(git -C "$real" rev-parse --show-toplevel 2>/dev/null) || top=""
+       # the dotfiles repo at $HOME makes every folder under it look like a repo: only $HOME itself counts
+       { [ -n "$top" ] && { [ "$top" != "$home" ] || [ "$real" = "$home" ]; }; } || die "refused: $real is not a git repo and not under ~/Developer" ;;
+  esac
+  printf '%s\n' "$real"
+}
+
+meta_add() { # task-dir line...: append under the task's lock
+  mkdir -p "$CREW_ROOT/.locks"
+  ( flock 9; printf '%s\n' "${@:2}" >>"$1/meta" ) 9>"$CREW_ROOT/.locks/$(basename "$1")"
+}
+
+consume_locked() { # task-id pending-file my-name my-sid my-pid; runs under the spawn lock
+  local id=$1 pf=$2 mname=$3 msid=$4 mpid=${5:-} pname psid r tname tsid reason lf tok pp top resume own=""
+  [ -f "$pf" ] || return 0   # another call of this session got it first
+  # provenance: the launched session carries the token and runs under the reservation's pane. Anything else is refused
+  # and leaves the reservation for the real one.
+  tok=$(link_get "$pf" token); pp=$(link_get "$pf" pane_pid)
+  if [ -z "$tok" ] || [ "$tok" != "${CREW_SPAWN_TOKEN:-}" ] || [ -z "$pp" ] || [[ " $(ancestors | tr '\n' ' ') " != *" $pp "* ]]; then
+    echo "crew: spawn join refused: this is not the session that task $id launched" >&2; return 0
+  fi
+  pname=$(link_get "$pf" parent_name); psid=$(link_get "$pf" parent_sid); top=$(link_get "$pf" top)
+  rm -f "$pf"
+  if [ "$top" = 1 ]; then   # a top-level lead: no link; it becomes the lead of its own task
+    if [ -d "$CREW_ROOT/$id" ]; then meta_add "$CREW_ROOT/$id" "lead=$mname" "lead_pid=$mpid" "lead_sid=$msid"; fi
+    echo "crew: started as a top-level lead (task $id)" >&2; return 0
+  fi
+  lf=$(link_path "$msid")
+  [ ! -f "$lf" ] || return 0   # already reports somewhere (joined by hand)
+  r=$(resolve_session "$psid" "")
+  if [ -z "$r" ]; then echo "crew: spawn join refused: the spawning lead '$pname' is not running" >&2; return 0; fi
+  tname=$(cut -f1 <<<"$r"); tsid=$(cut -f3 <<<"$r")
+  reason=$(chain_check "$tsid" "$tname" "$msid") || { echo "crew: spawn join refused: $reason" >&2; return 0; }
+  # a woken owner is already counted by its old link (live by name or continuation): it and its new session are one sub
+  resume=$(meta_get "$CREW_ROOT/$id" resume_sid); [ -z "$resume" ] || own="$msid $resume"
+  reason=$(spawn_limits "$tname" "$tsid" "$id" "$own") || { echo "crew: spawn join refused: $reason" >&2; return 0; }
+  mkdir -p "$CREW_ROOT/.links"
+  # the link install is one step under the links lock, like crew join
+  { flock 9; link_write "$lf" "$mname" "$tname" "$tsid"; } 9>"$CREW_ROOT/.links.lock" || { echo "crew: spawn join refused: cannot write the link" >&2; return 0; }
+  if [ -d "$CREW_ROOT/$id" ]; then meta_add "$CREW_ROOT/$id" "sub=$mname" "sub_sid=$msid"; fi
+  echo "crew: joined: $mname reports to $tname (spawned for $id)" >&2
+}
+
+# The first crew call of a spawned session (it has CREW_SPAWN_TASK and CREW_SPAWN_TOKEN) completes its join. Never
+# fails the caller; says what happened on stderr. Not while this very command holds the spawn lock (SPAWN_HELD).
+consume_spawn() {
+  local id=${CREW_SPAWN_TASK:-} me
+  [ "${SPAWN_HELD:-0}" != 1 ] || return 0
+  [[ "$id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] && [ -f "$CREW_ROOT/.pending/$id" ] || return 0
+  me=$(lead_session) || return 0
+  [ -n "$me" ] && [ "$(cut -f3 <<<"$me")" != - ] || return 0
+  ( flock 8; consume_locked "$id" "$CREW_ROOT/.pending/$id" "$(cut -f1 <<<"$me")" "$(cut -f3 <<<"$me")" "$(cut -f2 <<<"$me")" ) 8>"$CREW_ROOT/.spawn.lock" || true
+}
+
+tmux_windows() { # names of the windows in the spawn session; dies when the session is missing
+  command -v tmux >/dev/null 2>&1 || die "spawn: tmux not found"
+  tmux list-windows -t "${CREW_SPAWN_TMUX:-claude}:" -F '#{window_name}' || die "spawn: no tmux session '${CREW_SPAWN_TMUX:-claude}' (CREW_SPAWN_TMUX names another)"
+}
+
+spawn_fail() { # task-id reason: the task failed to start; no reservation stays
+  rm -f "$CREW_ROOT/.pending/$1"
+  cmd_log "$1" failed "spawn: $2"
+  die "spawn: $2 (task $1 marked failed)"
+}
+
+# Has the window $1 (id) started a live pane? Polls up to $CREW_SPAWN_WAIT_S seconds (default 5) for it to be
+# running claude; a pane that is gone (or dead) is a failed start, a pane that is alive but not yet named claude
+# after the wait is accepted.
+spawn_started() {
+  local i out cmd
+  for ((i = 0; i < ${CREW_SPAWN_WAIT_S:-5} * 5; i++)); do
+    out=$(tmux list-panes -t "$1" -F '#{pane_dead} #{pane_current_command}' 2>/dev/null) || return 1
+    [ "${out%% *}" = 0 ] || return 1
+    cmd=${out#* }
+    if [ "$cmd" = claude ] || [[ "$cmd" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then return 0; fi
+    sleep 0.2
+  done
+  out=$(tmux list-panes -t "$1" -F '#{pane_dead}' 2>/dev/null) || return 1
+  [ "$out" = 0 ]
+}
+
+# Claude asks "Do you trust the files in this folder" before it starts in a folder it has not seen: nothing in the new
+# session runs (so it never joins) until someone answers it. Looks at the pane of window $2 for task $1 (polling up to
+# $CREW_SPAWN_TRUST_WAIT_S seconds (default: CREW_SPAWN_WAIT_S), until the sub has joined or its composer shows) and, when the dialog is open, raises it as a
+# decision (crew ask) so HQ shows it. Prints the decision id, else nothing. crew never presses a key in it.
+spawn_trust_prompt() {
+  local i out
+  for ((i = 0; i <= ${CREW_SPAWN_TRUST_WAIT_S:-${CREW_SPAWN_WAIT_S:-5}} * 5; i++)); do
+    out=$(tmux capture-pane -p -J -t "$2" 2>/dev/null) || return 0
+    if grep -qE 'Yes, I trust this folder|Quick safety check: Is this a project you created' <<<"$out"; then
+      cmd_ask "$1" "trust prompt open in $3: accept it there"; return 0
+    fi
+    [ -e "$CREW_ROOT/.pending/$1" ] || return 0   # the sub joined: it is past the dialog
+    grep -q '❯' <<<"$out" && return 0
+    sleep 0.2
+  done
+}
+
+# Open the window for task dir $1 (meta: spawn_slug, spawn_model, repo) for lead $2 (sid $3), under the spawn lock.
+# The reservation (.pending/<task>: parent, token, window id, pane pid) is written once the window exists; nothing
+# can consume it before, because consuming takes the same lock. A launch that fails, or a window that is gone right
+# after, marks the task failed.
+spawn_launch() {
+  local d=$1 lname=$2 lsid=$3 id slug model repo sess win n=1 names child prompt pf token out wid ppid top resume kind=sub-lead dash=()
+  id=$(basename "$d"); slug=$(meta_get "$d" spawn_slug); model=$(meta_get "$d" spawn_model); repo=$(meta_get "$d" repo); top=$(meta_get "$d" top)
+  resume=$(meta_get "$d" resume_sid)
+  sess=${CREW_SPAWN_TMUX:-claude}
+  mkdir -p "$CREW_ROOT/.pending"
+  names=$(tmux_windows)
+  win=$slug
+  while grep -qxF -- "$win" <<<"$names"; do n=$((n + 1)); win="$slug-$n"; done
+  child="$lname/$win"
+  token=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+  prompt="You are a sub-lead for $lname on crew task $id. Run \`crew whoami\` first (it completes your join). Read the brief at $d/brief.md. Use /orchestrate (or /crew dispatch for small parts) to do it; report up to $lname at milestones only per the crew skill's chain-of-command rules; when done, run \`crew log $id done\` and \`crew summary $id\`, then stop. Never ask the user in your own pane: every question is \`crew ask $id \"<question>\"\` (it reaches your lead and HQ), and the answer arrives typed into your pane as the user's words. Do not close your window."
+  if [ -n "$resume" ]; then   # a woken feature owner (crew wake): its own session and name; crew wake wrote the prompt
+    kind="woken owner"; child=$(meta_get "$d" sub); prompt="$(cat "$d/wake-prompt.md")"
+  elif [ "$top" = 1 ]; then   # a top-level lead: named for its slug alone, the user's first message is its prompt
+    kind="top-level lead"; child=$win
+    prompt="$(cat "$d/brief.md")"$'\n\n'"You are a top-level lead (crew); run \`crew whoami\` first."
+    [[ "$prompt" != -* ]] || dash=(--)   # a first message that starts with a dash is not a flag
+  fi
+  # Claude Code compacts by itself when its context nears this window minus a 13000 token buffer (the bundled CLI reads
+  # CLAUDE_CODE_AUTO_COMPACT_WINDOW as tokens, 100000 to 1000000): a sub-lead then stays near SOFT even mid-task.
+  # Passed with -e always: a tmux server that is already running does not inherit this process's environment.
+  local acw=(-e "CLAUDE_CODE_AUTO_COMPACT_WINDOW=${CLAUDE_CODE_AUTO_COMPACT_WINDOW:-$((COMPACT_SOFT + 13000))}")
+  # The repo is not given as tmux -c (tmux expands #{...} in it): env enters it, so the path is taken literally.
+  local cl=(claude -n "$child")
+  [ -z "$resume" ] || cl=(claude --resume "$resume" -n "$child")   # a woken owner
+  local argv=(tmux new-window -d -P -F '#{window_id} #{pane_pid}' -t "$sess:" -n "$win" -e "CREW_SPAWN_TASK=$id" -e "CREW_SPAWN_TOKEN=$token" "${acw[@]}" -- env -C "$repo" "${cl[@]}")
+  [ -z "$model" ] || argv+=(--model "$model")
+  argv+=("${dash[@]}" "$prompt")
+  # 8: the spawn lock, which a tmux server started from here must not inherit
+  out=$("${argv[@]}" 8>&-) || spawn_fail "$id" "tmux could not open the window"
+  read -r wid ppid <<<"$out"
+  [[ "$wid" =~ ^@[0-9]+$ ]] && [[ "$ppid" =~ ^[0-9]+$ ]] || spawn_fail "$id" "tmux did not report the new window"
+  pf=$CREW_ROOT/.pending/$id
+  printf 'parent_name=%s\nparent_sid=%s\nchild_name=%s\ntoken=%s\nwindow_id=%s\npane_pid=%s\n' "$lname" "$lsid" "$child" "$token" "$wid" "$ppid" >"$pf.tmp.$$" && { [ "$top" != 1 ] || echo top=1 >>"$pf.tmp.$$"; } && mv "$pf.tmp.$$" "$pf"
+  if ! spawn_started "$wid"; then
+    tmux kill-window -t "$wid" 2>/dev/null || true
+    spawn_fail "$id" "the sub-lead window closed right after launch (does \`claude\` start in $repo?)"
+  fi
+  meta_add "$d" "window=$sess:$win" "window_id=$wid"
+  cmd_log "$id" running "$kind launched in $sess:$win"
+  printf 'id=%s\nwindow=%s:%s\nchild=%s\n' "$id" "$sess" "$win" "$child"
+  local trust; trust=$(spawn_trust_prompt "$id" "$wid" "$sess:$win")
+  [ -z "$trust" ] || printf 'note=trust prompt open in %s:%s (%s): accept it there\n' "$sess" "$win" "$trust"
+}
+
+cmd_spawn() {
+  local slug="" brief="" bfile="" repo="" model="" shape=ship resume="" have_brief=0 top=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --top) top=1; shift ;;
+      --repo) repo=${2:-}; shift 2 ;;
+      --model) model=${2:-}; shift 2 ;;
+      --shape) shape=${2:-}; shift 2 ;;
+      --brief) bfile=${2:-}; shift 2 ;;
+      --resume) resume=${2:-}; shift 2 ;;
+      --) shift; if [ $# -ge 1 ] && [ -z "$slug" ]; then slug=$1; shift; fi; if [ $# -ge 1 ]; then brief=$1; have_brief=1; fi; break ;;   # after --, text starting with a dash is the brief
+      -*) die "unknown flag $1" ;;
+      *) if [ -z "$slug" ]; then slug=$1; else brief=$1; have_brief=1; fi; shift ;;
+    esac
+  done
+  local me lname lsid reason d id r
+  mkdir -p "$CREW_ROOT"
+  relink_once   # a spawned session joins (and so has its depth) before the limits are computed; takes the spawn lock itself
+  exec 8>"$CREW_ROOT/.spawn.lock"; flock 8   # limits, window names and the reservation are one step; closed when this command ends
+  SPAWN_HELD=1
+  if [ -n "$resume" ]; then
+    d=$(tdir "$resume"); id=$resume
+    [ "$(meta_get "$d" spawned)" = 1 ] || die "spawn --resume: $id was not made by crew spawn"
+    [ -z "$(meta_get "$d" owner)" ] || die "spawn --resume: $id is a wake of a feature owner: crew wake --resume $id"
+    if [ "$(meta_get "$d" top)" = 1 ]; then   # a top-level lead has no spawning lead: anyone may resume it
+      lname=""; lsid=""
+      reason=$(top_limit "$id") || die "spawn refused: $reason"
+    else
+      me=$(self_session); lname=$(cut -f1 <<<"$me"); lsid=$(cut -f3 <<<"$me")
+      r=$(resolve_session "$(meta_get "$d" lead_sid)" ""); [ -n "$r" ] || r=$(resolve_session "" "$(meta_get "$d" lead)")
+      [ "$(cut -f3 <<<"$r")" = "$lsid" ] || die "spawn --resume: $id was spawned by $(meta_get "$d" lead), not $lname"
+    fi
+    [ "$(state_of "$d")" = queued ] || die "spawn --resume: $id is $(state_of "$d"), not queued"
+    if [ -f "$CREW_ROOT/.pending/$id" ]; then   # it already has a window: only a dead one may be replaced
+      reservation_alive "$CREW_ROOT/.pending/$id" "$(tmux list-windows -a -F '#{window_id}' 2>/dev/null || true)" ||
+        rm -f "$CREW_ROOT/.pending/$id"
+      [ ! -f "$CREW_ROOT/.pending/$id" ] || die "spawn --resume: $id already has a live window ($(meta_get "$d" window)); close it first"
+    fi
+    if [ -n "$lsid" ]; then reason=$(spawn_limits "$lname" "$lsid" "$id") || die "spawn refused: $reason"; fi
+    if ! reason=$(cmd_mem); then echo "still waiting for RAM: $reason"; exit 1; fi
+    tmux_windows >/dev/null
+    spawn_launch "$d" "$lname" "$lsid"
+    return 0
+  fi
+  [ -n "$slug" ] && { [ $have_brief = 1 ] || [ -n "$bfile" ]; } || die "spawn needs SLUG and a brief (text, or --brief FILE)"
+  [ $have_brief = 0 ] || [ -z "$bfile" ] || die "give the brief as text or as --brief FILE, not both"
+  if [ $top = 1 ]; then [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{1,40}$ ]] || die "slug: 2-41 lowercase letters, digits, dashes"
+  else [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{0,40}$ ]] || die "slug: lowercase letters, digits, dashes"; fi
+  case "$shape" in ship | scout) ;; *) die "--shape must be ship or scout" ;; esac
+  if [ -n "$bfile" ]; then [ -f "$bfile" ] || die "brief file not found: $bfile"; fi
+  if [ -n "$model" ]; then [[ "$model" =~ ^[A-Za-z0-9][][A-Za-z0-9._:-]*$ ]] || die "bad --model '$model'"; fi
+  local intent
+  if [ -n "$bfile" ]; then intent=$(first_line "$bfile"); else intent=$(first_line <(printf '%s\n' "$brief")); fi
+  [ -n "$intent" ] || die "the brief is empty"
+  intent=${intent:0:200}
+  if [ $top = 1 ]; then
+    repo=$(top_repo "$repo") || exit 2
+    lname=""; lsid=""   # no spawning lead: the caller (HQ, a shell) is not recorded anywhere
+    reason=$(top_limit) || die "spawn refused: $reason"
+  else
+    if [ -n "$repo" ]; then repo=$(cd "$repo" 2>/dev/null && pwd -P) || die "repo not found"; else repo=$(repo_of); [ -n "$repo" ] || repo=$(pwd -P); fi
+    me=$(self_session); lname=$(cut -f1 <<<"$me"); lsid=$(cut -f3 <<<"$me")
+    reason=$(spawn_limits "$lname" "$lsid") || die "spawn refused: $reason"
+  fi
+  local ram=1 memmsg=""
+  memmsg=$(cmd_mem) || ram=0
+  if [ $ram = 1 ]; then tmux_windows >/dev/null; fi   # no point making a task for a window that cannot open
+  d=$(NEW_OWN=1 NEW_TOP=$top cmd_new "$slug" --shape "$shape" --repo "$repo" -- "$intent" | sed -n 's/^dir=//p')
+  [ -d "$d" ] || die "spawn: could not make the task"
+  id=$(basename "$d")
+  if [ -n "$bfile" ]; then cp -- "$bfile" "$d/brief.md"; else printf '%s\n' "$brief" >"$d/brief.md"; fi
+  meta_add "$d" "spawned=1" "spawn_slug=$slug" ${model:+"spawn_model=$model"}
+  [ $top = 0 ] || meta_add "$d" "top=1"
+  if [ $ram = 0 ]; then
+    cmd_log "$id" queued "spawn waiting for RAM"
+    printf 'id=%s\nqueued: spawn waiting for RAM, not launched (%s). Start it with: crew spawn --resume %s\n' "$id" "$memmsg" "$id"
+    return 0
+  fi
+  spawn_launch "$d" "$lname" "$lsid"
+}
+
+cmd_new() {
+  local slug="" shape="" repo="" intent=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --shape) shape=${2:-}; shift 2 ;;
+      --repo) repo=${2:-}; shift 2 ;;
+      --) intent=${2:-}; break ;;
+      -*) die "unknown flag $1" ;;
+      *) if [ -z "$slug" ]; then slug=$1; else intent=$1; fi; shift ;;
+    esac
+  done
+  [ -n "$slug" ] && [ -n "$intent" ] || die "new needs SLUG and intent"
+  case "$shape" in ship | scout | draft) ;; *) die "--shape must be ship, scout or draft" ;; esac
+  [[ "$slug" =~ ^[a-z0-9][a-z0-9-]{0,40}$ ]] || die "slug: lowercase letters, digits, dashes"
+  [ -z "$repo" ] || repo=$(cd "$repo" && pwd -P) || die "repo not found"
+  mkdir -p "$CREW_ROOT"
+  relink_once
+  local base id n=1
+  # ids are MMDD-slug: drop a leading date the caller already put in the slug (today's only: 2048-solver stays)
+  local today; today=$(date +%m%d)
+  if [[ "$slug" == "$today"-?* ]]; then slug=${slug#"$today"-}; fi
+  base="$today-$slug"; id=$base
+  until mkdir "$CREW_ROOT/$id" 2>/dev/null; do
+    [ -e "$CREW_ROOT/$id" ] || die "cannot create $CREW_ROOT/$id"
+    n=$((n + 1)); id="$base-$n"
+  done
+  local d="$CREW_ROOT/$id"
+  printf 'shape=%s\nrepo=%s\ncreated=%s\n' "$shape" "$repo" "$(now)" >"$d/meta"
+  local lname lpid lsid plink pl lines
+  IFS=$'\t' read -r lname lpid lsid < <(lead_session || true) || true
+  if [ -n "${lname:-}" ] && [ "${NEW_TOP:-0}" != 1 ]; then   # NEW_TOP: a top-level lead's task has no lead until that session starts
+    # a joined session's tasks count under its live parent (lead=parent, sub=this session)
+    plink=$(link_path "${lsid:--}"); pl=""
+    if [ -f "$plink" ] && [ "${NEW_OWN:-0}" != 1 ]; then pl=$(link_parent "$plink"); fi   # NEW_OWN: crew spawn owns the task itself
+    if [ -n "$pl" ]; then
+      lines=$(printf 'lead=%s\nlead_pid=%s\nlead_sid=%s\nsub=%s\nsub_sid=%s\n' "$(cut -f1 <<<"$pl")" "$(cut -f2 <<<"$pl")" "$(cut -f3 <<<"$pl")" "$lname" "${lsid#-}")
+    else
+      lines=$(printf 'lead=%s\nlead_pid=%s\nlead_sid=%s\n' "$lname" "$lpid" "${lsid#-}")
+    fi
+    mkdir -p "$CREW_ROOT/.locks"
+    ( flock 9; printf '%s\n' "$lines" >>"$d/meta" ) 9>"$CREW_ROOT/.locks/$id"
+  fi
+  printf '%s\n' "$intent" >"$d/intent.md"
+  printf '%s\tqueued\t%s\n' "$(now)" "created" >"$d/status"
+  echo "id=$id"
+  echo "dir=$d"
+}
+
+# Status notes never reach the user. A note that names a D-id nothing has open, or asks a question, was meant
+# for the user: warn on stderr (one line) and point to `crew ask`. Never fails the caller.
+warn_note_for_user() {
+  local note=$1 id bad=""
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    if ! decision_dir "$id" >/dev/null; then bad=$id; break; fi
+  done < <(printf '%s\n' "$note" | grep -oiE '\bD[0-9]+\b' || true)
+  if [ -z "$bad" ] && ! [[ "$note" =~ \?([[:space:]]|$) ]]; then return 0; fi
+  echo "crew: warning: ${bad:+$bad is not an open decision: }status notes do not reach the user; ask with crew ask <id> \"<question>\" (it opens a D-id)" >&2
+}
+
+cmd_log() {
+  [ $# -ge 2 ] || die "log needs ID STATE"
+  local d; d=$(tdir "$1")
+  valid_state "$2" || die "bad state '$2' (one of: $STATES)"
+  # A held task leaves hold only through `crew answer` (or review/done/failed/dropped),
+  # so a late "running" or "waiting" from the lead can't bury a question the worker just recorded.
+  if [ "$(state_of "$d")" = held ] && { [ "$2" = running ] || [ "$2" = waiting ]; }; then
+    die "task $1 is held: answer it first (crew answer)"
+  fi
+  local prev note chk; prev=$(state_of "$d"); note=${3:-}
+  if [ "$2" = review ]; then   # the last `crew check` verdict rides along on the review line
+    chk=$(meta_get "$d" check)
+    [ -z "$chk" ] || note="${note:+$note }[check: $chk]"
+  fi
+  printf '%s\t%s\t%s\n' "$(now)" "$2" "$(printf '%s' "$note" | tr '\t\n' '  ')" >>"$d/status"
+  # only for `crew log` itself: hold/answer/spawn log their own notes through here
+  [ "${FUNCNAME[1]:-}" != main ] || warn_note_for_user "$note"
+  # a question about work that ended (or whose hold became a review) is moot
+  case "$2" in
+    done | landed | failed | dropped) rm -f "$d/decision" ;;
+    review) [ "$prev" != held ] || rm -f "$d/decision" ;;
+  esac
+}
+
+cmd_meta() {
+  [ $# -ge 2 ] || die "meta needs ID key=value"
+  local d; d=$(tdir "$1"); shift
+  local kv
+  for kv in "$@"; do [[ "$kv" =~ ^[a-z_][a-z0-9_]*=.*$ ]] || die "bad pair '$kv'"; done
+  mkdir -p "$CREW_ROOT/.locks"
+  exec 9>"$CREW_ROOT/.locks/$(basename "$d")"; flock 9   # one writer at a time; closed when this command ends
+  for kv in "$@"; do
+    printf '%s\n' "$kv" >>"$d/meta"
+    # an explicit lead=/sub= is a different session than the one that made the task: its sid is that name's
+    # live session, else none (a stale lead_sid would keep pointing at the creator)
+    case "$kv" in
+      lead=* | sub=*) case " $* " in *" ${kv%%=*}_sid="*) ;; *) printf '%s_sid=%s\n' "${kv%%=*}" "$(unique_sid_of "${kv#*=}")" >>"$d/meta" ;; esac ;;
+    esac
+  done
+}
+
+# Phone alert for an open decision: "<lead>: D<n>", the question. The lead is the task's lead=, else the calling
+# session, else "crew".
+notify_decision() { # task-dir D-id question
+  local lead; lead=$(meta_get "$1" lead)
+  [ -n "$lead" ] || lead=$(lead_session | cut -f1)
+  local q=${3//[$'\t\n']/ }
+  notify "${lead:-crew}: $2" "${q:0:200}"
+}
+
+cmd_hold() {
+  [ $# -eq 2 ] || die "hold needs ID question"
+  local d id; d=$(tdir "$1")
+  id=$(claim_decision "$d")
+  printf '%s\n' "$2" >"$d/hold.md"
+  rm -f "$d/answer.md" "$d/ask.md"
+  cmd_log "$1" held "$(printf '%s' "$2" | head -c 120)"
+  notify_decision "$d" "$id" "$2"
+  echo "$id"
+}
+
+# An open decision that leaves the state alone. On a held task it is the hold itself (hold.md), so the
+# text and the D-id never diverge; a held task without an id (older holds) gets one here.
+cmd_ask() {
+  [ $# -eq 2 ] || die "ask needs ID question"
+  local d id st; d=$(tdir "$1"); st=$(state_of "$d")
+  case "$st" in done | landed | dropped) die "task $1 is $st: nothing to ask" ;; esac
+  id=$(claim_decision "$d")
+  printf '%s\n' "$2" >"$(question_file "$d")"
+  rm -f "$d/answer.md"
+  notify_decision "$d" "$id" "$2"
+  echo "$id"
+}
+
+cmd_answer() {
+  [ $# -eq 2 ] || die "answer needs ID|D<n> answer"
+  local d id; d=$(tdir_or_decision "$1"); id=$(open_decision "$d")
+  if [ "$(state_of "$d")" = held ]; then
+    printf '%s\n' "$2" >"$d/answer.md"
+    rm -f "$d/decision"
+    cmd_log "$(basename "$d")" answered "$(printf '%s' "$2" | head -c 120)"
+  else
+    [ -n "$id" ] || die "task $(basename "$d") is not held and has no open decision"
+    printf '%s\n' "$2" >"$d/answer.md"
+    rm -f "$d/decision"
+    # same state, a note that keeps what the last one said (HQ finds the PR number in it) and adds the answer, in
+    # place of an earlier answer; no phone alert (nothing new for the user)
+    local before; before=$(tail -n 1 "$d/status" | cut -f3 | sed -E 's/( · )?answered D[0-9]+: .*$//')
+    printf '%s\t%s\t%s\n' "$(now)" "$(state_of "$d")" "${before:+$before · }answered $id: $(printf '%s' "$2" | tr '\t\n' '  ' | head -c 100)" >>"$d/status"
+  fi
+}
+
+# One line per task: id, state, age of last event, shape, repo basename, last note.
+row() {
+  local d=$1 last ts st note age repo
+  last=$(tail -n 1 "$d/status")
+  ts=$(cut -f1 <<<"$last"); st=$(cut -f2 <<<"$last"); note=$(cut -f3 <<<"$last")
+  age=$(($(date +%s) - $(date -d "$ts" +%s)))
+  # a running task silent for 3h is probably a dead worker
+  if [ "$st" = running ] && [ $age -ge 10800 ]; then note="⚠ stale? $note"; fi
+  local did win; did=$(open_decision "$d"); if [ -n "$did" ]; then note="$did · $note"; fi
+  win=$(meta_get "$d" window); if [ -n "$win" ]; then note="[$win] $note"; fi   # a spawned sub-lead's tmux window
+  if [ $age -lt 3600 ]; then age="$((age / 60))m"; elif [ $age -lt 172800 ]; then age="$((age / 3600))h"; else age="$((age / 86400))d"; fi
+  repo=$(meta_get "$d" repo); repo=${repo##*/}
+  if [ "${SHOW_LEADS:-0}" = 1 ]; then
+    local lead lsid r; lead=$(meta_get "$d" lead); lsid=$(meta_get "$d" lead_sid)
+    r=$(resolve_session "$lsid" "$lead"); [ -z "$r" ] || lead=$(cut -f1 <<<"$r")
+    printf '  %-28s %-9s %4s  %-5s %-14s %-20s %s\n' "$(basename "$d")" "$st" "$age" "$(meta_get "$d" shape)" "${repo:--}" "${lead:--}" "${note:0:70}"
+  else
+    printf '  %-28s %-9s %4s  %-5s %-14s %s\n' "$(basename "$d")" "$st" "$age" "$(meta_get "$d" shape)" "${repo:--}" "${note:0:70}"
+  fi
+}
+
+cmd_ls() {
+  local all=0 days=2 open=0 flt=0 prepo=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --all) all=1; shift ;;
+      --open) open=1; shift ;;
+      --days) days=${2:-2}; shift 2 ;;
+      --repo) flt=1; prepo=$(repo_of "${2:-}"); shift 2 ;;
+      --leads) SHOW_LEADS=1; shift ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  relink_once
+  sess_load
+  # the SessionStart hook calls `crew ls --open` from the session's cwd: show that repo's parked items
+  if [ $open = 1 ] && [ $flt = 0 ]; then flt=1; prepo=$(repo_of); fi
+  local needs="" running="" waiting="" done_="" d st cutoff
+  cutoff=$(($(date +%s) - days * 86400))
+  for d in "$CREW_ROOT"/*/; do
+    [ -d "$d" ] || continue
+    d=${d%/}
+    [ -f "$d/status" ] || continue
+    st=$(state_of "$d")
+    # a renamed lead/sub: lead=/sub= follow it, so readers that match by name (HQ) still find it. Open tasks only.
+    case "$st" in done | landed | dropped) ;; *) refresh_names "$d" ;; esac
+    case "$st" in
+      held | failed) needs+="$(row "$d")"$'\n' ;;
+      queued | running | answered | waiting | review)   # review needs the user only through an open ask
+        if [ -f "$d/decision" ]; then needs+="$(row "$d")"$'\n'
+        elif [ "$st" = waiting ]; then waiting+="$(row "$d")"$'\n'
+        else running+="$(row "$d")"$'\n'; fi ;;
+      *)
+        [ $open = 0 ] || continue
+        if [ $all = 1 ] || [ "$(stat -c %Y "$d/status")" -ge "$cutoff" ]; then
+          done_+="$(row "$d")"$'\n'
+        fi ;;
+    esac
+  done
+  [ -z "$needs" ] || printf 'NEEDS YOU\n%s' "$needs"
+  [ -z "$running" ] || printf 'RUNNING\n%s' "$running"
+  [ -z "$waiting" ] || printf 'WAITING ON OTHERS\n%s' "$waiting"
+  elsewhere
+  parked_section "$flt" "$prepo"
+  [ -z "$done_" ] || printf 'DONE\n%s' "$done_"
+}
+
+cmd_show() {
+  [ $# -eq 1 ] || die "show needs ID"
+  local d did; d=$(tdir_or_decision "$1")
+  if [ -s "$d/summary.md" ]; then cat "$d/summary.md"; echo; fi
+  echo "== $(basename "$d") ($(state_of "$d"))  $d"
+  grep -v '^$' "$d/meta" | awk -F= '{v[$1]=$0} END {for (k in v) print "  " v[k]}' | sort
+  local k cur sid r nm was
+  for k in lead sub; do   # the session's name now, when it was renamed since the task was made
+    cur=$(meta_get "$d" "$k"); sid=$(meta_get "$d" "${k}_sid")
+    { [ -n "$cur" ] && [ -n "$sid" ]; } || continue
+    r=$(resolve_session "$sid" "$cur"); [ -n "$r" ] || continue
+    nm=$(cut -f1 <<<"$r"); was=$cur; [ "$nm" != "$cur" ] || was=$(meta_get "$d" "${k}_was")
+    echo "$k: $nm${was:+$([ "$was" = "$nm" ] || echo " (was $was)")}"
+  done
+  cur=$(meta_get "$d" check)
+  [ -z "$cur" ] || echo "check: $cur ($(meta_get "$d" check_at))"
+  echo "intent: $(head -c 400 "$d/intent.md")"
+  did=$(open_decision "$d")
+  [ -z "$did" ] || echo "decision: $did — $(cat "$(question_file "$d")" 2>/dev/null)"
+  [ ! -f "$d/hold.md" ] || echo "question: $(cat "$d/hold.md")"
+  [ ! -f "$d/answer.md" ] || echo "answer: $(cat "$d/answer.md")"
+  echo "status (last 5):"; tail -n 5 "$d/status" | sed 's/^/  /'
+  local f
+  for f in brief.md report.md; do [ ! -f "$d/$f" ] || echo "$f: $d/$f ($(wc -l <"$d/$f") lines)"; done
+}
+
+# What the lead told the user about a task's result, kept so the user can find it again (HQ lists it).
+cmd_summary() {
+  [ $# -eq 2 ] || die "summary needs ID and - (stdin) or \"text\""
+  local d text; d=$(tdir "$1")
+  if [ "$2" = "-" ]; then text=$(cat); else text=$2; fi
+  [ -n "${text//[[:space:]]/}" ] || die "summary text is empty"
+  local tmp=$d/summary.md.tmp.$$
+  { printf '%s\n' "$text" >"$tmp" && mv "$tmp" "$d/summary.md"; } || { rm -f "$tmp"; die "cannot write $d/summary.md"; }
+  echo "saved $d/summary.md"
+  notify_summary "$d" "$text"
+}
+
+# The completion alert: only a top-level lead (a live session with no live parent) sends it, so a sub-lead's
+# summary stays between it and its lead and a plain shell sends nothing. Title "<lead>: <task>", body the
+# verdict line without markdown, 200 chars. A summary text that already alerted for this task never does again.
+notify_summary() { # task-dir text
+  local d=$1 me sid lf line key
+  sess_load
+  me=$(lead_session); [ -n "$me" ] || return 0
+  sid=$(cut -f3 <<<"$me"); lf=$(link_path "$sid")
+  if [ -f "$lf" ] && [ -n "$(link_parent "$lf")" ]; then return 0; fi
+  key=$(printf '%s' "$2" | sha256sum | cut -d' ' -f1)
+  if grep -qxF "$key" "$d/alerted-summary" 2>/dev/null; then return 0; fi
+  printf '%s\n' "$key" >>"$d/alerted-summary" 2>/dev/null || true
+  line=$(awk 'NF {print; exit}' <<<"$2" | sed -E 's/\[([^]]*)\]\([^)]*\)/\1/g; s/^[[:space:]]*(#+|>|[-*+])[[:space:]]+//; s/(\*\*|__|[`*])//g; s/^[[:space:]]+//')
+  notify "$(cut -f1 <<<"$me"): $(short_name "$(basename "$d")")" "${line:0:200}"
+}
+
+# Claude workers can't write report files, so the lead saves the final reply from the transcript.
+cmd_save() {
+  [ $# -ge 1 ] && [ $# -le 2 ] || die "save needs ID [K]"
+  local d; d=$(tdir "$1")
+  local key=agent out=$d/report.md agent f newest="" projects="${CREW_PROJECTS:-$HOME/.claude/projects}"
+  if [ -n "${2:-}" ]; then key="agent_$2"; out=$d/report-$2.md; fi
+  agent=$(meta_get "$d" "$key" || true)
+  [ -n "$agent" ] || die "no $key in $1 meta (crew meta $1 $key=<agent id>)"
+  # exact match: agent-a<name>-<hex>.jsonl (named agent) or agent-<id>.jsonl (recorded raw id); audit-1 must not match audit-10
+  local b
+  for f in "$projects"/*/*/subagents/agent-*"$agent"*.jsonl; do
+    [ -f "$f" ] || continue
+    b=${f##*/}
+    [ "$b" = "agent-$agent.jsonl" ] || [ "$b" = "agent-a$agent.jsonl" ] ||
+      [[ "$b" =~ ^agent-a"$agent"-[0-9a-f]+\.jsonl$ ]] || continue
+    if [ -z "$newest" ] || [ "$f" -nt "$newest" ]; then newest=$f; fi
+  done
+  [ -n "$newest" ] || die "no transcript for agent '$agent' under $projects"
+  if [ $(($(date +%s) - $(stat -c %Y "$newest"))) -lt 60 ]; then
+    echo "crew: warning: transcript changed in the last 60s; the worker may still be running" >&2
+  fi
+  local text
+  text=$(jq -rs '
+    ([.[] | select(.type == "assistant") | .message.content[]?
+       | select(.type == "tool_use" and .name == "SubagentHandback") | .input.message] | last)
+    // ([.[] | select(.type == "assistant") | .message.content[]?
+       | select(.type == "text") | .text] | last) // empty' "$newest")
+  [ -n "$text" ] || die "no handback or assistant text in $newest"
+  printf '%s\n' "$text" >"$out"
+  echo "saved $out ($(wc -c <"$out") bytes) from $newest"
+}
+
+# List only: which worktrees of a repo are safe to remove. Never removes anything.
+cmd_gc() {
+  local repo base wt="" br="" head="" first=1 line
+  repo=$(cd "${1:-.}" && git rev-parse --show-toplevel) || die "not a git repo: ${1:-.}"
+  base=$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)
+  if [ -z "$base" ]; then
+    for base in master main; do git -C "$repo" show-ref --verify -q "refs/heads/$base" && break; done
+  fi
+  git -C "$repo" rev-parse --verify -q "$base" >/dev/null || die "cannot find the default branch of $repo"
+  # merged = reachable from the remote default branch or from the local one (a local merge is not pushed yet)
+  local localbase=${base#origin/}
+  git -C "$repo" show-ref --verify -q "refs/heads/$localbase" || localbase=$base
+  echo "repo $repo, default branch $base (local: $localbase)"
+  local removable="" n=0
+  gc_one() { # path branch-ref head
+    local p=$1 b=${2#refs/heads/} h=$3 merged=n dirty=y unpushed size
+    [ "$p" != "$repo" ] || return 0   # the worktree we were pointed at is never a candidate
+    n=$((n + 1))
+    if [ ! -d "$p" ]; then printf '  %-50s missing directory (git worktree prune)\n' "$p"; return; fi
+    if git -C "$repo" merge-base --is-ancestor "$h" "$base" 2>/dev/null ||
+      git -C "$repo" merge-base --is-ancestor "$h" "$localbase" 2>/dev/null; then merged=y; fi
+    [ -n "$(git -C "$p" status --porcelain 2>/dev/null)" ] || dirty=n
+    if git -C "$p" rev-parse -q --verify '@{u}' >/dev/null 2>&1; then
+      unpushed=$(git -C "$p" rev-list --count '@{u}..HEAD')
+    else
+      unpushed=$(git -C "$p" rev-list --count HEAD --not --remotes)
+    fi
+    size=$(du -sh "$p" 2>/dev/null | cut -f1)
+    printf '  %-50s %-26s merged=%s dirty=%s unpushed=%s size=%s\n' "$p" "${b:-(detached)}" "$merged" "$dirty" "$unpushed" "${size:--}"
+    if [ $merged = y ] && [ $dirty = n ]; then removable+="  git -C $(printf '%q' "$repo") worktree remove $(printf '%q' "$p")"$'\n'; fi
+  }
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt=${line#worktree }; br=""; head="" ;;
+      "HEAD "*) head=${line#HEAD } ;;
+      "branch "*) br=${line#branch } ;;
+      "") if [ -n "$wt" ]; then
+            if [ $first = 1 ]; then first=0; else gc_one "$wt" "$br" "$head"; fi   # first entry = main worktree
+          fi; wt="" ;;
+    esac
+  done < <(git -C "$repo" worktree list --porcelain; echo)
+  [ $n -gt 0 ] || echo "  (no linked worktrees)"
+  [ -z "$removable" ] || printf 'merged and clean, safe to remove (run yourself; the branch stays):\n%s' "$removable"
+}
+
+# --- compact: a lead keeps its subs' contexts small, deterministically (the lead model decides nothing) ---
+# Sessions have a 1M window; 200k (SOFT) is our own quality limit, 400k (HARD) the point past which waiting costs too much.
+# An idle big context costs nothing until the session works again, so a sub is compacted at a boundary: when it is
+# idle, no prompt is open, it was not compacted in the last 20 min, and either ctx >= SOFT and its open task logged a
+# milestone (any `crew log` entry, new note or state change, or a `crew summary`) since the last compaction, or ctx >= HARD. A sub whose
+# tasks are all done/landed/dropped is never compacted: the lead is told to close it. Before handing a sub new work,
+# `crew compact --auto SUB` compacts it at ctx >= SOFT with no milestone needed (the new work is the boundary).
+# Context = input + cache_read + cache_creation tokens of the latest assistant turn in the sub's transcript (the
+# approach of orchestrate/scripts/worker-sizes.py); only the tail of the file is read, it can be ~100MB. The pane
+# checks are those of the HQ server (mods/hq/web/tmux.ts): Claude is the pane's foreground process, no permission or
+# selection prompt is open, idle = no "esc to interrupt". Text reaches the pane only as tmux argv (send-keys -l --,
+# then a separate Enter after the pane is read again): no shell is involved.
+COMPACT_SOFT=${CREW_COMPACT_SOFT:-200000}
+COMPACT_HARD=${CREW_COMPACT_HARD:-400000}
+COMPACT_COOLDOWN_S=1200
+[[ "$COMPACT_SOFT" =~ ^[0-9]+$ ]] && [[ "$COMPACT_HARD" =~ ^[0-9]+$ ]] || { echo "crew: CREW_COMPACT_SOFT/HARD must be token counts" >&2; exit 2; }
+
+TMAP=""; TMAP_LOADED=0
+tmap_load() { # the live claude sessions in tmux panes (bin tmux-map), read once per process
+  [ $TMAP_LOADED = 0 ] || return 0
+  TMAP_LOADED=1
+  local m=${CREW_TMUX_MAP:-$CREW_BIN/../mods/hq/bin/tmux-map}
+  [ -x "$m" ] || return 0
+  TMAP=$(CREW_SESSIONS="$CREW_SESSIONS" "$m" 2>/dev/null || true)
+}
+
+# the tmux target of live session NAME (sessionId SID), else nothing. Two sessions with one name: the one whose
+# transcript is SID's.
+pane_target() {
+  local rows
+  rows=$(N=$1 awk -F'\t' '$1 == ENVIRON["N"] && $2 != "" {print $2 "\t" $7}' <<<"$TMAP")
+  [ -n "$rows" ] || return 0
+  if [ "$(wc -l <<<"$rows")" -gt 1 ]; then
+    rows=$(S="/$2.jsonl" awk -F'\t' '{n = length(ENVIRON["S"])} substr($2, length($2) - n + 1) == ENVIRON["S"]' <<<"$rows")
+  fi
+  if [ -n "$rows" ] && [ "$(wc -l <<<"$rows")" -eq 1 ]; then cut -f1 <<<"$rows"; fi
+}
+
+# Claude (comm claude, or a version for a background session) is in the foreground process group of the pane
+fg_ok() {
+  local out pid cmd tp
+  [[ "$1" =~ ^([A-Za-z0-9_-]+:[0-9]+\.[0-9]+|%[0-9]+)$ ]] || return 1   # a pane id (%N) carries no #{}
+  # -u: see tmux-map (a non-UTF-8 locale without $TMUX turns the tab into "_")
+  out=$(tmux -u display-message -p -t "$1" $'#{pane_pid}\t#{pane_current_command}' 2>/dev/null) || return 1
+  IFS=$'\t' read -r pid cmd <<<"$out"
+  [[ "$pid" =~ ^[0-9]+$ ]] && [[ "$cmd" =~ ^(claude|[0-9]+\.[0-9]+\.[0-9]+)$ ]] || return 1
+  tp=$(ps -o tpgid= -p "$pid" 2>/dev/null | tr -d ' ' || true)
+  [[ "$tp" =~ ^[0-9]+$ ]] && [ "$tp" -gt 0 ] || return 1
+  ps -e -o pgid=,comm= 2>/dev/null | awk -v t="$tp" '$1 == t && ($2 == "claude" || $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/) {f = 1} END {exit !f}'
+}
+
+# A permission or selection prompt on the visible screen (the last 25 lines): a cursor on a numbered option, a footer
+# naming its keys, or a question over numbered options.
+screen_prompt() {
+  local lines; lines=$(grep -v '^[[:space:]]*$' <<<"$1" | tail -n 25 || true)
+  grep -qE '^[[:space:]]*(❯|›)[[:space:]]*[0-9]+\.[[:space:]]' <<<"$lines" && return 0
+  grep -qiE 'Esc to cancel|Enter to (select|confirm)|Tab to amend|↑/↓ to navigate' <<<"$lines" && return 0
+  grep -qE '^[[:space:]]*(❯|›)?[[:space:]]*[0-9]+\.[[:space:]]+[^[:space:]]' <<<"$lines" &&
+    grep -qE '(^|[^[:alnum:]_])(Do you want to|Would you like to|Do you trust)([^[:alnum:]_]|$)' <<<"$lines" && return 0
+  return 1
+}
+# (a /compact shows "Compacting conversation…" instead of "esc to interrupt", with an empty composer below it)
+screen_busy() { grep -v '^[[:space:]]*$' <<<"$1" | tail -n 12 | grep -qiE 'esc to interrupt|Compacting conversation'; }
+
+# The text in the composer (after the last prompt mark ❯), trimmed; fails when the screen shows no composer. Claude wraps a
+# long line itself: it goes on in the lines below, indented, up to the composer's bottom border (a line of ─). Those lines
+# are joined to the first by one space (a word wrapped mid-word gets a space too: compare without whitespace).
+composer_text() {
+  local scr=${1//$'\xc2\xa0'/ }
+  printf '%s\n' "$scr" | awk '
+    /^[[:space:]]*❯/ { sub(/^[[:space:]]*❯/, ""); buf = ""; found = 1; open = 1; mark = 1 }
+    !mark && /^[[:space:]]*─/ { open = 0; next }
+    { mark = 0 }
+    found && open { l = $0; gsub(/^[[:space:]]+|[[:space:]]+$/, "", l); if (l != "") buf = buf (buf == "" ? "" : " ") l }
+    END { if (!found) exit 1; print buf }'
+}
+
+# P_STATE idle|busy|prompt|draft|nocomposer (P_SCREEN the capture, P_COMPOSER the composer text), or return 1 with
+# P_REASON. draft: the user has unsent text in the composer, which a typed /compact would join and Enter would submit.
+P_STATE=""; P_SCREEN=""; P_REASON=""; P_COMPOSER=""
+pane_read() {
+  P_STATE=""; P_SCREEN=""; P_COMPOSER=""
+  fg_ok "$1" || { P_REASON="claude is not in the foreground of the pane"; return 1; }
+  P_SCREEN=$(tmux capture-pane -p -J -t "$1" 2>/dev/null | tr -d '\000-\010\013-\037\177') || { P_REASON="could not read the pane"; return 1; }
+  if screen_prompt "$P_SCREEN"; then P_STATE=prompt
+  elif screen_busy "$P_SCREEN"; then P_STATE=busy
+  elif ! P_COMPOSER=$(composer_text "$P_SCREEN"); then P_STATE=nocomposer
+  elif [ -n "$P_COMPOSER" ]; then P_STATE=draft
+  else P_STATE=idle; fi
+}
+
+# C_CTX / C_TS: context tokens and time of the latest assistant turn of session $1 (fails: no transcript or turn)
+C_CTX=0; C_TS=""
+ctx_read() {
+  local sid=$1 f="" g out size n=3000000
+  C_CTX=0; C_TS=""
+  [[ "$sid" =~ ^[A-Za-z0-9-]+$ ]] || return 1
+  for g in "${CREW_PROJECTS:-$HOME/.claude/projects}"/*/"$sid".jsonl; do [ -f "$g" ] && { f=$g; break; }; done
+  [ -n "$f" ] || return 1
+  size=$(stat -c %s "$f" 2>/dev/null || echo 0)
+  while :; do
+    out=$(tail -c "$n" "$f" | grep -a '"assistant"' | jq -Rr 'fromjson? | select(.type == "assistant" and .message.usage != null) | [(.timestamp // ""), ((.message.usage.input_tokens // 0) + (.message.usage.cache_read_input_tokens // 0) + (.message.usage.cache_creation_input_tokens // 0))] | @tsv' 2>/dev/null | awk -F'\t' '$2 > 0' || true)
+    if [ -n "$out" ] || [ "$n" -ge "$size" ]; then break; fi
+    n=$((n * 10))
+  done
+  [ -n "$out" ] || return 1
+  IFS=$'\t' read -r C_TS C_CTX <<<"$(tail -n 1 <<<"$out")"
+}
+fmt_k() { echo "$((($1 + 500) / 1000))k"; }
+
+# R_AT: when session $1 was last compacted by crew (iso), else empty
+R_AT=""
+rec_read() { R_AT=$(sed -n 's/^compacted=//p' "$CREW_ROOT/.compact/$(sid_key "$1")" 2>/dev/null | tail -n 1 || true); }
+
+# T_OPEN: the dirs of session $1's tasks that are not done/landed/dropped; T_LAST: the one with the newest status line
+T_OPEN=""; T_LAST=""; T_LAST_STATE=""
+sub_tasks() {
+  local d st ts s best="" LC_COLLATE=C prev="$CREW_ROOT/.prev/$(sid_key "$1")"
+  T_OPEN=""; T_LAST=""; T_LAST_STATE=""
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}
+    [ -f "$d/status" ] || continue
+    # a task is the sub's by its sub_sid, or by an earlier id of the same session (a resume: .prev, as resolve_session)
+    s=$(meta_get "$d" sub_sid)
+    [ -n "$s" ] && { [ "$s" = "$1" ] || { [ -f "$prev" ] && grep -qxF -- "$s" "$prev"; }; } || continue
+    st=$(state_of "$d"); ts=$(tail -n 1 "$d/status" | cut -f1)
+    case "$st" in done | landed | dropped) ;; *) T_OPEN+="$d"$'\n' ;; esac
+    if [[ "$ts" > "$best" || -z "$T_LAST" ]]; then best=$ts; T_LAST=$d; T_LAST_STATE=$st; fi
+  done
+}
+
+# some open task logged anything (`crew log`: a new note counts as much as a state change; orchestrate logs its waves as
+# running -> running) or got a summary after $1 (iso, may be empty)
+milestone_since() {
+  local d s LC_COLLATE=C
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    if LC_ALL=C awk -F'\t' -v s="$1" '$1 > s {f = 1} END {exit !f}' "$d/status"; then return 0; fi
+    if [ -f "$d/summary.md" ]; then
+      s=$(date -u -r "$d/summary.md" +%Y-%m-%dT%H:%M:%SZ)
+      [[ "$s" > "$1" ]] && return 0
+    fi
+  done <<<"$T_OPEN"
+  return 1
+}
+
+one_line() { printf '%s' "$1" | tr '\r\n\t' '   ' | tr -d '\000-\037\177' | sed 's/^ *//; s/ *$//'; }
+
+# What the sub keeps through the compaction, in its own words (its latest crew log note and summary), written by crew
+# so the lead spends nothing on it. Needs sub_tasks to have run for the session.
+build_focus() {
+  local ids="" briefs="" ds="" d t f="keep:" n s
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    ids+=" $(basename "$d")"
+    [ ! -f "$d/brief.md" ] || briefs+=" $d/brief.md"
+    t=$(open_decision "$d"); [ -z "$t" ] || ds+=" $t"
+  done <<<"$T_OPEN"
+  [ -z "$ids" ] || f+=" crew task(s)$ids;"
+  if [ -n "$T_LAST" ]; then
+    n=$(tail -n 1 "$T_LAST/status" | cut -f3)
+    f+=" latest log: $T_LAST_STATE${n:+ - $n};"
+    s=$(first_line "$T_LAST/summary.md")
+    [ -z "$s" ] || f+=" summary: $s;"
+  fi
+  [ -z "$briefs" ] || f+=" briefs:$briefs;"
+  [ -z "$ds" ] || f+=" open decisions:$ds;"
+  f+=" the current milestone and the next step"
+  f=$(one_line "$f")
+  printf '%s' "${f:0:900}"
+}
+
+# Types /compact [focus] into the pane and presses Enter. Prints the reason and returns 3 when it must not (nothing
+# is pressed then); prints nothing and returns 0 when compaction started. One sender per sub (a lock).
+# args: name sid target focus
+compact_send() {
+  local name=$1 sid=$2 target=$3 text="/compact" i
+  [ -z "$4" ] || text+=" $4"
+  mkdir -p "$CREW_ROOT/.locks" "$CREW_ROOT/.compact"
+  (
+    flock -n 9 || { echo "another compaction of $name is under way"; exit 3; }
+    pane_read "$target" || { echo "$P_REASON"; exit 3; }
+    case "$P_STATE" in
+      busy) echo "$name is busy (the pane shows esc to interrupt)"; exit 3 ;;
+      prompt) echo "a prompt is open in $name's pane: answer it in tmux"; exit 3 ;;
+      draft) [ "${P_COMPOSER//[[:space:]]/}" = "${text//[[:space:]]/}" ] || { echo "draft: unsent text in $name's composer, nothing was typed"; exit 3; } ;;   # (an earlier /compact left typed: Enter alone sends it)
+      nocomposer) echo "$name's composer is not visible, nothing was typed"; exit 3 ;;
+    esac
+    [ "$P_STATE" = draft ] || tmux send-keys -t "$target" -l -- "$text" >/dev/null 2>&1 || { echo "tmux send-keys failed"; exit 3; }
+    for i in $(seq 1 40); do
+      pane_read "$target" || { echo "$P_REASON: Enter was not pressed, and the text may still be in the pane"; exit 3; }
+      case "$P_STATE" in busy | prompt) echo "$name became $P_STATE while typing: Enter was not pressed, and the text may still be in the composer"; exit 3 ;; esac
+      # the composer must hold exactly what was typed: anything else in front of it would be submitted with it
+      # (Claude wraps a long line, also in the middle of a word: whitespace is not compared)
+      if [ "${P_COMPOSER//[[:space:]]/}" = "${text//[[:space:]]/}" ]; then break; fi
+      [ "$i" -lt 40 ] || { echo "the composer does not hold exactly the typed text: Enter was not pressed, and the text may still be there"; exit 3; }
+      sleep 0.025
+    done
+    tmux send-keys -t "$target" Enter >/dev/null 2>&1 || { echo "tmux send-keys failed"; exit 3; }
+    local at d; at=$(now)
+    printf 'compacted=%s\nctx_before=%s\n' "$at" "${C_CTX:-0}" >"$CREW_ROOT/.compact/$(sid_key "$sid").tmp" &&
+      mv "$CREW_ROOT/.compact/$(sid_key "$sid").tmp" "$CREW_ROOT/.compact/$(sid_key "$sid")"
+    while IFS= read -r d; do
+      [ -z "$d" ] || meta_add "$d" "compacted=$at" "ctx_before=${C_CTX:-0}"
+    done <<<"$T_OPEN"
+  ) 9>"$CREW_ROOT/.locks/compact-$(sid_key "$sid")"
+}
+
+# After /compact: wait (bounded) until the pane is idle again, so the lead's next message is not queued behind it.
+compact_wait() {
+  local target=$1 deadline calm=0
+  deadline=$(($(date +%s) + ${CREW_COMPACT_WAIT_S:-120}))
+  sleep "${CREW_COMPACT_SETTLE_S:-2}"
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if pane_read "$target" && [ "$P_STATE" = idle ]; then calm=$((calm + 1)); else calm=0; fi
+    [ "$calm" -lt 2 ] || return 0
+    sleep "${CREW_COMPACT_POLL_S:-1}"
+  done
+  return 1
+}
+
+# Should live sub NAME (sessionId SID) be compacted now? $3 = 1: the lead is about to give it new work.
+# Sets E_ACT (compact|skip|wait|close), E_MSG (the report line) and E_TARGET.
+E_ACT=""; E_MSG=""; E_TARGET=""
+compact_eval() {
+  local name=$1 sid=$2 new=$3 k now_s at_s LC_COLLATE=C
+  E_ACT=skip; E_TARGET=""
+  ctx_read "$sid" || { E_MSG="skip $name: no transcript"; return 0; }
+  k=$(fmt_k "$C_CTX")
+  rec_read "$sid"
+  if [ -n "$R_AT" ]; then
+    now_s=$(date -u -d "$(now)" +%s); at_s=$(date -u -d "$R_AT" +%s 2>/dev/null || echo 0)
+    # inside the cooldown, or the transcript has no turn since the compaction (its last reading is from before it)
+    if [ $((now_s - at_s)) -lt $COMPACT_COOLDOWN_S ] || [[ "${C_TS:0:19}" < "${R_AT:0:19}" ]]; then E_MSG="skip $name: recent"; return 0; fi
+  fi
+  [ "$C_CTX" -ge "$COMPACT_SOFT" ] || { E_MSG="skip $name: ctx $k"; return 0; }
+  sub_tasks "$sid"
+  if [ "$new" != 1 ]; then
+    if [ -z "$T_LAST" ]; then E_MSG="skip $name: no task"; return 0; fi
+    if [ -z "$T_OPEN" ]; then E_ACT=close; E_MSG="close $name? ($T_LAST_STATE, ctx $k)"; return 0; fi
+    if [ "$C_CTX" -lt "$COMPACT_HARD" ] && ! milestone_since "$R_AT"; then E_MSG="skip $name: no milestone (ctx $k)"; return 0; fi
+  fi
+  tmap_load
+  E_TARGET=$(pane_target "$name" "$sid")
+  [ -n "$E_TARGET" ] || { E_MSG="skip $name: no tmux pane"; return 0; }
+  pane_read "$E_TARGET" || { E_MSG="skip $name: $P_REASON"; return 0; }
+  case "$P_STATE" in
+    busy) if [ "$C_CTX" -ge "$COMPACT_HARD" ]; then E_ACT=wait; E_MSG="wait $name: busy at $k"; else E_MSG="skip $name: busy"; fi; return 0 ;;
+    prompt | draft | nocomposer) E_MSG="skip $name: $P_STATE"; return 0 ;;
+  esac
+  E_ACT=compact; E_MSG="compacted $name (ctx $k)"
+}
+
+# Evaluate and, when due, compact live sub NAME/SID. Prints the report line ($4 = q: only a `compacted` line).
+# $3 = 1: new work is coming, so wait until it is idle again. Returns 1 when a refusal was printed.
+compact_one() {
+  local name=$1 sid=$2 new=$3 mode=$4 reason line
+  compact_eval "$name" "$sid" "$new"
+  line=$E_MSG
+  if [ "$E_ACT" = compact ]; then
+    if reason=$(compact_send "$name" "$sid" "$E_TARGET" "$(build_focus)"); then
+      if [ "$new" = 1 ] && ! compact_wait "$E_TARGET"; then line+="; still busy after ${CREW_COMPACT_WAIT_S:-120}s"; fi
+    else
+      line="skip $name: $reason"; E_ACT=skip
+    fi
+  fi
+  if [ "$mode" != q ] || [ "$E_ACT" = compact ]; then printf '%s\n' "$line"; fi
+}
+
+# The --auto sweep over the live subs of a lead (name, sessionId). Cheap when there is nothing to do: no links or no
+# live sub means no transcript is read and no tmux is asked. $3 = q: silent unless it compacts.
+compact_sweep() {
+  local n s sid
+  # one grep: no link names this lead as its parent (by sessionId or name), so there is nothing to read or ask
+  grep -qsFx -e "parent_sid=$2" -e "parent_name=$1" "$CREW_ROOT"/.links/* 2>/dev/null || return 0
+  while IFS=$'\t' read -r n s sid; do
+    [ "$s" = live ] || continue
+    compact_one "$n" "$sid" 0 "$3" || true
+  done < <(subs_of "$1" "$2")
+  return 0
+}
+
+# SUB (a name or sessionId) -> R_NAME, R_SID: a live session joined under lead (name $1, sid $2); else the reason on
+# stderr and exit 3. Itself and its own lead are refused by name.
+R_NAME=""; R_SID=""
+resolve_sub() {
+  local lead=$1 lsid=$2 want=$3 n s sid lf hits=0 gone=0
+  R_NAME=""; R_SID=""
+  [ "$want" != "$lead" ] && [ "$want" != "$lsid" ] || { echo "crew: refused: a session cannot compact itself" >&2; exit 3; }
+  lf=$(link_path "$lsid")
+  if [ -f "$lf" ] && { [ "$want" = "$(link_get "$lf" parent_name)" ] || [ "$want" = "$(link_get "$lf" parent_sid)" ]; }; then
+    echo "crew: refused: '$want' is your own lead; only a lead compacts its subs" >&2; exit 3
+  fi
+  while IFS=$'\t' read -r n s sid; do
+    [ "$n" = "$want" ] || [ "$sid" = "$want" ] || continue
+    if [ "$s" = live ]; then hits=$((hits + 1)); R_NAME=$n; R_SID=$sid; else gone=1; fi
+  done < <(subs_of "$lead" "$lsid")
+  [ $hits -le 1 ] || { echo "crew: refused: more than one live sub is named '$want'; pass its sessionId" >&2; exit 3; }
+  if [ $hits -eq 0 ]; then
+    if [ $gone = 1 ]; then echo "crew: refused: '$want' is not running" >&2; else echo "crew: refused: '$want' is not a live session joined under $lead" >&2; fi
+    exit 3
+  fi
+}
+
+cmd_compact() {
+  local auto=0 sub="" focus="" have_focus=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --auto) auto=1; shift ;;
+      -*) die "unknown flag $1" ;;
+      *) if [ -z "$sub" ]; then sub=$1; else focus="${focus:+$focus }$1"; have_focus=1; fi; shift ;;
+    esac
+  done
+  [ $auto = 0 ] || [ $have_focus = 0 ] || die "compact --auto takes no focus (crew writes it)"
+  [ $auto = 1 ] || [ -n "$sub" ] || die 'compact needs SUB ["focus"], or --auto [SUB]'
+  local me lead lsid
+  me=$(self_session); lead=$(cut -f1 <<<"$me"); lsid=$(cut -f3 <<<"$me")
+  [ -d "$CREW_ROOT" ] || die "no subs: nothing to compact"
+  relink_once
+  sess_load
+  if [ $auto = 1 ] && [ -z "$sub" ]; then compact_sweep "$lead" "$lsid" v; return 0; fi
+  resolve_sub "$lead" "$lsid" "$sub"
+  if [ $auto = 1 ]; then compact_one "$R_NAME" "$R_SID" 1 v; return 0; fi
+  # one-off: idle and no prompt are the only conditions
+  [ "${#focus}" -le 900 ] || die "focus is longer than 900 characters"
+  ctx_read "$R_SID" || true
+  sub_tasks "$R_SID"
+  tmap_load
+  local target reason
+  target=$(pane_target "$R_NAME" "$R_SID")
+  [ -n "$target" ] || { echo "crew: refused: $R_NAME is not in a tmux pane" >&2; exit 3; }
+  focus=$(one_line "$focus")
+  [ -n "$focus" ] || focus=$(build_focus)
+  if ! reason=$(compact_send "$R_NAME" "$R_SID" "$target" "$focus"); then echo "crew: refused: $reason" >&2; exit 3; fi
+  echo "compacted $R_NAME (ctx $(fmt_k "$C_CTX"))"
+}
+
+# --- digest: the end-of-reply block a lead pastes under its answer ---
+# The id without its leading MMDD- date prefixes (1014-1014-stats -> stats); same rule as the HQ board.
+short_name() {
+  local n=$1
+  while [[ "$n" =~ ^[0-9]{4}-. ]]; do n=${n#????-}; done
+  printf '%s' "$n"
+}
+
+# One lead's view, plain text for a ```text fence. "Since last message": its tasks whose current state began
+# at or after the lead's marker (the time of its last digest) and is one the user cares about. The marker file
+# also lists the changes of that very second already reported, so one that came just before the digest is not
+# shown twice and one that came just after is not lost. "Needs you": its open decisions, lowest D-id first.
+# Prints nothing when both are empty; --peek leaves the marker alone.
+cmd_digest() {
+  local lead="" peek=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --lead) lead=${2:-}; [ -n "$lead" ] || die "--lead needs a name"; shift 2 ;;
+      --peek) peek=1; shift ;;
+      *) die "unknown flag $1" ;;
+    esac
+  done
+  local lsid="" own=0
+  if [ -z "$lead" ]; then
+    own=1
+    IFS=$'\t' read -r lead _ lsid < <(lead_session || true) || true
+    [ -n "$lead" ] || die "digest: not inside a claude session; pass --lead NAME"
+  fi
+  [ -d "$CREW_ROOT" ] || return 0
+  relink_once
+  sess_load
+  [ "$lsid" != - ] || lsid=""
+  if [ -z "$lsid" ]; then lsid=$(cut -f3 <<<"$(resolve_session "" "$lead")"); fi
+  # the lifecycle sweep first, so a sub it closes is not compacted: it acts only for the lead's own plain digest
+  local lcb act=0
+  if [ $own = 1 ] && [ $peek = 0 ] && [ -n "$lsid" ]; then act=1; fi
+  lcb=$(lifecycle_block "$lead" "$lsid" $act || true)
+  # a sub that is due is compacted here (the lead runs digest at the end of every reply); one line when it does
+  local auto=""
+  if [ $own = 1 ] && [ $peek = 0 ] && [ -n "$lsid" ]; then
+    auto=$(compact_sweep "$lead" "$lsid" q || true)
+    answers_sweep "$lsid"; pane_ask_sweep "$lead" "$lsid"   # queued answers are retried; a sub's in-pane question becomes a D-id
+  fi
+  local LC_COLLATE=C   # timestamps are compared as text
+  local mark stamp since
+  mark="$CREW_ROOT/.digest-$(printf '%s' "$lead" | tr -c 'A-Za-z0-9._-' _)"
+  stamp=$(now)
+  local reported=""
+  since=$(head -n 1 "$mark" 2>/dev/null || true)
+  if [[ "$since" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$ ]]; then
+    reported=$(tail -n +2 "$mark")
+  else
+    since=$(date -u -d "$stamp -24 hours" +%Y-%m-%dT%H:%M:%SZ)
+  fi
+
+  local changes="" needs="" shown="" d id ts st note did glyph key sub tsid r
+  for d in "$CREW_ROOT"/*/; do
+    d=${d%/}
+    [ -f "$d/status" ] || continue
+    # a task belongs to the lead its lead_sid resolves to, whatever either is called now; the name decides
+    # only when it has no lead_sid or that session is not live
+    tsid=$(meta_get "$d" lead_sid)
+    r=""; [ -z "$tsid" ] || r=$(resolve_session "$tsid" "$(meta_get "$d" lead)")
+    if [ -n "$r" ]; then [ "$(cut -f3 <<<"$r")" = "$lsid" ] || continue
+    else [ "$(meta_get "$d" lead)" = "$lead" ] || continue; fi
+    id=$(basename "$d")
+    # when the task entered its current state (first line of the last run of one state) and the note it came with
+    IFS=$'\t' read -r ts st note < <(awk -F'\t' '$2 != s {s = $2; t = $1; n = $3} END {printf "%s\t%s\t%s\n", t, s, n}' "$d/status")
+    # a finished task from before the window is not shown: leave its names alone
+    case "$st" in done | landed | dropped) [[ "$ts" < "$since" ]] || refresh_names "$d" ;; *) refresh_names "$d" ;; esac
+    sub=$(meta_get "$d" sub || true)
+    key="$id|$ts|$st"
+    if [[ ! "$ts" < "$since" ]] && ! grep -qxF -- "$key" <<<"$reported"; then
+      case "$st" in
+        review | done | landed) glyph=✓ ;;
+        failed) glyph=✗ ;;
+        held) glyph='?' ;;
+        answered) glyph=→ ;;
+        *) glyph="" ;;
+      esac
+      [ -z "$glyph" ] || { changes+="$ts"$'\t'"$glyph"$'\t'"$(short_name "$id")${sub:+ via $sub}"$'\t'"$st"$'\t'"$note"$'\n'; [ "$ts" != "$stamp" ] || shown+="$key"$'\n'; }
+    fi
+    did=$(open_decision "$d")
+    if [ -n "$did" ]; then
+      needs+="${did#D}"$'\t'"$did"$'\t'"$id"$'\t'"$(short_name "$id")${sub:+ via $sub}"$'\t'"$(first_line "$(question_file "$d")")"$'\n'
+    fi
+  done
+
+  local out="" w g name q talk
+  [ -z "$lcb" ] || out+="$lcb"$'\n'
+  [ -z "$auto" ] || out+="$auto"$'\n'
+  if [ -n "$changes" ]; then
+    changes=$(printf '%s' "$changes" | sort -s -t$'\t' -k1,1)
+    w=$(awk -F'\t' '{if (length($3) > m) m = length($3)} END {print m + 0}' <<<"$changes")
+    out+="Since last message"$'\n'
+    while IFS=$'\t' read -r ts g name st note; do
+      out+="$(printf '  %s %-*s  %s' "$g" "$w" "$name" "$st")"
+      if [ -n "$note" ]; then out+=" · ${note:0:70}"; fi
+      out+=$'\n'
+    done <<<"$changes"
+  fi
+  # sibling owners' threads (only once a thread exists), between the changes and the decisions
+  if [ -d "$CREW_ROOT/.talk" ]; then
+    . "$CREW_BIN/crew-owners.sh"; . "$CREW_BIN/crew-talk.sh"
+    talk=$(talk_digest_lines "$lead" "$lsid" "$since" || true)
+    [ -z "$talk" ] || out+="Talk"$'\n'"$talk"$'\n'
+  fi
+  if [ -n "$needs" ]; then
+    needs=$(printf '%s' "$needs" | sort -n -s -t$'\t' -k1,1)
+    w=$(awk -F'\t' '{if (length($2) > m) m = length($2)} END {print m + 0}' <<<"$needs")
+    out+="Needs you"$'\n'
+    while IFS=$'\t' read -r _ did tid name q; do
+      if [ ${#q} -gt 100 ]; then q="${q:0:99}…"; fi
+      out+="$(printf '  %-*s  %s — %s → crew show %s' "$w" "$did" "$name" "$q" "$tid")"$'\n'
+    done <<<"$needs"
+  fi
+  [ -z "$lsid" ] || out+=$(answers_waiting_lines "$lsid")
+  printf '%s' "$out"
+  # what stays reported: the changes of this very second, old and new
+  [ $peek = 1 ] || { { printf '%s\n' "$stamp"; [ "$since" != "$stamp" ] || printf '%s' "$reported"$'\n'; printf '%s' "$shown"; } | awk 'NR == 1 || (NF && !seen[$0]++)' >"$mark.tmp" && mv "$mark.tmp" "$mark"; }
+}
+
+. "$CREW_BIN/crew-answer.sh"
+. "$CREW_BIN/crew-lifecycle.sh"
+
+case "${1:-}" in
+  save) shift; cmd_save "$@" ;;
+  summary) shift; cmd_summary "$@" ;;
+  gc) shift; cmd_gc "$@" ;;
+  worktree) shift; exec "$CREW_BIN/crew-worktree" "$@" ;;
+  check) shift; exec "$CREW_BIN/crew-check" "$@" ;;
+  new) shift; cmd_new "$@" ;;
+  join) shift; cmd_join "$@" ;;
+  leave) shift; cmd_leave "$@" ;;
+  whoami) shift; cmd_whoami "$@" ;;
+  subs) shift; cmd_subs "$@" ;;
+  relink) shift; cmd_relink "$@" ;;
+  meta-migrate) shift; cmd_meta_migrate "$@" ;;
+  spawn) shift; cmd_spawn "$@" ;;
+  log) shift; cmd_log "$@" ;;
+  meta) shift; cmd_meta "$@" ;;
+  hold) shift; cmd_hold "$@" ;;
+  ask) shift; cmd_ask "$@" ;;
+  answer) shift; cmd_answer "$@" ;;
+  deliver-answer) shift; cmd_deliver_answer "$@" ;;   # (not in --help: only the input hook and HQ hold its key; see crew-answer.sh)
+  digest) shift; cmd_digest "$@" ;;
+  compact) shift; cmd_compact "$@" ;;
+  ls) shift; cmd_ls "$@" ;;
+  mem) shift; cmd_mem ;;
+  next) shift; cmd_next ;;
+  watch) shift; cmd_watch ;;
+  park) shift; cmd_park "$@" ;;
+  unpark) shift; cmd_unpark "$@" ;;
+  show) shift; cmd_show "$@" ;;
+  dir) shift; tdir "${1:-}"; echo ;;
+  diff) shift; exec "$CREW_BIN/crew-diff" "$@" ;;
+  owner) shift; . "$CREW_BIN/crew-owners.sh"; cmd_owner "$@" ;;
+  owners) shift; . "$CREW_BIN/crew-owners.sh"; cmd_owners "$@" ;;
+  sleep) shift; . "$CREW_BIN/crew-owners.sh"; . "$CREW_BIN/crew-sleep.sh"; cmd_sleep "$@" ;;
+  wake) shift; . "$CREW_BIN/crew-owners.sh"; . "$CREW_BIN/crew-wake.sh"; cmd_wake "$@" ;;
+  talk) shift; . "$CREW_BIN/crew-owners.sh"; . "$CREW_BIN/crew-talk.sh"; cmd_talk "$@" ;;
+  close) shift; . "$CREW_BIN/crew-owners.sh"; . "$CREW_BIN/crew-sleep.sh"; . "$CREW_BIN/crew-close.sh"; cmd_close "$@" ;;
+  -h | --help | help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

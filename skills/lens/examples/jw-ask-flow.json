@@ -1,0 +1,659 @@
+{
+ "id": "jw-ask-flow",
+ "title": "What happens when you run `jw ask`",
+ "subtitle": "Following one question from your shell, through the `jw` wrapper, to a GPT worker and back",
+ "layers": [
+  {
+   "id": "you",
+   "name": "You"
+  },
+  {
+   "id": "jw",
+   "name": "jw script"
+  },
+  {
+   "id": "out",
+   "name": "Outside & disk"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "shell",
+   "label": "Your shell",
+   "kind": "zsh",
+   "layer": "you",
+   "simple": "Where you type the command. It splits your words into arguments and starts the script.",
+   "deep": "The shell does word-splitting and quote removal before `jw` ever runs, so `\"where is auth handled?\"` arrives as ONE argument (`$2`). Quoting here is what keeps the question in one piece.",
+   "analogy": "The customer at the counter handing over a written order.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "router",
+   "label": "Command router",
+   "kind": "case statement",
+   "layer": "jw",
+   "files": [
+    "jw:250-261"
+   ],
+   "simple": "Looks at the first word (`ask`, `run`, `review`...) and hands the rest to the matching function.",
+   "deep": "A bash `case` on `${1:-}`. The `:-` default avoids an 'unbound variable' crash under `set -u` when you run `jw` with no args. `shift` drops the subcommand so each `cmd_*` sees only its own flags.",
+   "analogy": "A switchboard operator routing each call to the right desk.",
+   "confidence": "evidenced",
+   "functions": [
+    {
+     "name": "case \"${1:-}\"",
+     "loc": "jw:250",
+     "simple": "The whole router is 12 lines.",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 250,
+      "lang": "bash",
+      "src": "case \"${1:-}\" in\n  init) shift; cmd_init \"$@\";;\n  run) shift; cmd_run \"$@\";;\n  resume) shift; cmd_resume \"$@\";;\n  post) shift; cmd_post \"$@\";;\n  board) shift; cmd_board \"$@\";;\n  review) shift; cmd_review \"$@\";;\n  ask) shift; cmd_ask \"$@\";;\n  usage) cmd_usage;;\n  -h|--help|\"\") usage;;\n  *) die \"unknown command $1\";;\nesac",
+      "highlight": [
+       257
+      ],
+      "notes": {}
+     }
+    }
+   ]
+  },
+  {
+   "id": "ask",
+   "label": "cmd_ask",
+   "kind": "function",
+   "layer": "jw",
+   "files": [
+    "jw:224-241"
+   ],
+   "simple": "Reads the flags, wraps your question with safety rules, and asks `invoke` to run it.",
+   "deep": "Parses `--cwd/--model/--timeout/--write` with a `while (($#))` + `case` loop. Unless `--write` is given, it appends a read-only constraint to the prompt. It always appends an anti-redraft line, then calls `invoke` with task name `ask-<timestamp>` and `JW_PRINT=full` so the full reply is printed.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "invoke",
+   "label": "invoke",
+   "kind": "function",
+   "layer": "jw",
+   "files": [
+    "jw:53-93"
+   ],
+   "simple": "The engine room: runs jcode with a time limit, saves everything to disk, decides if it worked, and prints a short summary.",
+   "deep": "Runs `jcode run ... --json` inside a subshell with `timeout`, stdout to `<task>.json`, stderr to `<task>.err`. Captures the exit code without tripping `set -e` (`|| rc=$?`). Extracts `session_id` and `text` with `jq`, classifies status (timeout / error / empty / ok), writes a ledger row, then prints either the full reply or just the EVIDENCE block.",
+   "analogy": "A courier who delivers the letter, waits for the reply, files a copy, and reads you only the important part.",
+   "confidence": "evidenced",
+   "functions": [
+    {
+     "name": "status classification",
+     "loc": "jw:59-65",
+     "simple": "Turns an exit code + reply into one word.",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 59,
+      "lang": "bash",
+      "src": "  local sid text status\n  sid=$(jq -r '.session_id // empty' \"$out\" 2>/dev/null || true)\n  text=$(jq -r '.text // empty' \"$out\" 2>/dev/null || true)\n  if (( rc == 124 )); then status=\"timeout\"\n  elif (( rc != 0 )); then status=\"error($rc)\"\n  elif [[ -z \"$text\" ]]; then status=\"empty\"\n  else status=\"ok\"; fi",
+      "highlight": [
+       62
+      ],
+      "notes": {}
+     }
+    }
+   ]
+  },
+  {
+   "id": "jcode",
+   "label": "jcode \u2192 OpenAI",
+   "kind": "external CLI",
+   "layer": "out",
+   "simple": "The actual AI agent. It reads your repo, thinks, and returns JSON with a reply and a session id.",
+   "deep": "Invoked as `jcode run -p openai -m gpt-6-sol -C <cwd> --json <prompt>`. The jw script never talks to OpenAI itself; it only depends on two JSON fields: `.session_id` and `.text`.",
+   "confidence": "inferred"
+  },
+  {
+   "id": "files",
+   "label": "Run files",
+   "kind": "json + err",
+   "layer": "out",
+   "files": [
+    "~/.claude/orchestration/adhoc/runs/"
+   ],
+   "simple": "Every reply is saved in full on disk, so the terminal only needs to show a summary.",
+   "deep": "`ask-<ts>.json` holds jcode's raw JSON; `ask-<ts>.err` holds stderr. `${out%.json}.err` is bash suffix-stripping: it removes `.json` from the end of the path.",
+   "confidence": "evidenced"
+  },
+  {
+   "id": "ledger",
+   "label": "Ledger",
+   "kind": "markdown table",
+   "layer": "out",
+   "files": [
+    "jw:43-50"
+   ],
+   "simple": "A running log: one table row per run with time, task, model, session and status.",
+   "deep": "`ledger_row` creates `ledger.md` with a header on first use, then appends with `>>`. For ad-hoc asks the slug is `adhoc`, so all asks share one ever-growing ledger.",
+   "confidence": "evidenced",
+   "functions": [
+    {
+     "name": "ledger_row()",
+     "loc": "jw:43",
+     "simple": "Create-if-missing, then append.",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 43,
+      "lang": "bash",
+      "src": "ledger_row() { # slug task model session status\n  local dir=\"$ORCH_ROOT/$1\"\n  mkdir -p \"$dir\"\n  if [[ ! -f \"$dir/ledger.md\" ]]; then\n    printf '# Ledger: %s\\n\\n## jcode runs\\n| time | task | model | session | status |\\n|---|---|---|---|---|\\n' \"$1\" > \"$dir/ledger.md\"\n  fi\n  printf '| %s | %s | %s | %s | %s |\\n' \"$(date '+%F %T')\" \"$2\" \"$3\" \"$4\" \"$5\" >> \"$dir/ledger.md\"\n}",
+      "highlight": [
+       46,
+       49
+      ],
+      "notes": {}
+     }
+    }
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "from": "shell",
+   "to": "router",
+   "label": "argv"
+  },
+  {
+   "from": "router",
+   "to": "ask",
+   "label": "shift; call"
+  },
+  {
+   "from": "ask",
+   "to": "invoke",
+   "label": "prompt"
+  },
+  {
+   "from": "invoke",
+   "to": "jcode",
+   "label": "runs"
+  },
+  {
+   "from": "invoke",
+   "to": "files",
+   "label": "writes"
+  },
+  {
+   "from": "invoke",
+   "to": "ledger",
+   "label": "appends"
+  },
+  {
+   "from": "invoke",
+   "to": "shell",
+   "label": "summary"
+  }
+ ],
+ "traces": [
+  {
+   "title": "jw ask --cwd ~/app \"where is auth handled?\"",
+   "trigger": "You type `jw ask --cwd ~/app \"where is auth handled?\"` and press Enter.",
+   "steps": [
+    {
+     "node": "shell",
+     "title": "The shell builds the argument list",
+     "simple": "Your shell splits the line into 4 pieces and starts `jw` with them. The quotes keep your question as one piece.",
+     "deep": "After expansion `~/app` becomes an absolute path. Bash then starts the script; line 6 `set -euo pipefail` makes it stop on errors, on unset variables, and on failures inside pipes.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 6,
+      "lang": "bash",
+      "src": "set -euo pipefail\n\nORCH_ROOT=\"${ORCH_ROOT:-$HOME/.claude/orchestration}\"",
+      "highlight": [
+       6
+      ],
+      "notes": {
+       "6": "The safety net for the whole script. `-e` exit on error, `-u` unset variable is an error, `pipefail` a pipe fails if any part fails."
+      }
+     },
+     "state": [
+      {
+       "name": "$1",
+       "value": "\"ask\"",
+       "changed": true
+      },
+      {
+       "name": "$2 $3",
+       "value": "\"--cwd\" \"/home/you/app\"",
+       "changed": true
+      },
+      {
+       "name": "$4",
+       "value": "\"where is auth handled?\"",
+       "changed": true
+      },
+      {
+       "name": "ORCH_ROOT",
+       "value": "\"/home/you/.claude/orchestration\"",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "router",
+     "title": "Route to cmd_ask",
+     "simple": "The router sees `ask` and calls `cmd_ask` with the remaining 3 arguments.",
+     "deep": "`shift` removes `$1`, so inside `cmd_ask`, `$1` is now `--cwd`. Unknown commands hit `*)` and `die` exits with code 2.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 250,
+      "lang": "bash",
+      "src": "case \"${1:-}\" in\n  init) shift; cmd_init \"$@\";;\n  run) shift; cmd_run \"$@\";;\n  resume) shift; cmd_resume \"$@\";;\n  post) shift; cmd_post \"$@\";;\n  board) shift; cmd_board \"$@\";;\n  review) shift; cmd_review \"$@\";;\n  ask) shift; cmd_ask \"$@\";;\n  usage) cmd_usage;;\n  -h|--help|\"\") usage;;\n  *) die \"unknown command $1\";;\nesac",
+      "highlight": [
+       257
+      ],
+      "notes": {
+       "257": "`shift` throws away `ask`, then `\"$@\"` passes every remaining argument, each still correctly quoted."
+      }
+     },
+     "state": [
+      {
+       "name": "$@ (inside cmd_ask)",
+       "value": "--cwd /home/you/app \"where is auth handled?\"",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "ask",
+     "title": "Parse the flags",
+     "simple": "A loop reads the arguments one at a time. Flags set settings. Anything else becomes the prompt.",
+     "deep": "`while (($#))` loops while arguments remain. Flags with a value do `shift 2`; the prompt does `shift`. Note: any second bare word silently REPLACES the prompt, because `prompt=$1` overwrites.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 224,
+      "lang": "bash",
+      "src": "cmd_ask() { # [--cwd DIR] [--model M] [--timeout S] [--write] \"prompt\"\n  local cwd=\"$PWD\" model=\"gpt-6-sol\" tmo=900 write=0 prompt=\"\"\n  while (($#)); do\n    case $1 in\n      --cwd) cwd=$2; shift 2;; --model) model=$2; shift 2;; --timeout) tmo=$2; shift 2;;\n      --write) write=1; shift;; -*) die \"unknown flag $1\";; *) prompt=$1; shift;;\n    esac\n  done\n  [[ -n $prompt ]] || { usage; exit 2; }",
+      "highlight": [
+       229
+      ],
+      "notes": {
+       "229": "`*) prompt=$1` overwrites, it does not append. `jw ask foo bar` asks only `bar`."
+      }
+     },
+     "predict": {
+      "q": "You forget the quotes: `jw ask where is auth`. What prompt is sent?",
+      "options": [
+       "\"where is auth\" as one prompt",
+       "\"auth\", the last word only",
+       "An error about too many args"
+      ],
+      "answer": 1,
+      "why": "Each bare word hits `*) prompt=$1`, overwriting the previous one. Only the last word survives, and no error is raised."
+     },
+     "state": [
+      {
+       "name": "cwd",
+       "value": "\"/home/you/app\"",
+       "changed": true
+      },
+      {
+       "name": "model",
+       "value": "\"gpt-6-sol\""
+      },
+      {
+       "name": "tmo",
+       "value": "900"
+      },
+      {
+       "name": "write",
+       "value": "0"
+      },
+      {
+       "name": "prompt",
+       "value": "\"where is auth handled?\"",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "ask",
+     "title": "Wrap the prompt with guardrails",
+     "simple": "Because you did not pass `--write`, jw adds a read-only rule to your question. It also asks for one final answer.",
+     "deep": "`(( write )) || prompt=...` runs the right side only when `write` is 0. These are prompt-level guardrails: the model is asked not to edit files, but nothing technically prevents it. The timestamp `ts` names the run files.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 233,
+      "lang": "bash",
+      "src": "  (( write )) || prompt=\"$prompt\n\nConstraints: read-only. Do NOT modify, create, or delete files; do not commit or push.\"\n  prompt=\"$prompt\n\nGive a single final answer; do not repeat or redraft it.\"\n  local ts; ts=$(date +%Y%m%d-%H%M%S)\n  JW_PRINT=full invoke adhoc \"ask-$ts\" \"$model\" \"$tmo\" \"$cwd\" \"$ORCH_ROOT/adhoc/runs/ask-$ts.json\" \"$prompt\"",
+      "highlight": [
+       233,
+       235
+      ],
+      "notes": {
+       "233": "Arithmetic test: `(( 0 ))` is false, so the `||` branch runs and appends the constraint."
+      }
+     },
+     "state": [
+      {
+       "name": "prompt",
+       "value": "\"where is auth handled?\"\\n\\nConstraints: read-only. Do NOT modify... \\n\\nGive a single final answer...",
+       "changed": true
+      },
+      {
+       "name": "ts",
+       "value": "\"20260930-181502\"",
+       "changed": true
+      }
+     ],
+     "aside": "A polite sign on the door, not a lock. Real isolation would need a sandbox or a read-only mount."
+    },
+    {
+     "node": "invoke",
+     "title": "Run jcode inside a time limit",
+     "simple": "jw starts jcode in your project folder, with a 15 minute limit. The reply goes to a file, errors to another file.",
+     "deep": "The `( ... )` subshell means `cd` does not change jw's own directory. `timeout 900` kills jcode after 900 s and returns 124. `|| rc=$?` is the key trick: under `set -e` a failing command would kill the script, but a command on the left of `||` is exempt, so the exit code is saved instead.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 53,
+      "lang": "bash",
+      "src": "invoke() {\n  local slug=$1 task=$2 model=$3 tmo=$4 cwd=$5 out=$6; shift 6\n  mkdir -p \"$(dirname \"$out\")\"\n  local rc=0\n  (cd \"$cwd\" && timeout \"$tmo\" jcode run -p openai -m \"$model\" -C \"$cwd\" --json \"$@\") >\"$out\" 2>\"${out%.json}.err\" || rc=$?",
+      "highlight": [
+       57
+      ],
+      "notes": {
+       "57": "Three ideas in one line: subshell for `cd`, `timeout` for a hard limit, `|| rc=$?` to survive failure under `set -e`."
+      }
+     },
+     "predict": {
+      "q": "jcode crashes with exit code 1. What does jw do next?",
+      "options": [
+       "The script stops right there",
+       "It saves rc=1 and keeps going",
+       "It retries jcode once more"
+      ],
+      "answer": 1,
+      "why": "`|| rc=$?` catches the failure, so `set -e` does not fire. jw continues, marks status `error(1)`, logs it, prints stderr and exits 3."
+     },
+     "state": [
+      {
+       "name": "out",
+       "value": "\".../adhoc/runs/ask-20260930-181502.json\"",
+       "changed": true
+      },
+      {
+       "name": "rc",
+       "value": "0",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "jcode",
+     "title": "The worker answers",
+     "simple": "jcode reads your repo, finds the answer and returns JSON with a `text` reply and a `session_id`.",
+     "deep": "jw relies on only two fields from jcode's JSON. That narrow contract makes jw robust to jcode adding new fields, but fragile if those two are ever renamed.",
+     "confidence": "inferred",
+     "state": [
+      {
+       "name": ".session_id",
+       "value": "\"ses_8f1c...\"",
+       "changed": true
+      },
+      {
+       "name": ".text",
+       "value": "\"Auth lives in src/auth/middleware.ts:12 ...\"",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "invoke",
+     "title": "Decide: ok, empty, error or timeout",
+     "simple": "jw pulls two fields out of the JSON and turns the result into one status word.",
+     "deep": "`jq -r '.x // empty'` prints nothing (not `null`) if the field is missing. `2>/dev/null || true` means a corrupt JSON file just yields empty strings instead of killing the script. The order of checks matters: timeout (124) is tested before generic errors.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 59,
+      "lang": "bash",
+      "src": "  local sid text status\n  sid=$(jq -r '.session_id // empty' \"$out\" 2>/dev/null || true)\n  text=$(jq -r '.text // empty' \"$out\" 2>/dev/null || true)\n  if (( rc == 124 )); then status=\"timeout\"\n  elif (( rc != 0 )); then status=\"error($rc)\"\n  elif [[ -z \"$text\" ]]; then status=\"empty\"\n  else status=\"ok\"; fi",
+      "highlight": [
+       60,
+       62
+      ],
+      "notes": {
+       "62": "124 is the special exit code `timeout` uses. Checking it first gives a clearer status than `error(124)`."
+      }
+     },
+     "state": [
+      {
+       "name": "sid",
+       "value": "\"ses_8f1c...\"",
+       "changed": true
+      },
+      {
+       "name": "text",
+       "value": "\"Auth lives in ...\"",
+       "changed": true
+      },
+      {
+       "name": "status",
+       "value": "\"ok\"",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "ledger",
+     "title": "Log the run",
+     "simple": "One row is added to the ledger so every run can be found later.",
+     "deep": "The ledger row is written BEFORE the success check exits, so failed and timed-out runs are logged too. That ordering is what makes the ledger trustworthy for debugging.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 67,
+      "lang": "bash",
+      "src": "  ledger_row \"$slug\" \"$task\" \"$model\" \"${sid:-none}\" \"$status\"",
+      "highlight": [
+       67
+      ],
+      "notes": {}
+     },
+     "state": [
+      {
+       "name": "ledger.md +row",
+       "value": "| 2026-09-30 18:15:47 | ask-20260930-181502 | gpt-6-sol | ses_8f1c... | ok |",
+       "changed": true
+      }
+     ]
+    },
+    {
+     "node": "shell",
+     "title": "Print the summary and the reply",
+     "simple": "You see a short header, then the reply. The full JSON stays on disk.",
+     "deep": "Failure path: print the last 15 lines of stderr and exit 3. Empty reply: exit 4. For `ask`, `JW_PRINT=full` prints the first 100 lines of the reply. `run` uses the default mode and only prints the EVIDENCE block, which keeps an orchestrator's context small.",
+     "confidence": "evidenced",
+     "code": {
+      "file": "~/.claude/bin/jw",
+      "start": 69,
+      "lang": "bash",
+      "src": "  echo \"task:     $task\"\n  echo \"model:    $model\"\n  echo \"session:  ${sid:-none}\"\n  echo \"cwd:      $cwd\"\n  echo \"status:   $status\"\n  echo \"output:   $out\"\n  if [[ \"$status\" != ok && \"$status\" != empty ]]; then\n    echo \"--- stderr (last 15 lines) ---\"; tail -n 15 \"${out%.json}.err\" || true\n    exit 3\n  fi\n  [[ \"$status\" == empty ]] && exit 4\n\n  if [[ ${JW_PRINT:-evidence} == full ]]; then\n    echo \"--- reply (first 100 lines) ---\"; printf '%s\\n' \"$text\" | head -n 100\n    return 0\n  fi",
+      "highlight": [
+       75,
+       79,
+       81
+      ],
+      "notes": {
+       "81": "`JW_PRINT=full` was set on the same line as the `invoke` call in `cmd_ask`, so it applies only to that call.",
+       "75": "Anything except ok/empty is a failure: show stderr, exit 3."
+      }
+     },
+     "state": [
+      {
+       "name": "exit code",
+       "value": "0",
+       "changed": true
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "whatifs": [
+  {
+   "title": "Remove `|| rc=$?`",
+   "change": "Line 57 becomes just the jcode command, without `|| rc=$?`.",
+   "outcome": "With `set -e`, any jcode failure or timeout now kills jw instantly. No ledger row is written, no status is printed and no stderr tail is shown. You get a silent exit and have to go digging in the .err file.",
+   "lesson": "Under `set -e`, catch expected failures explicitly so you can report them.",
+   "node": "invoke",
+   "affects": [
+    "ledger",
+    "shell",
+    "files"
+   ],
+   "confidence": "evidenced"
+  },
+  {
+   "title": "Pass `--write` by habit",
+   "change": "You run `jw ask --write \"...\"` for every question.",
+   "outcome": "The read-only rule is no longer added. The worker may edit files directly in your working tree, not in a worktree. `jw run` isolates work in a git worktree; `ask` does not.",
+   "lesson": "Guardrails in prompts are soft. Isolation (worktrees) is the hard boundary.",
+   "node": "ask",
+   "affects": [
+    "invoke",
+    "jcode"
+   ],
+   "confidence": "evidenced"
+  },
+  {
+   "title": "Two asks in the same second",
+   "change": "Two agents call `jw ask` at the same moment.",
+   "outcome": "Both compute the same `ts`, so both write `ask-<ts>.json` and `.err`. The later one overwrites the earlier one's files, while the ledger gets two rows pointing at one file.",
+   "lesson": "Timestamps with second precision are not unique ids.",
+   "node": "files",
+   "affects": [
+    "invoke",
+    "ledger"
+   ],
+   "confidence": "inferred"
+  }
+ ],
+ "decisions": [
+  {
+   "title": "Full output to disk, summary to screen",
+   "chosen": "Save jcode's complete JSON to a file and print only a summary or EVIDENCE block.",
+   "simple": "The header comment says why: keep the orchestrator's context small.",
+   "deep": "Lines 3-4 state the goal. An orchestrating Claude session pays tokens for everything printed. Printing a summary and a file path lets it read the full reply only when needed.",
+   "alternatives": [
+    {
+     "name": "Print everything",
+     "tradeoff": "Simpler, but every run floods the orchestrator's context and burns tokens."
+    },
+    {
+     "name": "Print nothing, only the path",
+     "tradeoff": "Cheapest, but forces an extra read on every run, even when the summary would do."
+    }
+   ],
+   "confidence": "evidenced"
+  },
+  {
+   "title": "Bash + jq instead of Python",
+   "chosen": "A single bash script using `jq` for JSON.",
+   "simple": "It mostly glues CLI tools together (git, timeout, jcode, flock), which bash does natively.",
+   "deep": "`timeout`, `flock`, `git worktree` and exit codes are first-class in bash. The cost is sharp edges: quoting, `set -e` exemptions, and argument parsing done by hand.",
+   "alternatives": [
+    {
+     "name": "Python + argparse",
+     "tradeoff": "Safer argument parsing and real data structures, but more boilerplate around subprocess, timeouts and locking."
+    }
+   ],
+   "confidence": "inferred"
+  }
+ ],
+ "risks": [
+  {
+   "title": "Extra words silently replace the prompt",
+   "where": "~/.claude/bin/jw:229",
+   "what": "`jw ask where is auth` sends only `auth`. There is no warning, so the answer can look plausible but be about the wrong thing.",
+   "fix": "Die if `prompt` is already set, or join all positional words.",
+   "severity": "medium",
+   "confidence": "evidenced"
+  },
+  {
+   "title": "Missing flag value crashes with a cryptic error",
+   "where": "~/.claude/bin/jw:228",
+   "what": "`jw ask --cwd` with nothing after it reads `$2`, which is unset. `set -u` aborts with `$2: unbound variable` instead of the usage text.",
+   "fix": "Check `(($# >= 2))` before `shift 2`, or use `${2:?--cwd needs a value}`.",
+   "severity": "low",
+   "confidence": "evidenced"
+  },
+  {
+   "title": "Run files can collide",
+   "where": "~/.claude/bin/jw:239",
+   "what": "`ts` has one-second precision, so parallel asks can overwrite each other's output files.",
+   "fix": "Add `$$` or `%N` nanoseconds to `ts`.",
+   "severity": "low",
+   "confidence": "inferred"
+  }
+ ],
+ "quiz": [
+  {
+   "q": "Why does line 57 end with `|| rc=$?`?",
+   "options": [
+    "To keep going after jcode fails",
+    "To retry jcode after a failure",
+    "To hide jcode's error output"
+   ],
+   "answer": 0,
+   "why": "`set -e` would abort on failure. Putting the command left of `||` exempts it and saves the exit code for the status logic."
+  },
+  {
+   "q": "Where would you look for the complete reply of an ask?",
+   "options": [
+    "In the ledger table rows",
+    "In adhoc/runs/ask-<ts>.json",
+    "In the board.md message log"
+   ],
+   "answer": 1,
+   "why": "The ledger only stores a status row. The full jcode JSON is saved in the runs folder."
+  },
+  {
+   "q": "jcode runs past 900 s. What status does the ledger show?",
+   "options": [
+    "error(124) with exit 3",
+    "empty with exit code 4",
+    "timeout with exit code 3"
+   ],
+   "answer": 2,
+   "why": "`timeout` returns 124, which is checked first and mapped to `timeout`. Any non-ok, non-empty status exits 3."
+  },
+  {
+   "q": "What actually stops `jw ask` from editing files?",
+   "options": [
+    "Only a sentence in the prompt",
+    "A read-only git worktree",
+    "The --no-worktree flag"
+   ],
+   "answer": 0,
+   "why": "`ask` runs in your directory with a prompt-level constraint only. Worktrees are used by `jw run`, not `ask`."
+  }
+ ],
+ "glossary": [
+  {
+   "term": "subshell",
+   "def": "A child copy of the shell, made with ( ... ). Changes inside it, such as cd, do not affect the parent."
+  },
+  {
+   "term": "set -e",
+   "def": "Bash option: exit immediately when a command fails, except commands tested by if, &&, || and similar."
+  },
+  {
+   "term": "ledger",
+   "def": "jw's markdown table of runs: time, task, model, session id and status."
+  },
+  {
+   "term": "worktree",
+   "def": "A second working folder for the same git repo, on its own branch, so a worker can edit without touching your checkout."
+  }
+ ]
+}

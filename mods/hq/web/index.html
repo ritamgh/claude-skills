@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HQ Board</title>
+<style nonce="__NONCE__">
+:root {
+  --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1f23; --muted: #6b6f76; --line: #dcdad2;
+  --accent: #1f6feb; --need: #b45309; --need-bg: #fff4e0; --ok: #1a7f37; --bad: #c62828; --code: #f0eee8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14161a; --panel: #1c1f25; --ink: #e6e7ea; --muted: #959aa3; --line: #2d3139;
+    --accent: #6ea8fe; --need: #f5b45c; --need-bg: #2b2315; --ok: #56d364; --bad: #ff7b72; --code: #101216;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; gap: 12px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+header h1 { font-size: 16px; margin: 0; }
+header .sum { color: var(--muted); font-size: 13px; flex: 1; }
+header .err { color: var(--bad); font-size: 13px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px; max-width: 1400px; margin: 0 auto; }
+@media (min-width: 900px) { .layout.open { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 20px 0 8px; font-weight: 600; }
+h2:first-child { margin-top: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.need { border-left: 3px solid var(--need); background: var(--need-bg); }
+.tag { display: inline-block; font: 600 12px ui-monospace, monospace; color: var(--need); margin-right: 8px; }
+.what { font-weight: 600; margin-right: 8px; }
+.msg { color: var(--ink); overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.answer { display: flex; gap: 8px; margin-top: 8px; }
+.answer input, .send input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+button { font: inherit; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.link { border: 0; background: none; color: var(--accent); padding: 0; text-align: left; }
+button:disabled { opacity: .5; cursor: default; }
+.note { font-size: 13px; margin-top: 6px; }
+.note.bad { color: var(--bad); } .note.ok { color: var(--ok); }
+.shead { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; }
+.shead .name { font-weight: 600; } .shead .state { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.dot { color: var(--muted); } .dot.busy { color: var(--ok); }
+.row { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) auto; gap: 8px; padding: 3px 0; font-size: 14px; }
+.row .st { color: var(--muted); font-size: 13px; }
+.row.hasdiff { grid-template-columns: 1.4em minmax(0, 1fr) auto auto; align-items: baseline; }
+.row button.diff { padding: 1px 8px; font-size: 12px; }
+.rowwrap .note { margin: 0 0 4px 1.4em; }
+.row.owner { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+.row.owner button { padding: 1px 8px; font-size: 12px; }
+.wake { display: flex; gap: 8px; margin: 2px 0 4px 1.4em; }
+.wake input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+.result { display: flex; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; color: inherit; }
+.result:first-child { border-top: 0; }
+.result .v { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.result .ok { color: var(--ok); } .result .bad { color: var(--bad); }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; display: none; flex-direction: column; min-height: 0; }
+.layout.open aside { display: flex; }
+aside .bar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+aside .bar b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+pre { margin: 0; padding: 10px 12px; background: var(--code); font: 12px/1.35 ui-monospace, "SF Mono", Menlo, monospace; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1; min-height: 0; }
+#newlead { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+#newlead[hidden] { display: none; }
+#newlead form { display: grid; gap: 8px; max-width: 640px; }
+#newlead label { display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+#newlead input, #newlead select, #newlead textarea { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; min-width: 0; }
+#newlead textarea { min-height: 90px; resize: vertical; }
+.banner { background: var(--need-bg); color: var(--need); padding: 6px 12px; font-size: 13px; }
+.send { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); }
+.sendnote { padding: 0 12px 8px; }
+@media (min-width: 900px) { aside { position: sticky; top: 56px; height: calc(100vh - 72px); } }
+@media (max-width: 899px) {
+  aside { position: fixed; left: 0; right: 0; bottom: 0; height: 72vh; border-radius: 12px 12px 0 0; z-index: 5; box-shadow: 0 -4px 24px rgba(0,0,0,.25); }
+  .layout.open { padding-bottom: 74vh; }
+}
+</style>
+</head>
+<body>
+<header><h1>HQ</h1><a href="/plan">Plans</a><span class="sum" id="sum">loading…</span><span class="err" id="err"></span><button id="newbtn" type="button">New lead</button></header>
+<section id="newlead" hidden></section>
+<div class="layout" id="layout">
+  <main id="board"></main>
+  <aside id="panel"></aside>
+</div>
+<script nonce="__NONCE__">
+'use strict'
+const $ = id => document.getElementById(id)
+// Every piece of text from the server goes in through append(string): a text node, never markup.
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag)
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === undefined || v === false) continue
+    if (k === 'class') e.className = v
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v)
+    else e.setAttribute(k, v)
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) e.append(kid)
+  return e
+}
+const ago = at => {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000))
+  return s < 60 ? s + 's' : s < 3600 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h'
+}
+const GLYPH = { ask: '?', review: '◐', run: '…', wait: '⏸' }
+const drafts = {}
+const answered = {}
+const diffed = {} // task id -> { cls, text }: the last Diff result, kept across board renders
+const diffNotes = {} // task id -> the note element drawn for it now
+const diffBusy = {}
+const wakeOpen = {} // feature -> true while its Wake input is shown
+const wakeDrafts = {} // feature -> the text typed so far
+const wakeBusy = {}
+const wokeMsgs = {} // feature -> what crew said when it was woken, shown for a while: its row is gone by then
+let lastJson = ''
+let panel = null // { kind: 'session', target, name } | { kind: 'result', id }
+let paneTimer = null
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  let data = null
+  try { data = await res.json() } catch (e) { /* not JSON */ }
+  return { status: res.status, data }
+}
+
+function openSession(session) {
+  if (!session.target) return
+  stopPane()
+  panel = { kind: 'session', target: session.target, name: session.name }
+  renderPanel()
+  refreshPane()
+  paneTimer = setInterval(refreshPane, 3000)
+}
+async function openResult(item) {
+  stopPane()
+  panel = { kind: 'result', id: item.id, name: item.name }
+  renderPanel()
+  const r = await api('/api/result/' + encodeURIComponent(item.id))
+  if (!panel || panel.id !== item.id) return
+  $('body').textContent = r.status === 200 ? r.data.text : (r.data && r.data.error) || 'could not load the result'
+}
+function stopPane() { if (paneTimer) clearInterval(paneTimer); paneTimer = null }
+function closePanel() { stopPane(); panel = null; renderPanel() }
+
+async function refreshPane() {
+  if (!panel || panel.kind !== 'session') return
+  const target = panel.target
+  const r = await api('/api/pane/' + encodeURIComponent(target))
+  if (!panel || panel.target !== target) return
+  const pre = $('body')
+  const atEnd = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40
+  pre.textContent = r.status === 200 ? r.data.text : (r.data && r.data.error) || 'could not read the pane'
+  if (atEnd) pre.scrollTop = pre.scrollHeight
+  $('banner').hidden = !(r.data && r.data.promptOpen)
+}
+
+function renderPanel() {
+  const aside = $('panel'), layout = $('layout')
+  aside.replaceChildren()
+  layout.classList.toggle('open', panel !== null)
+  if (!panel) return
+  aside.append(h('div', { class: 'bar' }, h('b', {}, panel.kind === 'session' ? panel.name + ' · ' + panel.target : 'Result · ' + panel.name), h('button', { onclick: closePanel, 'aria-label': 'Close' }, 'Close')))
+  if (panel.kind === 'session') aside.append(h('div', { class: 'banner', id: 'banner', hidden: 'hidden' }, 'A prompt is open in this pane. Answer it in tmux; messages are refused until it is closed.'))
+  aside.append(h('pre', { id: 'body' }, 'loading…'))
+  if (panel.kind !== 'session') return
+  const input = h('input', { type: 'text', id: 'msg', placeholder: 'Message to this session (Enter to send)', autocomplete: 'off', maxlength: '2000' })
+  const note = h('div', { class: 'note sendnote', id: 'sendnote' })
+  const form = h('form', { class: 'send' }, input, h('button', { class: 'primary', type: 'submit' }, 'Send'))
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault()
+    const text = input.value.trim()
+    if (!text) return
+    const r = await api('/api/send', { target: panel.target, text })
+    if (r.status === 200) { input.value = ''; note.className = 'note sendnote ok'; note.textContent = 'sent' ; refreshPane() }
+    else { note.className = 'note sendnote bad'; note.textContent = ((r.data && r.data.error) || 'send failed') + (r.data && r.data.reason ? ' — ' + r.data.reason : '') }
+  })
+  aside.append(form, note)
+  input.focus()
+}
+
+function needCard(n) {
+  const head = h('div', {}, h('span', { class: 'tag' }, n.tag), h('span', { class: 'what' }, n.what), h('span', { class: 'msg' }, n.msg))
+  const card = h('div', { class: 'card need' }, head)
+  if (n.kind === 'chat' && n.target) card.append(h('div', { class: 'note' }, h('button', { class: 'link', onclick: () => openSession({ name: n.session, target: n.target }) }, 'open ' + n.session)))
+  if (n.kind === 'ask') {
+    if (!n.decision) { card.append(h('div', { class: 'note muted' }, 'No decision id: answer it in the session.')); return card }
+    const input = h('input', { type: 'text', 'data-key': n.decision, placeholder: 'Your answer', maxlength: '2000', autocomplete: 'off' })
+    input.value = drafts[n.decision] || ''
+    input.addEventListener('input', () => { drafts[n.decision] = input.value })
+    const note = h('div', { class: 'note' })
+    if (answered[n.decision]) { note.className = 'note ' + answered[n.decision].cls; note.textContent = answered[n.decision].text }
+    const form = h('form', { class: 'answer' }, input, h('button', { class: 'primary', type: 'submit' }, 'Answer'))
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault()
+      const text = input.value.trim()
+      if (!text) return
+      const r = await api('/api/answer', { did: n.decision, text })
+      if (r.status === 200) {
+        delete drafts[n.decision]
+        answered[n.decision] = { cls: r.data.relayed ? 'ok' : 'bad', text: r.data.relayed ? 'Recorded and sent to ' + r.data.lead + '.' : 'Recorded. Not sent yet: ' + r.data.reason }
+        lastJson = ''
+        load()
+      } else { note.className = 'note bad'; note.textContent = (r.data && r.data.error) || 'answer failed' }
+    })
+    card.append(form, note)
+  }
+  return card
+}
+
+async function openDiff(id, button) {
+  if (diffBusy[id]) return
+  diffBusy[id] = true
+  button.disabled = true
+  const note = () => diffNotes[id]
+  diffed[id] = { cls: 'note', text: 'opening…' }
+  if (note()) { note().className = 'note'; note().textContent = 'opening…' }
+  try {
+    const r = await api('/api/diff', { id })
+    diffed[id] = r.status === 200 ? { cls: 'note ok', text: r.data.message } : { cls: 'note bad', text: (r.data && r.data.error) || 'diff failed' }
+  } catch (e) {
+    diffed[id] = { cls: 'note bad', text: 'diff failed: ' + (e && e.message ? e.message : 'connection lost') }
+  } finally {
+    if (note()) { note().className = diffed[id].cls; note().textContent = diffed[id].text }
+    diffBusy[id] = false
+    button.disabled = false
+  }
+}
+
+// A task row; one the server marked diffable also gets a Diff button (crew diff opens the changes next to its lead) and a place for the answer.
+function taskRow(r) {
+  const row = h('div', { class: r.diffable ? 'row hasdiff' : 'row' }, h('span', {}, GLYPH[r.kind]), h('span', {}, r.name), h('span', { class: 'st' }, [r.state, r.note].filter(Boolean).join(' · ')))
+  if (!r.diffable) return row
+  const button = h('button', { class: 'diff', type: 'button', title: 'Open this task\'s changes in nvim next to its lead' }, 'Diff')
+  button.addEventListener('click', () => openDiff(r.id, button))
+  row.append(button)
+  const note = h('div', { class: 'note' })
+  if (diffed[r.id]) { note.className = diffed[r.id].cls; note.textContent = diffed[r.id].text }
+  diffNotes[r.id] = note
+
+  return h('div', { class: 'rowwrap' }, row, note)
+}
+
+// An asleep owner: its row from the server and a Wake button that opens a one-line input; Enter sends `crew wake` with that text.
+function ownerRow(o) {
+  const f = o.feature
+  const slot = h('div', {})
+  const note = h('div', { class: 'note bad', hidden: 'hidden' })
+  const button = h('button', { type: 'button', title: 'Wake this owner with a message' }, 'Wake')
+  const close = () => { delete wakeOpen[f]; slot.replaceChildren() }
+  const open = focus => {
+    wakeOpen[f] = true
+    const input = h('input', { type: 'text', 'data-key': 'wake:' + f, placeholder: 'Message for ' + f + ' (Enter to wake)', maxlength: '2000', autocomplete: 'off' })
+    input.value = wakeDrafts[f] || ''
+    input.addEventListener('input', () => { wakeDrafts[f] = input.value })
+    input.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close() } })
+    const form = h('form', { class: 'wake' }, input, h('button', { class: 'primary', type: 'submit' }, 'Wake'))
+    form.addEventListener('submit', async ev => {
+      ev.preventDefault()
+      const text = input.value.trim()
+      if (!text || wakeBusy[f]) return
+      wakeBusy[f] = true
+      note.hidden = true
+      try {
+        const r = await api('/api/wake', { feature: f, text })
+        if (r.status === 200) {
+          delete wakeDrafts[f]
+          close()
+          wokeMsgs[f] = r.data.message
+          setTimeout(() => { delete wokeMsgs[f]; lastJson = ''; load() }, 20000)
+          lastJson = ''
+          load()
+        } else { note.textContent = (r.data && r.data.error) || 'wake failed'; note.hidden = false }
+      } catch (e) {
+        note.textContent = 'wake failed: ' + (e && e.message ? e.message : 'connection lost'); note.hidden = false
+      } finally { wakeBusy[f] = false }
+    })
+    slot.replaceChildren(form)
+    if (focus) input.focus()
+  }
+  button.addEventListener('click', () => { if (wakeOpen[f]) close(); else open(true) })
+  if (wakeOpen[f]) open(false)
+  return h('div', { class: 'rowwrap' }, h('div', { class: 'row owner' }, h('span', {}, o.text), button), slot, note)
+}
+
+function render(view) {
+  const main = $('board')
+  const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null
+  const caret = focused ? document.activeElement.selectionStart : 0
+  main.replaceChildren()
+  main.append(h('h2', {}, 'Needs you · ' + view.total))
+  if (view.needs.length === 0) main.append(h('div', { class: 'muted' }, 'Nothing needs you.'))
+  for (const n of view.needs) main.append(needCard(n))
+  main.append(h('h2', {}, 'Sessions'))
+  for (const f of Object.keys(wokeMsgs)) main.append(h('div', { class: 'note ok' }, wokeMsgs[f]))
+  for (const c of view.cards) {
+    const card = h('div', { class: 'card' })
+    if (c.session) {
+      const s = c.session
+      const label = s.name === s.project ? s.name : s.name + ' · ' + s.project
+      const head = h('button', { class: 'shead', disabled: s.target ? undefined : 'disabled', onclick: () => openSession(s), title: s.target ? 'Open the pane' : 'Not in tmux' },
+        h('span', { class: 'dot ' + (s.state === 'busy' ? 'busy' : '') }, s.state === 'busy' ? '●' : '○'), h('span', { class: 'name' }, label), h('span', { class: 'state' }, s.state + ' · ' + s.age))
+      card.append(head)
+    } else card.append(h('div', { class: 'name muted' }, 'Other crew work'))
+    for (const r of c.rows) card.append(taskRow(r))
+    for (const o of c.owners || []) card.append(ownerRow(o))
+    for (const t of c.talks || []) card.append(h('div', { class: 'row' }, h('span', { class: 'st' }, '·'), h('span', {}, t)))
+    main.append(card)
+  }
+  if (view.folded > 0) main.append(h('div', { class: 'muted note' }, '+' + view.folded + ' idle session' + (view.folded === 1 ? '' : 's')))
+  main.append(h('h2', {}, 'Results · 24h'))
+  if (view.results.length === 0) main.append(h('div', { class: 'muted' }, 'Nothing finished in the last 24 hours.'))
+  else {
+    const card = h('div', { class: 'card' })
+    for (const r of view.results) card.append(h('button', { class: 'result', onclick: () => openResult(r) }, h('span', { class: r.mark === '✓' ? 'ok' : 'bad' }, r.mark), h('span', { class: 'v' }, r.name + ' · ' + r.project + ' · ' + r.verdict), h('span', { class: 'muted' }, ago(r.at))))
+    main.append(card)
+  }
+  if (focused) {
+    const again = main.querySelector('input[data-key="' + focused + '"]')
+    if (again) { again.focus(); again.setSelectionRange(caret, caret) }
+  }
+}
+
+async function load() {
+  const r = await api('/api/board')
+  if (r.status === 401) { $('err').textContent = 'Signed out: open the URL the server printed.'; return }
+  if (r.status !== 200) { $('err').textContent = (r.data && r.data.error) || 'board unavailable'; return }
+  $('err').textContent = ''
+  const view = r.data
+  const need = view.total
+  const live = view.cards.filter(c => c.session).length
+  $('sum').textContent = (need > 0 ? need + ' need you · ' : '') + live + ' session' + (live === 1 ? '' : 's')
+  const key = JSON.stringify({ ...view, at: 0 })
+  if (key === lastJson) return
+  lastJson = key
+  render(view)
+}
+// New lead: a top-level lead started with `crew spawn --top`; the server validates and runs it as argv.
+let leadOpen = false
+async function toggleLead() {
+  leadOpen = !leadOpen
+  const box = $('newlead')
+  box.hidden = !leadOpen
+  box.replaceChildren()
+  if (!leadOpen) return
+  const pick = h('select', { id: 'nl-pick' }, h('option', { value: '' }, 'Pick a folder…'))
+  const path = h('input', { type: 'text', id: 'nl-path', placeholder: 'or type an absolute path', autocomplete: 'off' })
+  const name = h('input', { type: 'text', id: 'nl-name', placeholder: 'a-z, 0-9, dashes', autocomplete: 'off', maxlength: '41' })
+  const text = h('textarea', { id: 'nl-text', placeholder: "The lead's first message", maxlength: '8000' })
+  const model = h('input', { type: 'text', id: 'nl-model', placeholder: 'blank: the CLI default', autocomplete: 'off' })
+  const note = h('div', { class: 'note', id: 'nl-note' })
+  const form = h('form', {}, h('b', {}, 'New lead'),
+    h('label', {}, 'Repo', pick, path), h('label', {}, 'Name', name), h('label', {}, 'First message', text), h('label', {}, 'Model (optional)', model),
+    h('div', {}, h('button', { class: 'primary', type: 'submit' }, 'Start lead'), ' ', h('button', { type: 'button', onclick: toggleLead }, 'Cancel')), note)
+  pick.addEventListener('change', () => { if (pick.value) path.value = pick.value })
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault()
+    note.className = 'note'; note.textContent = 'starting…'
+    const r = await api('/api/spawn', { repo: path.value.trim(), slug: name.value.trim(), text: text.value, ...(model.value.trim() ? { model: model.value.trim() } : {}) })
+    if (r.status === 200) {
+      note.className = 'note ok'
+      note.textContent = r.data.queued ? name.value.trim() + ' is queued: waiting for RAM (crew spawn --resume ' + r.data.id + ')' : name.value.trim() + ' started in ' + r.data.window
+      name.value = ''; text.value = ''
+      lastJson = ''
+      load()
+    } else { note.className = 'note bad'; note.textContent = (r.data && r.data.error) || 'could not start the lead' }
+  })
+  box.append(form)
+  name.focus()
+  const repos = await api('/api/repos')
+  if (repos.status === 200) for (const repo of repos.data.repos) pick.append(h('option', { value: repo }, repo))
+}
+$('newbtn').addEventListener('click', toggleLead)
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && panel) closePanel() })
+load()
+setInterval(load, 5000)
+</script>
+</body>
+</html>

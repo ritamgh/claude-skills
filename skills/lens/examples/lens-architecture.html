@@ -1,0 +1,1309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How lens turns a question into a lesson page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&family=Permanent+Marker&family=Shantell+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBF6EA;--paper-2:#F3EBD8;--card:#FFFDF8;--ink:#1B1A17;--ink-2:#46413A;--ink-3:#6B6458;--line:#1B1A17;--dot:rgba(27,26,23,.11);
+  --teal:#1FA898;--teal-ink:#0A6B60;--teal-soft:#D3F1EC;
+  --pink:#FF7EB6;--pink-ink:#B21F5C;--pink-soft:#FFE0EE;
+  --yellow:#FFD84D;--yellow-ink:#7A5A00;
+  --hl-y:#FFE680;--hl-p:#FFC3DD;--hl-t:#BDEDE5;
+  --tk-c:#857D70;--tk-s:#0A6B60;--tk-n:#A3470F;--tk-k:#B21F5C;
+  --shadow:2px 4px 14px rgba(60,48,20,.12);
+  --display:"Permanent Marker","Comic Sans MS",cursive;
+  --hand:"Shantell Sans","Comic Sans MS",cursive;
+  --body:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --wob:14px 18px 12px 20px / 18px 12px 20px 14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#1A1915;--paper-2:#24221D;--card:#25231E;--ink:#F3EDE0;--ink-2:#D3CBBA;--ink-3:#A79F8F;--line:#E9E1D1;--dot:rgba(243,237,224,.08);
+  --teal:#34C7B5;--teal-ink:#6FDCCD;--teal-soft:#173F3A;
+  --pink:#FF86BC;--pink-ink:#FF9CC8;--pink-soft:#46202F;
+  --yellow:#F2CB4E;--yellow-ink:#F5D46B;
+  --hl-y:rgba(255,216,77,.30);--hl-p:rgba(255,126,182,.30);--hl-t:rgba(52,199,181,.28);
+  --tk-c:#9C9483;--tk-s:#7FDCCB;--tk-n:#F3A46F;--tk-k:#FF9CC8;
+  --shadow:2px 6px 18px rgba(0,0,0,.45);color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#1A1915;--paper-2:#24221D;--card:#25231E;--ink:#F3EDE0;--ink-2:#D3CBBA;--ink-3:#A79F8F;--line:#E9E1D1;--dot:rgba(243,237,224,.08);
+  --teal:#34C7B5;--teal-ink:#6FDCCD;--teal-soft:#173F3A;
+  --pink:#FF86BC;--pink-ink:#FF9CC8;--pink-soft:#46202F;
+  --yellow:#F2CB4E;--yellow-ink:#F5D46B;
+  --hl-y:rgba(255,216,77,.30);--hl-p:rgba(255,126,182,.30);--hl-t:rgba(52,199,181,.28);
+  --tk-c:#9C9483;--tk-s:#7FDCCB;--tk-n:#F3A46F;--tk-k:#FF9CC8;
+  --shadow:2px 6px 18px rgba(0,0,0,.45);color-scheme:dark;}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+body{margin:0;background-color:var(--paper);background-image:radial-gradient(var(--dot) 1.2px,transparent 1.3px);background-size:22px 22px;
+  color:var(--ink);font:400 19px/1.65 var(--body);font-variant-numeric:lining-nums}
+::selection{background:var(--hl-y);color:var(--ink)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px;border-radius:6px}
+a{color:var(--teal-ink);text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--teal)}
+a:hover{text-decoration-color:var(--pink)}
+code{font-family:var(--mono);font-size:.84em;overflow-wrap:anywhere;background:var(--paper-2);padding:.08em .32em;border-radius:5px}
+p{margin:0 0 .85em}
+button{font:inherit;color:inherit}
+html{scrollbar-color:var(--ink-3) transparent}
+::-webkit-scrollbar{width:12px;height:12px}::-webkit-scrollbar-thumb{background:var(--ink-3);border-radius:8px;border:3px solid var(--paper)}
+
+/* ---------- page frame ---------- */
+.page{display:grid;grid-template-columns:220px minmax(0,1fr);gap:48px;max-width:1660px;margin:0 auto;padding:0 48px 120px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:36px 0 24px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
+main{min-width:0;padding-top:28px;overflow-wrap:break-word}
+
+/* ---------- rail: the sketched contents ---------- */
+.rail-brand{display:flex;align-items:center;gap:10px;font:700 18px var(--hand);color:var(--ink)}
+.rail-brand svg{width:46px;height:46px}
+.toc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.toc>li>a{display:flex;align-items:baseline;gap:8px;padding:5px 10px;border-radius:10px;font:600 17px var(--hand);color:var(--ink-2);text-decoration:none}
+.toc>li>a:hover{background:var(--paper-2);color:var(--ink)}
+.toc>li>a.on{color:var(--ink);background:linear-gradient(100deg,transparent 2%,var(--hl-y) 4%,var(--hl-y) 94%,transparent 97%)}
+.toc .cnt{margin-left:auto;font:400 15px var(--hand);color:var(--ink-3)}
+.stops{list-style:none;margin:6px 0 10px 14px;padding:0 0 0 20px;position:relative}
+.stops::before{content:"";position:absolute;left:8px;top:12px;bottom:12px;border-left:3px dashed var(--ink-3);opacity:.5}
+.stops .fill{position:absolute;left:7px;top:12px;width:5px;border-radius:3px;background:var(--teal);height:var(--h,0px);transition:height .5s cubic-bezier(.16,1,.3,1)}
+.stops li{position:relative}
+.stops a{display:block;padding:4px 6px 4px 18px;font-size:16px;line-height:1.35;color:var(--ink-3);text-decoration:none;border-radius:8px}
+.stops a:hover{color:var(--ink);background:var(--paper-2)}
+.stops .dot{position:absolute;left:-19px;top:6px;width:18px;height:18px;border-radius:50%;border:2.5px solid var(--ink-3);background:var(--paper);display:grid;place-items:center;font:700 10px var(--body);color:var(--paper)}
+.stops li.done a{color:var(--ink-2)}
+.stops li.done .dot{background:var(--teal);border-color:var(--teal)}
+.stops li.done .dot::after{content:"";width:7px;height:4px;border:solid var(--paper);border-width:0 0 2.5px 2.5px;transform:translateY(-1px) rotate(-45deg)}
+.stops li.here a{color:var(--ink);font-weight:700}
+.stops li.here .dot{border-color:var(--teal);background:var(--paper);box-shadow:0 0 0 4px var(--teal-soft)}
+.stops li.gate:not(.done) .dot::after{content:"?";color:var(--pink-ink);font:700 11px var(--hand)}
+.rail-foot .keys{display:flex;flex-direction:column;gap:6px}.rail-foot .keys span{display:flex;gap:4px;align-items:center}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:12px;font:400 15px var(--hand);color:var(--ink-3)}
+kbd{font:600 13.5px var(--mono);border:1.5px solid var(--ink-3);border-bottom-width:3px;border-radius:6px;padding:0 5px;color:var(--ink-2);background:var(--card)}
+
+/* ---------- controls ---------- */
+.pill{display:inline-flex;border:2px solid var(--line);border-radius:999px;padding:3px;background:var(--card)}
+.pill button{border:0;background:none;padding:5px 16px;border-radius:999px;cursor:pointer;font:600 16px var(--hand);color:var(--ink-2)}
+.pill button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.pill button:not([aria-pressed="true"]):hover{background:var(--paper-2)}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border:2px solid var(--line);border-radius:50%;background:var(--card);cursor:pointer;color:var(--ink)}
+.icon-btn svg{width:22px;height:22px}
+.icon-btn:hover{background:var(--paper-2)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:var(--wob);background:var(--card);padding:8px 18px;cursor:pointer;font:600 17px var(--hand);color:var(--ink);transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px) rotate(-.4deg);background:var(--paper-2)}
+.btn.go{background:var(--yellow);color:#1B1A17;border-color:#1B1A17}
+.btn.go:hover{background:#FFE47A}
+.btn.quiet{border-color:transparent;background:none;color:var(--ink-2);padding:6px 10px}
+.btn.quiet:hover{color:var(--ink);background:var(--paper-2)}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
+.btn svg{width:20px;height:20px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 40px;align-items:start;margin-bottom:8px}
+.hero-ctl{display:flex;gap:12px;align-items:center;justify-content:flex-end;grid-column:2;grid-row:1}
+.hero-txt{grid-column:1;grid-row:1 / span 2}
+h1{font:400 clamp(40px,4.6vw,76px)/1.08 var(--display);letter-spacing:.005em;margin:0;max-width:20ch;text-wrap:balance}
+h1 code{font-size:.7em;background:var(--hl-y)}
+h1 .swipe{background:linear-gradient(100deg,transparent 0,var(--hl-p) 1.5%,var(--hl-p) 97%,transparent 100%) no-repeat 0 62%/100% 62%;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 .06em}
+.swash{display:block;width:min(520px,70%);height:20px;margin:6px 0 18px;color:var(--teal)}
+.lede{font-size:21px;line-height:1.6;color:var(--ink-2);max-width:62ch;margin:0}
+.hero-mascot{grid-column:2;grid-row:2;justify-self:end;width:150px;height:150px;transform:rotate(4deg)}
+.resume{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:6px 0 26px;padding:14px 20px;background:var(--hl-t);border-radius:var(--wob);font:600 17px var(--hand)}
+.resume b{font-family:var(--body)}
+
+/* ---------- section heads ---------- */
+section.sec{margin-top:96px;scroll-margin-top:24px}
+section.sec:first-of-type{margin-top:36px}
+.sec-head{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:10px}
+h2{font:400 clamp(34px,3.2vw,48px)/1.1 var(--display);margin:0;letter-spacing:.01em}
+h2::after{content:"";display:block;height:10px;width:calc(100% + 16px);margin-top:4px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 40 2, 80 9, 120 5 S 180 3, 198 6' fill='none' stroke='%231FA898' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat;background-size:100% 100%}
+.sec-intro{color:var(--ink-2);max-width:66ch;margin:6px 0 28px}
+.grow{flex:1}
+
+/* ---------- map ---------- */
+.map-top{display:flex;align-items:flex-end;gap:12px 28px;flex-wrap:wrap;margin:0 0 18px}
+.map-top h2{margin-right:4px}
+.map-hint{font:400 17px var(--hand);color:var(--ink-2);flex:1;min-width:260px;padding-bottom:10px}
+.map-hint b{font-family:var(--body)}
+.map-card{background:var(--card);border:2.5px solid var(--line);border-radius:22px 28px 20px 30px / 28px 20px 30px 22px;padding:10px 10px 6px;box-shadow:var(--shadow)}
+.mapwrap{overflow-x:auto;overscroll-behavior-x:contain}
+#map{display:block;width:100%;min-width:900px;height:auto}
+#map text{pointer-events:none}
+#map .zone path{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-dasharray:7 7;opacity:.75}
+#map .zone text{font:700 16px var(--hand);fill:var(--ink-3)}
+#map .edge .wire,#map .edge .head{fill:none;stroke:var(--ink-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#map .elabel{font:400 15px var(--hand);fill:var(--ink-2);stroke:var(--card);stroke-width:5px;paint-order:stroke;stroke-linejoin:round}
+#map .node{cursor:pointer}
+#map .node .fill{fill:var(--card)}
+#map .node .hatch{fill:url(#hatch);opacity:0;transition:opacity .3s}
+#map .node .stroke{fill:none;stroke:var(--line);stroke-width:2;stroke-linecap:round}
+#map .node .lbl{font:700 18px var(--body);fill:var(--ink)}
+#map .node .kind{font:400 15px var(--hand);fill:var(--ink-3)}
+#map .node:hover .fill,#map .node:focus-visible .fill{fill:var(--paper-2)}
+#map .node:focus{outline:none}
+#map .node:focus-visible .stroke{stroke:var(--teal);stroke-width:3.5}
+#map .node.onroute .stroke{stroke:var(--teal-ink);stroke-width:2.6}
+#map .node.active .hatch{opacity:1}
+#map .node.active .stroke{stroke:var(--teal-ink);stroke-width:3.4}
+#map .node.picked .fill{fill:var(--hl-y)}
+#map .node.hit .hatch{opacity:1;fill:url(#hatchP)}
+#map .node.hit .stroke,#map .node.origin .stroke{stroke:var(--pink-ink);stroke-width:3}
+#map .node.origin .fill{fill:var(--hl-p)}
+#map .node.dim{opacity:.32}
+#map .edge.hit .wire,#map .edge.hit .head{stroke:var(--pink-ink);stroke-width:2.6}
+#map .edge.dimmed,#map .elabel.dimmed{opacity:.3}
+
+/* ---------- architecture: async edges, clickable edges, marks ---------- */
+#map .route,#map .ghost{pointer-events:none}
+#map .edge.async .wire{stroke-dasharray:9 8}
+#map .edge .hitarea{fill:none;stroke:transparent;stroke-width:18;pointer-events:stroke}
+#map .edge.link{cursor:pointer}
+#map .edge:focus{outline:none}
+#map .edge.link:hover:not(.hit) .wire,#map .edge.link:hover:not(.hit) .head,#map .edge:focus-visible:not(.hit) .wire,#map .edge:focus-visible:not(.hit) .head{stroke:var(--teal);stroke-width:3.2}
+#map .edge.sel:not(.hit) .wire,#map .edge.sel:not(.hit) .head{stroke:var(--teal-ink);stroke-width:3.6}
+#map .node.endpoint .stroke{stroke:var(--teal-ink);stroke-width:3}
+#map .node.marked .fill{fill:var(--hl-y)}
+#map .node.marked .stroke{stroke:var(--pink-ink);stroke-width:3.4}
+#map .ghost{fill:none;stroke:var(--teal);stroke-width:4;stroke-linecap:round;stroke-dasharray:2 9;opacity:.5}
+#map .route{fill:none;stroke:var(--teal);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+#map .route.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .7s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.map-foot{display:flex;gap:22px;flex-wrap:wrap;align-items:center;font:400 16px var(--hand);color:var(--ink-3);padding:6px 8px 4px}
+.map-foot i{display:inline-block;width:28px;height:7px;border-radius:4px;background:var(--teal);vertical-align:middle;margin-right:6px;opacity:.85}
+.map-foot i.p{background:var(--pink)}
+.map-foot i.d{background:none;height:0;border-top:3px dashed var(--ink-2);border-radius:0;opacity:1}
+
+/* the component note that opens under the map */
+.node-note{margin-top:22px;background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);padding:26px 30px 22px;box-shadow:var(--shadow);position:relative}
+.node-note[hidden]{display:none}
+.node-note .close{position:absolute;right:14px;top:14px}
+.node-note h3{font:700 30px/1.2 var(--body);margin:0 50px 4px 0;letter-spacing:-.01em}
+.node-note .kindline{font:400 17px var(--hand);color:var(--ink-3);margin-bottom:6px}
+.node-note .files{font:400 14.5px var(--mono);color:var(--ink-3);margin-bottom:16px;overflow-wrap:anywhere}
+.node-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px}
+.links{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:17px}
+.links dt{font:700 15px var(--hand);color:var(--ink-3);padding-top:2px}
+.links dd{margin:0}
+.side-h{font:700 17px var(--hand);color:var(--ink-3);margin:18px 0 6px}
+.side-h:first-child{margin-top:0}
+.at a{display:block;font-size:16.5px;padding:2px 0}
+.archblock{margin:20px 0 0;padding:14px 20px 12px;background:var(--paper-2);border:2px dashed var(--ink-3);border-radius:var(--wob)}
+.archblock .side-h{margin:0 0 8px}
+.archblock .links dt,.edge-dl dt{white-space:nowrap}
+.edge-dl{font-size:18px;gap:10px 18px}
+.edge-dl dt{font-size:16px}
+details.inside{margin-top:14px;border-top:2px dashed var(--ink-3);padding-top:12px}
+details.inside summary{cursor:pointer;font:700 18px var(--body);list-style:none;display:flex;gap:12px;align-items:baseline}
+details.inside summary::before{content:"+";font:700 20px var(--hand);color:var(--teal-ink);width:14px}
+details.inside[open] summary::before{content:"\2013"}
+details.inside summary span{font:400 14px var(--mono);color:var(--ink-3)}
+
+/* ---------- the trip ---------- */
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 30px}
+.tabs button{border:2px solid var(--line);background:var(--card);border-radius:var(--wob);padding:9px 20px;cursor:pointer;font:600 18px var(--hand);color:var(--ink-2)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);transform:rotate(-1deg)}
+.tabs button:not([aria-selected="true"]):hover{background:var(--paper-2);color:var(--ink)}
+.trigger{display:flex;gap:14px;align-items:flex-start;max-width:900px;margin:0 0 40px;padding:16px 22px;background:var(--card);border:2px dashed var(--ink-3);border-radius:var(--wob);font-size:18px}
+.trigger .lab{font:700 17px var(--hand);color:var(--teal-ink);white-space:nowrap;padding-top:1px}
+.trip{position:relative}
+.stop{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:0 26px;padding-bottom:84px;scroll-margin-top:28px}
+.stop::before{content:"";position:absolute;left:30px;top:66px;bottom:6px;border-left:4px dotted var(--ink-3);opacity:.45}
+.stop:last-child::before{display:none}
+.stop.past::before{border-left:4px solid var(--teal);opacity:.75}
+.stop .num{width:64px;height:64px;display:grid;place-items:center;font:400 30px var(--display);color:var(--ink);position:relative}
+.stop .num svg{position:absolute;inset:0;width:100%;height:100%;color:var(--ink)}
+.stop.here .num svg .ring,.stop.past .num svg .ring{color:var(--teal-ink)}
+.stop.here .num{color:var(--teal-ink)}
+.stop.here .num svg .bg{fill:var(--teal-soft)}
+.stop-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:6px 0 4px}
+.stop-title{font:700 clamp(26px,2.2vw,34px)/1.2 var(--body);margin:0;letter-spacing:-.012em;text-wrap:balance}
+.stop-title code{font-size:.8em}
+.stop-meta{font:400 17px var(--hand);color:var(--ink-3);margin-bottom:22px;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.stop-meta a{font-weight:600}
+.stamp{display:inline-block;font:700 15px var(--hand);padding:1px 10px;border:2px solid currentColor;border-radius:8px 12px 9px 13px;transform:rotate(-2deg);white-space:nowrap;cursor:help;vertical-align:middle}
+.stamp.evidenced{color:var(--teal-ink)}
+.stamp.inferred{color:var(--yellow-ink)}
+.stamp.uncertain{color:var(--pink-ink)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px;align-items:start}
+.cols.solo{grid-template-columns:minmax(0,1fr)}
+.narr{max-width:68ch}
+.narr p:last-child{margin-bottom:0}
+.blurred{filter:blur(7px);user-select:none;pointer-events:none;opacity:.6}
+.gate-wait{font:600 18px var(--hand);color:var(--pink-ink);margin:0 0 6px}
+.aside{display:flex;gap:12px;align-items:flex-start;margin:22px 0 0;max-width:64ch;font:400 18px/1.55 var(--hand);color:var(--ink-2)}
+.aside svg{flex:none;width:30px;height:30px;color:var(--pink)}
+.stop-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+
+/* guess-first gate */
+.turn{display:grid;grid-template-columns:80px minmax(0,1fr);gap:4px 18px;margin:0 0 28px;padding:20px 24px;background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow)}
+.turn .masc{width:80px;height:80px}
+.turn .q{font:700 21px/1.4 var(--body);margin:2px 0 14px}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice{display:flex;gap:14px;align-items:center;text-align:left;background:var(--paper);border:2px solid var(--line);border-radius:var(--wob);padding:11px 16px;cursor:pointer;font-size:18px;line-height:1.4;transition:transform .15s,background .15s}
+.choice:hover:not(:disabled){background:var(--hl-y);transform:translateX(3px)}
+.choice .k{flex:none;display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;font:700 15px var(--hand)}
+.choice:disabled{cursor:default}
+.choice.right{background:var(--hl-t);border-color:var(--teal-ink)}
+.choice.right .k{background:var(--teal-ink);border-color:var(--teal-ink);color:var(--paper)}
+.choice.wrong{background:var(--hl-p);border-color:var(--pink-ink)}
+.choice.wrong .k{background:var(--pink-ink);border-color:var(--pink-ink);color:var(--paper)}
+.choice:disabled:not(.right):not(.wrong){opacity:.6}
+.verdict{margin-top:14px;font-size:18px}
+.verdict b{font:700 19px var(--hand);margin-right:6px}
+.verdict.ok b{color:var(--teal-ink)}.verdict.no b{color:var(--pink-ink)}
+
+/* code card */
+.code{margin:24px 0 0;background:var(--card);border:2.5px solid var(--line);border-radius:16px 22px 14px 24px / 22px 14px 24px 16px;box-shadow:var(--shadow);overflow:hidden;max-width:100%}
+.code figcaption{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:2px solid var(--line);background:var(--paper-2);font:400 16px var(--hand);color:var(--ink-3)}
+.code .file{font:600 16px var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.code .lines-n{margin-left:auto;white-space:nowrap}
+.code .rows{overflow-x:auto;padding:10px 0 12px;font:400 15.5px/1.7 var(--mono);scrollbar-width:thin;scrollbar-color:var(--ink-3) transparent}
+.code .rows.more{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent)}
+.ln{display:grid;grid-template-columns:4.2em max-content;padding-right:22px;min-width:100%;position:relative}
+.ln .n{color:var(--ink-3);text-align:right;padding-right:16px;user-select:none;opacity:.75}
+.ln .t{white-space:pre;padding:0 4px;border-radius:4px}
+.ln.hl .t{background:linear-gradient(100deg,transparent 0,var(--hl-y) 1%,var(--hl-y) 98.5%,transparent 100%) no-repeat 0 55%/100% 86%}
+.ln.hl .n{color:var(--ink);opacity:1;font-weight:600}
+.motion .stop:not(.seen) .ln.hl .t{background-size:0% 86%}
+.motion .stop.seen .ln.hl .t{transition:background-size .8s cubic-bezier(.16,1,.3,1) .15s}
+.nt{position:sticky;left:0;display:flex;gap:8px;align-items:flex-start;max-width:min(720px,88vw);margin:2px 0 8px 4.2em;padding:2px 10px 2px 0;font:600 16.5px/1.45 var(--hand);color:var(--pink-ink);white-space:normal}
+.nt svg{flex:none;width:26px;height:22px;margin-top:1px}
+.nt code{font-size:.82em;color:var(--ink)}
+.tk-c{color:var(--tk-c);font-style:italic}.tk-s{color:var(--tk-s)}.tk-n{color:var(--tk-n)}.tk-k{color:var(--tk-k);font-weight:600}
+
+/* memory sticky note */
+.memo{position:sticky;top:28px}
+.memo-note{position:relative;background:#FFF3B0;color:#1B1A17;padding:26px 20px 18px;border-radius:3px 3px 18px 3px;box-shadow:2px 6px 16px rgba(60,48,20,.18);transform:rotate(.8deg)}
+:root[data-theme="dark"] .memo-note{background:#3B3520;color:#F3EDE0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .memo-note{background:#3B3520;color:#F3EDE0}}
+.memo-note::before{content:"";position:absolute;top:-12px;left:50%;width:96px;height:26px;transform:translateX(-50%) rotate(-3deg);background:rgba(189,237,229,.85);border-radius:2px}
+.memo-h{font:700 19px var(--hand);margin:0 0 10px}
+.mv{padding:7px 0;border-top:1.5px dashed rgba(27,26,23,.25)}
+:root[data-theme="dark"] .mv{border-top-color:rgba(243,237,224,.2)}
+.mv dt{font:600 15px var(--mono);opacity:.75;overflow-wrap:anywhere}
+.mv dd{margin:2px 0 0;font:400 15.5px/1.45 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.mv.new dd span{background:linear-gradient(100deg,transparent 0,var(--hl-p) 2%,var(--hl-p) 97%,transparent 100%);padding:0 2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv .newtag{font:700 14px var(--hand);color:var(--pink-ink);margin-left:6px}
+:root[data-theme="dark"] .mv .newtag{color:#FF9CC8}
+.mv.masked dd{height:16px;margin-top:4px;width:72%;opacity:.45;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 16' preserveAspectRatio='none'%3E%3Cpath d='M2 9c6-7 10 6 16-1s10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1' fill='none' stroke='%231B1A17' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat;background-size:100% 100%}
+:root[data-theme="dark"] .mv.masked dd{filter:invert(1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mv.masked dd{filter:invert(1)}}
+.memo-lock{font:600 15px var(--hand);color:var(--pink-ink);margin:12px 0 0}
+.memo-empty{font:400 16px var(--hand);opacity:.75;margin:0}
+
+/* ---------- break it ---------- */
+.exps{display:flex;flex-direction:column;gap:26px}
+.exp{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow);overflow:hidden}
+.exp .change{padding:24px 28px}
+.exp h3{font:700 24px/1.3 var(--body);margin:0 0 10px;letter-spacing:-.01em}
+.exp .result{padding:24px 28px;background:var(--paper-2);border-left:2.5px dashed var(--ink-3);display:flex;flex-direction:column;gap:12px;align-items:flex-start;justify-content:center}
+.exp .result.shown{background:var(--pink-soft);justify-content:flex-start}
+.exp .guess{font:400 18px var(--hand);color:var(--ink-2)}
+.exp .what{font:700 18px var(--hand);color:var(--pink-ink)}
+.exp .takeaway{font:600 18px/1.5 var(--hand);color:var(--teal-ink)}
+
+/* ---------- why ---------- */
+.dec{margin-bottom:56px;max-width:1080px}
+.dec h3{font:700 28px/1.25 var(--body);margin:0 0 12px;letter-spacing:-.01em}
+.chosen{display:inline;font-size:19px;background:linear-gradient(100deg,transparent 0,var(--hl-y) 1%,var(--hl-y) 98%,transparent 100%);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 4px}
+.chosen-wrap{max-width:70ch;margin:0 0 16px}
+.chosen-wrap .lab{font:700 17px var(--hand);color:var(--ink-3);display:block;margin-bottom:2px}
+.alts{width:100%;border-collapse:collapse;margin-top:18px;font-size:17.5px}
+.alts th{text-align:left;font:700 16px var(--hand);color:var(--ink-3);padding:6px 16px 6px 0;border-bottom:2.5px solid var(--line)}
+.alts td{padding:12px 16px 12px 0;border-bottom:1.5px dashed var(--ink-3);vertical-align:top}
+.alts td:first-child{font-weight:700;width:30%}
+
+/* ---------- weak spots ---------- */
+.risks-head{display:flex;gap:18px;align-items:center}
+.risks-head svg{width:76px;height:76px;flex:none}
+.risks{display:flex;flex-direction:column}
+.risk{display:grid;grid-template-columns:110px minmax(0,1fr);gap:20px;padding:24px 0;border-bottom:2px dashed var(--ink-3);max-width:1080px}
+.risk:last-child{border-bottom:0}
+.sev{justify-self:start;align-self:start;font:700 16px var(--hand);padding:4px 14px;border:2.5px solid var(--line);border-radius:12px 16px 10px 18px;transform:rotate(-3deg);margin-top:4px}
+.sev.high{background:var(--pink);color:#1B1A17;border-color:#1B1A17}
+.sev.medium{background:var(--yellow);color:#1B1A17;border-color:#1B1A17}
+.sev.low{background:transparent;color:var(--ink-2)}
+.risk h3{font:700 23px/1.3 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.risk .loc{font:400 14.5px var(--mono);color:var(--ink-3);margin-bottom:10px;overflow-wrap:anywhere}
+.risk p{max-width:70ch}
+.risk .fix{max-width:70ch;color:var(--ink-2)}
+.risk .fix b{font:700 17px var(--hand);color:var(--teal-ink);margin-right:6px}
+
+/* ---------- interfaces, invariants, pressure points, decision forces (architecture) ---------- */
+.iface-card{background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow);overflow-x:auto;max-width:1180px}
+.ifaces{width:100%;border-collapse:collapse;font-size:17px;line-height:1.5}
+.ifaces th{text-align:left;font:700 16px var(--hand);color:var(--ink-3);padding:10px 16px;border-bottom:2.5px solid var(--line);background:var(--paper-2)}
+.ifaces td{padding:14px 16px;border-bottom:1.5px dashed var(--ink-3);vertical-align:top}
+.ifaces tr:last-child td{border-bottom:0}
+.ifaces tr.on td{background:var(--hl-y)}
+.ifaces td.none{color:var(--ink-3)}
+.iface-go{display:block;max-width:100%;border:0;background:none;padding:0;cursor:pointer;text-align:left;font:700 17.5px/1.4 var(--body);color:var(--ink);text-decoration:underline;text-decoration-color:var(--teal);text-decoration-thickness:2px;text-underline-offset:4px}
+.iface-go:hover{text-decoration-color:var(--pink)}
+.mode{display:inline-block;font:700 15px var(--hand);padding:1px 10px;border:2px solid var(--ink-2);border-radius:8px 12px 9px 13px;color:var(--ink-2)}
+.mode.async{border-style:dashed;color:var(--teal-ink);border-color:var(--teal-ink)}
+.invs,.press-list{display:flex;flex-direction:column}
+.inv,.press{display:grid;grid-template-columns:110px minmax(0,1fr);gap:20px;padding:24px 0;border-bottom:2px dashed var(--ink-3);max-width:1080px}
+.inv:last-child,.press:last-child{border-bottom:0}
+.inv .num{width:64px;height:64px;display:grid;place-items:center;font:400 30px var(--display);color:var(--ink);position:relative}
+.inv .num svg{position:absolute;inset:0;width:100%;height:100%;color:var(--ink)}
+.press h3{font:700 23px/1.3 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.inv h3{font:400 20px/1.5 var(--body);margin:0 0 6px}
+.enf{font:600 17px var(--hand);color:var(--ink-3);margin:0 0 10px}
+.enf+.enf{margin-top:-6px}
+.enf code{font-size:.82em}
+.breaks{max-width:70ch;margin:0 0 6px}
+.breaks b{font:700 17px var(--hand);color:var(--pink-ink);margin-right:6px}
+.press .links{max-width:70ch;margin:0 0 6px}
+.dec-ctx{max-width:70ch;margin:0 0 16px}
+.dec-ctx .lab,.dec-cons .lab{font:700 17px var(--hand);color:var(--ink-3);display:block;margin-bottom:2px}
+.dec-cons{max-width:70ch;margin:18px 0 0;padding:14px 20px;background:var(--pink-soft);border-radius:var(--wob)}
+.dec-cons .lab{color:var(--pink-ink)}
+
+/* ---------- quiz ---------- */
+.quiz{max-width:900px}
+.pips{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.pip{width:26px;height:26px;border-radius:50%;border:2.5px solid var(--ink-3);background:var(--card);cursor:pointer;padding:0}
+.pip.right{background:var(--teal);border-color:var(--teal-ink)}
+.pip.wrong{background:var(--pink);border-color:var(--pink-ink)}
+.pip.cur{box-shadow:0 0 0 4px var(--hl-y);border-color:var(--ink)}
+.qcard{background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);padding:28px 32px;box-shadow:var(--shadow)}
+.qnum{font:600 17px var(--hand);color:var(--ink-3)}
+.qtext{font:700 25px/1.35 var(--body);margin:6px 0 18px;letter-spacing:-.01em}
+.score-row{display:flex;gap:24px;align-items:center}
+.score-row svg{width:110px;height:110px;flex:none}
+.score{font:400 88px/1 var(--display)}
+.score small{font:400 30px var(--hand);color:var(--ink-3)}
+.qnav{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+
+/* ---------- glossary ---------- */
+.terms{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:22px 48px;margin:0}
+.terms div{break-inside:avoid}
+.terms dt{font:700 20px var(--body);display:inline;background:linear-gradient(100deg,transparent 0,var(--hl-t) 2%,var(--hl-t) 97%,transparent 100%);padding:0 4px}
+.terms dd{margin:6px 0 0;color:var(--ink-2);font-size:18px}
+.term{text-decoration:underline dotted var(--pink-ink) 2px;text-underline-offset:4px;cursor:help}
+#tip{position:fixed;z-index:30;max-width:340px;padding:12px 16px;background:#FFF3B0;color:#1B1A17;font:400 16px/1.45 var(--body);border-radius:3px 3px 14px 3px;box-shadow:2px 6px 16px rgba(0,0,0,.2);pointer-events:none;opacity:0;transform:translateY(4px) rotate(-.6deg);transition:opacity .15s,transform .15s}
+#tip.on{opacity:1;transform:translateY(0) rotate(-.6deg)}
+#tip b{font-family:var(--hand)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,24px) rotate(-1deg);background:var(--ink);color:var(--paper);padding:12px 22px;border-radius:var(--wob);font:600 17px var(--hand);opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.16,1,.3,1);pointer-events:none;z-index:40}
+.toast.on{opacity:1;transform:translate(-50%,0) rotate(-1deg)}
+footer.end{margin-top:110px;display:flex;gap:16px;align-items:center;font:400 18px var(--hand);color:var(--ink-3)}
+footer.end svg{width:64px;height:64px}
+
+/* ---------- ask claude (needs scripts/serve.py; opened as a file it copies instead) ---------- */
+.if-copy{display:contents}
+.if-ask,body.can-ask .if-copy{display:none}
+body.can-ask .if-ask{display:contents}
+#askPop{position:fixed;z-index:35;display:none;align-items:center;gap:8px;padding:8px 16px 8px 12px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:var(--wob);font:600 17px var(--hand);cursor:pointer;box-shadow:var(--shadow);transform:rotate(-1.2deg)}
+#askPop.on{display:inline-flex}
+#askPop:hover{background:var(--teal-ink);border-color:var(--teal-ink)}
+#askPop svg{width:20px;height:20px}
+#askPop kbd{font:600 13px var(--mono);border:1.5px solid currentColor;border-radius:5px;padding:0 5px;opacity:.7}
+.ask{position:fixed;top:0;right:0;bottom:0;z-index:36;width:min(500px,100vw);display:flex;flex-direction:column;background:var(--paper);border-left:2.5px solid var(--line);box-shadow:-10px 0 34px rgba(0,0,0,.16);transform:translateX(104%);visibility:hidden;transition:transform .3s cubic-bezier(.16,1,.3,1),visibility 0s .3s}
+.ask.on{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.16,1,.3,1)}
+.ask-head{display:flex;align-items:center;gap:12px;padding:16px 18px 14px 22px;border-bottom:2px solid var(--line);background:var(--paper-2)}
+.ask-head h2{font-size:32px;flex:1;white-space:nowrap}
+.ask-head h2::after{width:100%;height:8px}
+.ask-head .pill button{padding:4px 12px;font-size:15px}
+.ask-log{flex:1;overflow-y:auto;padding:22px 22px 28px;display:flex;flex-direction:column;gap:18px;overscroll-behavior:contain}
+.ask-empty{color:var(--ink-2);font:400 18px/1.5 var(--hand);display:grid;gap:12px;justify-items:start}
+.ask-empty svg{width:72px;height:72px}
+.ask-quote{background:var(--hl-y);color:var(--ink);padding:12px 16px;border-radius:3px 3px 16px 3px;font-size:17px;line-height:1.5;transform:rotate(-.5deg);box-shadow:2px 3px 0 rgba(27,26,23,.12);white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow-y:auto}
+.ask-quote .where{display:block;font:600 15px var(--hand);color:var(--ink-2);margin-bottom:6px;white-space:normal}
+.ask-about{font:600 16px var(--hand);color:var(--ink-2)}
+.ask-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ask-chips button{border:2px solid var(--line);border-radius:var(--wob);background:var(--card);padding:5px 12px;font:600 15px var(--hand);color:var(--ink);cursor:pointer}
+.ask-chips button:hover{background:var(--teal-soft)}
+.ask-me{align-self:flex-end;max-width:88%;background:var(--card);border:2px solid var(--line);border-radius:var(--wob);padding:8px 14px;font:500 18px/1.45 var(--hand);white-space:pre-wrap;overflow-wrap:anywhere}
+.ask-ai{font-size:18px;line-height:1.6;min-width:0}
+.ask-ai .who{font:600 15px var(--hand);color:var(--teal-ink);margin-bottom:4px}
+.ask-ai p,.ask-ai ul,.ask-ai ol{margin:0 0 .75em}
+.ask-ai ul,.ask-ai ol{padding-left:1.3em}
+.ask-ai li{margin:.2em 0}
+.ask-ai pre{margin:0 0 .75em;padding:10px 14px;background:var(--card);border:2px solid var(--line);border-radius:12px;overflow-x:auto;font:400 14.5px/1.6 var(--mono)}
+.ask-ai pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.ask-status{font:400 16px var(--hand);color:var(--ink-3)}
+.ask-status:empty{display:none}
+.ask-err{color:var(--pink-ink);font-weight:600}
+.ask-form{border-top:2px solid var(--line);padding:14px 18px 18px;display:grid;gap:10px;background:var(--paper-2)}
+.ask-form textarea{width:100%;box-sizing:border-box;min-height:76px;max-height:40vh;resize:vertical;font:400 18px/1.45 var(--body);color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.ask-form textarea:focus{outline:3px solid var(--teal);outline-offset:1px}
+.ask-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ask-row small{color:var(--ink-3);font-size:15px}
+.ask-row span{display:flex;gap:6px}
+@media (min-width:1800px){body.asking .page{max-width:calc(100vw - 540px);margin-left:20px}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1280px){.cols{grid-template-columns:minmax(0,1fr) 280px;gap:26px}.page{gap:40px;padding:0 32px 100px}}
+@media (max-width:1120px){
+  .page{grid-template-columns:minmax(0,1fr)}
+  .rail{min-width:0;position:sticky;top:0;z-index:20;height:auto;flex-direction:row;align-items:center;gap:10px;padding:8px 0;margin:0 -32px;padding-left:32px;padding-right:32px;background:var(--paper);border-bottom:2px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .rail-brand span,.rail-foot,.stops{display:none}
+  .rail-brand svg{width:34px;height:34px}
+  .toc{flex-direction:row;gap:4px}
+  .toc>li>a{white-space:nowrap;font-size:16px;padding:4px 10px}
+  .toc .cnt{display:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .memo{position:static;max-width:520px}
+  .node-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:900px){ /* the five-column table needs about 780px; below that each connection stacks into a card */
+  .ifaces thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .ifaces,.ifaces tbody,.ifaces tr,.ifaces td{display:block}
+  .ifaces tr{padding:12px 0;border-bottom:1.5px dashed var(--ink-3)}
+  .ifaces tr:last-child{border-bottom:0}
+  .ifaces td{border:0;padding:3px 16px}
+  .ifaces td.none{display:none}
+  .ifaces td::before{content:attr(data-label);display:block;font:700 14px var(--hand);color:var(--ink-3)}
+  .ifaces td:first-child::before{display:none}
+}
+@media (max-width:760px){
+  body{font-size:18px}
+  .inv h3{font-size:18px}
+  .page{padding:0 16px 80px}
+  .rail{margin:0 -16px;padding-left:16px;padding-right:16px}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .hero-ctl{grid-column:1;grid-row:1;justify-content:flex-start}
+  .hero-txt{grid-row:2}
+  .hero-mascot{display:none}
+  .lede{font-size:19px}
+  section.sec{margin-top:72px}
+  .stop{grid-template-columns:44px minmax(0,1fr);gap:0 14px;padding-bottom:64px}
+  .stop .num{width:44px;height:44px;font-size:22px}
+  .stop::before{left:20px;top:48px}
+  .turn{grid-template-columns:minmax(0,1fr);padding:18px}
+  .turn .masc{width:56px;height:56px}
+  .exp{grid-template-columns:minmax(0,1fr)}
+  .trigger{flex-direction:column;gap:4px}
+  .map-foot::before{content:"Swipe the map sideways to see all of it.";width:100%;color:var(--ink-2)}
+  .exp .result{border-left:0;border-top:2.5px dashed var(--ink-3)}
+  .risk{grid-template-columns:minmax(0,1fr);gap:8px}
+  .inv,.press{grid-template-columns:minmax(0,1fr);gap:8px}
+  .terms{grid-template-columns:minmax(0,1fr)}
+  .qcard,.node-note{padding:20px}
+  .alts td:first-child{width:auto}
+  .code .rows{font-size:14px}
+  .nt{margin-left:1.5em}
+  .ask-head{padding:12px 12px 12px 16px;gap:8px}
+  .ask-head h2{font-size:25px}
+  .ask-log{padding:18px 16px 24px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="rail" id="rail" aria-label="Contents"></nav>
+  <main>
+    <header class="hero">
+      <div class="hero-txt">
+        <h1 id="title"></h1>
+        <svg class="swash" viewBox="0 0 520 20" preserveAspectRatio="none" aria-hidden="true"><path d="M4 12 C 90 4, 180 18, 280 9 S 440 5, 516 11" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg>
+        <p class="lede" id="subtitle"></p>
+      </div>
+      <div class="hero-ctl">
+        <div class="pill" id="depth" role="group" aria-label="Detail level"><button data-d="simple">Plain</button><button data-d="deep">Deep</button></div>
+        <button class="icon-btn" id="themeBtn" aria-label="Switch between light and dark"></button>
+      </div>
+      <div class="hero-mascot" id="heroMascot" aria-hidden="true"></div>
+    </header>
+    <div id="resume"></div>
+    <section class="sec" id="s-map"></section>
+    <section class="sec" id="s-trip"></section>
+    <section class="sec" id="s-interfaces"></section>
+    <section class="sec" id="s-invariants"></section>
+    <section class="sec" id="s-pressure"></section>
+    <section class="sec" id="s-break"></section>
+    <section class="sec" id="s-why"></section>
+    <section class="sec" id="s-weak"></section>
+    <section class="sec" id="s-quiz"></section>
+    <section class="sec" id="s-terms"></section>
+    <footer class="end" id="end"></footer>
+  </main>
+</div>
+<div id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+<button id="askPop" type="button"></button>
+<aside class="ask" id="ask" aria-label="Ask Claude">
+  <div class="ask-head"><h2>Ask Claude</h2>
+    <div class="pill" id="askModel" role="group" aria-label="Model"><button data-model="haiku">Haiku</button><button data-model="sonnet">Sonnet</button></div>
+    <button class="icon-btn" id="askClose" aria-label="Close"></button></div>
+  <div class="ask-log" id="askLog" aria-live="polite"></div>
+  <form class="ask-form" id="askForm"><textarea id="askIn" rows="3" aria-label="Your question" placeholder="Ask anything about this lesson or the code"></textarea>
+    <div class="ask-row"><small>Enter sends, Shift+Enter for a new line. Claude can read the repo, not change it.</small>
+      <span><button type="button" class="btn quiet" id="askNew">New chat</button><button class="btn go" id="askSend">Send</button></span></div></form>
+</aside>
+<script id="lesson" type="application/json">{"id": "lens-architecture", "mode": "architecture", "title": "How lens turns a question into a lesson page", "subtitle": "An architecture deep dive: eight parts from a model's pen to a page that can phone Claude, and the rules that keep it honest", "layers": [{"id": "author", "name": "Authoring"}, {"id": "build", "name": "Build"}, {"id": "page", "name": "Page"}, {"id": "helper", "name": "Ask helper"}], "nodes": [{"id": "writer", "label": "Claude, the writer", "kind": "model in a Claude Code session", "prop": "model", "layer": "author", "col": 0, "row": 0, "files": ["SKILL.md:73-136"], "simple": "The only part that thinks. It reads the real code, then writes the lesson as plain data: nodes, edges, steps and a quiz. It never writes the page itself.", "deep": "SKILL.md's workflow has Claude resolve the question, gather evidence with `nl -ba FILE | sed -n 'A,Bp'` so line numbers are exact, then write a small Python generator whose `code()` helper slices snippets straight out of the source file. The generator emits the lesson JSON and runs build.py. Everything the model decides lives in that JSON. Layout, interaction and styling are not its job: SKILL.md says 'Your job is to produce excellent *lesson data*. The template does the rest.'", "analogy": "An author who hands the typesetter a manuscript, not a printed book.", "owns": "What the lesson claims, and how sure it is.", "exposes": "One JSON file shaped by reference/lesson-schema.md.", "runs": "Your Claude Code session. The only step in the whole pipeline that needs a model.", "scale": "One lesson per question. The schema budgets (4 to 10 map nodes, at most 25 lines per snippet) cap its size, because the reader is the limit, not the machine.", "confidence": "evidenced"}, {"id": "source", "label": "Real source files", "kind": "the code being explained", "prop": "folder", "layer": "author", "col": 0, "row": 2, "files": ["scripts/build.py:483-498"], "simple": "The files the lesson is about. The lesson shows lines copied from them, and the build can check each copy against the original.", "deep": "build.py never runs or parses this code. With `--check-src REPO` it opens the file named by each snippet, takes `start` and the snippet length, and compares line by line (scripts/build.py:493-498). The file is looked up relative to REPO first, then as a `~` path. The comparison ignores trailing spaces and any snippet line that is only `...`.", "owns": "The truth every snippet is held to.", "exposes": "Plain text files, addressed by path and line number.", "runs": "Wherever the explained repo lives. lens only reads it.", "scale": "The whole file is re-read for every snippet (scripts/build.py:493). At 25 lines a snippet that never matters.", "confidence": "evidenced"}, {"id": "validator", "label": "Validator", "kind": "build.py: validate and check_code", "prop": "shield", "layer": "build", "col": 1, "row": 2, "files": ["scripts/build.py:324-439", "scripts/build.py:459-498"], "simple": "Reads the lesson before anything is drawn. Mistakes that would break the page are errors and stop the build. Softer problems are warnings you should still read.", "deep": "`validate()` fills two lists and never raises: a field of the wrong type is reported as an error, not a crash. Errors: unknown node ids, a `sync` that is not a real boolean, missing required text, a scene name outside the twelve, a snippet that does not match its file. Warnings: an architecture lesson with no flows, more than half the edges without a protocol, two consecutive steps with no edge between their nodes, a repeated or self-loop edge, an invariant rule over 120 characters. main() prints every warning, then every error, and exits 1 if there is any error (scripts/build.py:523-528).", "analogy": "A proofreader who marks errors in red and warnings in pencil.", "owns": "The definition of a valid lesson.", "exposes": "`validate(L, repo)` returns `(errs, warns)`. On the command line: `warn:` and `ERROR:` lines, and exit code 1.", "runs": "Inside the build.py process on your machine, once per build.", "scale": "Linear in lesson size. The one hidden cost is the file re-read per snippet (scripts/build.py:493).", "confidence": "evidenced"}, {"id": "assembler", "label": "Assembler", "kind": "build.py: includes and injection", "prop": "package", "layer": "build", "col": 1, "row": 1, "files": ["scripts/build.py:34-45", "scripts/build.py:501-508", "scripts/build.py:529-531"], "simple": "Takes the chosen theme file and fills in three blanks: shared parts, the title and the lesson data. The result is one HTML file that opens on its own.", "deep": "`apply_includes()` replaces every line that is exactly `\u003c!-- lens:include NAME -->` with the file `assets/themes/parts/NAME`, verbatim, and exits with an ERROR if the part is missing or contains `__TITLE__` or `__LESSON_JSON__`. Then `render()` fills `__TITLE__` (HTML-escaped) and `__LESSON_JSON__` (the lesson on one line) in a single regex pass, so text inserted for one is never scanned for the other (scripts/build.py:501-508). On the way it rewrites every `<\/` to `<\\/` and the `<` of any `\u003c!--` or `\u003cscript` to `\\u003c`; JSON.parse reads all three back as the original text. Includes run first, so nothing inside a lesson can ever expand one.", "analogy": "A mail merge: the theme is the letter, the lesson is the address list.", "owns": "The final page text.", "exposes": "One self-contained .html file. By itself it fetches only Google Fonts; the ask helper is the one other thing it can call.", "runs": "The same build.py process, after validation has passed.", "scale": "Output size is theme plus lesson: zine.html is 108 KB and examples/jw-ask-flow.html is 111 KB. Every lesson repeats the theme.", "confidence": "evidenced"}, {"id": "theme", "label": "Theme page", "kind": "single-file HTML renderer", "prop": "browser", "layer": "page", "col": 2, "row": 1, "files": ["assets/themes/zine.html:538-1296", "assets/themes/sketch.html:655-663", "reference/themes.md"], "simple": "The page the reader sees. It reads the lesson data, draws the map, flows, quiz and notes, and handles keys and clicks. It works with no server at all.", "deep": "A theme is one HTML file. build.py fills `__LESSON_JSON__` into `\u003cscript id=\"lesson\" type=\"application/json\">` and the page runs `JSON.parse` on it (assets/themes/zine.html:538, 541). `L.mode === 'architecture'` (assets/themes/zine.html:547) relabels the sections (traces become Flows, whatifs become Failure modes) and adds Interfaces, Invariants and Pressure points. Each node sits in the column of its layer unless it sets `col` or `row` (assets/themes/zine.html:655). Each edge is a single curve between the facing sides of two boxes, fanned apart when several edges join the same pair (assets/themes/zine.html:699); I found no routing around other boxes, so crossings are fixed by choosing rows. A second theme, `sketch` (assets/themes/sketch.html), renders the same JSON with the same script tag and `lens:<id>` keys, and splices in two parts: `parts/props.js`, the icon library (LensProps), then `parts/scenes.js`, Blot and his twelve scenes (LensScenes) (assets/themes/sketch.html:561-562). An authored `scene` is drawn with its `items` (labelled things that move) and `props` (labelled places). A node with no scene gets a context plate instead: ctxPlate() builds it from the graph, with the node's own `prop` in the middle, its neighbours on either side and each edge's `payload` on the arrows (assets/themes/sketch.html:655-663; the choice is made at assets/themes/sketch.html:942). zine.html never mentions `scene` or `prop`, so it ignores all of them.", "analogy": "A reusable stage set: the lesson is the script, the theme decides the lighting and the props.", "owns": "How a lesson looks and behaves.", "exposes": "The contract in reference/themes.md: two placeholders, include lines, and the selectors `.node`, `[data-lens-stop]` and `.choice[data-p]` that scripts/smoke.mjs relies on. The sketch theme also reaches LensProps.draw, LensScenes.render and LensScenes.context in the parts.", "runs": "In the reader's browser. It works from a plain file and from the helper's http://127.0.0.1 address.", "scale": "Client side only. The map is a grid of fixed-size boxes, so the build warns outside 2 to 14 nodes (scripts/build.py:338) and the schema recommends 4 to 10.", "confidence": "evidenced"}, {"id": "store", "label": "Browser memory", "kind": "localStorage", "prop": "database", "layer": "page", "col": 2, "row": 2, "files": ["assets/themes/zine.html:552-557", "assets/themes/zine.html:1168"], "simple": "The browser remembers where you stopped, which guesses you answered and how the quiz went, so coming back picks up where you left off.", "deep": "Every key is `lens:<lesson id>:<name>` (assets/themes/zine.html:552). Saved: Plain or Deep, current flow, last stop, light or dark, the model choice, answered guess gates and quiz answers. The gate and quiz keys also contain a hash of their own questions (assets/themes/zine.html:553, 554), so editing a question starts that part fresh instead of pinning old answers to new text. Reads and writes are wrapped in try/catch (assets/themes/zine.html:557), so blocked storage simply means the page forgets. The ask key lives apart, under `lens:key`. Nothing in a key names the theme or the file, so zine and sketch share one set of progress, and in Chromium so do two different file:// pages with the same lesson id (tried: a stop saved in a zine build showed as Welcome back in a sketch build of the same id).", "analogy": "A bookmark that also remembers your quiz marks.", "owns": "One reader's progress through one lesson.", "exposes": "localStorage keys you can read in the dev tools. Nothing here leaves the browser.", "runs": "The reader's browser profile, one store per origin. In Chromium every file:// page counts as the same origin.", "scale": "A handful of small JSON values per lesson. Browsers cap localStorage at a few MB per origin (typical figure, not checked here); a failed write is swallowed.", "confidence": "evidenced"}, {"id": "helper", "label": "Ask helper (serve.py)", "kind": "localhost HTTP server", "prop": "server", "layer": "helper", "col": 3, "row": 0, "files": ["scripts/serve.py:14-17", "scripts/serve.py:105-214"], "simple": "A tiny local web server. It serves your lessons and is the one door through which the page can ask Claude. It checks who is knocking before it does anything.", "deep": "A ThreadingHTTPServer on 127.0.0.1, from port 4174 upward (scripts/serve.py:247), one thread per request. GET /__lens/health, GET / and GET /<name>.html need a same-origin Host. POST /__lens/ask also needs the `X-Lens-Key` header, a JSON content type, string fields, a model of haiku or sonnet and a UUID-shaped session id (scripts/serve.py:137-158). It then starts `claude -p` and relays its events as NDJSON. The key is a random token kept in ~/.config/lens/token with mode 600 (scripts/serve.py:46-51) and handed to the page in the link's #fragment, which browsers never send to a server.", "analogy": "A doorman with a guest list: wrong address, no entry; right address but no key, no entry.", "owns": "The key, the port and every claude process.", "exposes": "GET /__lens/health, GET /<name>.html and POST /__lens/ask, all on 127.0.0.1 only.", "runs": "A background Python process started by `serve.py LESSON.html`. One server per lessons folder; a second launch finds it and reuses it.", "scale": "One thread and one claude process per question in flight. I found no cap on concurrent asks in serve.py. Each answer is cut off after 300 seconds (scripts/serve.py:24), set by LENS_ASK_TIMEOUT.", "confidence": "evidenced"}, {"id": "claude", "label": "claude -p subprocess", "kind": "child process (Claude Code CLI)", "prop": "terminal", "layer": "helper", "col": 3, "row": 1, "files": ["scripts/serve.py:57-66", "scripts/serve.py:177-205"], "simple": "A fresh Claude Code run for every question, under your own login. It may only read: open files and search them. It cannot edit anything.", "deep": "claude_cmd() builds `claude -p --model haiku|sonnet --tools Read,Grep,Glob --setting-sources \"\" --strict-mcp-config --settings {autoMemoryEnabled:false, disableAllHooks:true} --system-prompt TUTOR --output-format stream-json --verbose --include-partial-messages`, plus `--resume SESSION` for a follow-up (scripts/serve.py:57-66). The process starts in the explained repo (`cwd=repo`), in its own process group, with the prompt written to stdin and stream-json read from stdout (scripts/serve.py:177-205).", "owns": "The session id and the answer text.", "exposes": "A prompt on stdin, one JSON event per line on stdout, an exit code, and `--resume` to continue a chat.", "runs": "A child of serve.py, in the explained repo's directory, under your own Claude Code login (no API key).", "scale": "One process per question. Parallel questions mean parallel processes, limited by your machine and by your Claude usage limits (not measured here).", "confidence": "evidenced"}], "edges": [{"from": "writer", "to": "validator", "label": "json", "protocol": "command line: LESSON.json OUT.html --check-src REPO", "sync": true, "payload": "lesson.json path", "guarantee": "All or nothing: any error exits 1 before a page is written (scripts/build.py:528)."}, {"from": "source", "to": "validator", "label": "lines", "protocol": "file read", "sync": true, "payload": "snippet lines"}, {"from": "validator", "to": "assembler", "label": "valid", "protocol": "in-process call, reached only when there are no errors", "sync": true, "payload": "parsed lesson"}, {"from": "assembler", "to": "theme", "label": "page", "protocol": "file write: the theme with parts, title and lesson JSON filled in", "sync": true, "payload": "one .html page"}, {"from": "theme", "to": "store", "label": "progress", "protocol": "localStorage API", "sync": true, "payload": "lens:<id>:last", "guarantee": "Best effort: a failed write is silently ignored (assets/themes/zine.html:557)."}, {"from": "theme", "to": "helper", "label": "ask", "protocol": "HTTP POST; out: q, model, session, lesson, quote, where; back: text, tool, session, error, done", "sync": false, "payload": "POST /__lens/ask", "guarantee": "A stream that ends without a done event is reported as cut off (assets/themes/zine.html:1271)."}, {"from": "helper", "to": "claude", "label": "prompt", "protocol": "subprocess: where, quote and question on stdin; JSON event lines out", "sync": true, "payload": "prompt on stdin", "guarantee": "Never outlives its request: SIGKILL to the whole process group on Stop, tab close or timeout (scripts/serve.py:185)."}, {"from": "writer", "to": "helper", "label": "start it", "protocol": "shell command in the background: serve.py LESSON.html --open", "sync": false, "payload": "serve.py LESSON"}], "traces": [{"title": "A lesson is built and opened", "trigger": "You ask lens how something works. Claude has gathered its evidence and now writes the lesson, builds it and opens it.", "steps": [{"node": "writer", "title": "Read the real lines", "simple": "Claude reads the files it will show, with line numbers. It copies nothing from memory.", "deep": "SKILL.md step 2 says to read the actual code with `nl -ba FILE | sed -n 'A,Bp'` so the numbers are exact, and to run cheap, safe code when that gives real values for the state panel. Anything it only guessed gets `inferred` or `uncertain` as its confidence.", "confidence": "evidenced", "scene": {"name": "lookup", "caption": "Claude reads exact line numbers, not memory", "items": ["nl -ba FILE"], "props": [{"prop": "folder", "label": "source files"}]}}, {"node": "writer", "title": "Write the lesson as data", "simple": "Claude writes a small Python script that produces the JSON. A helper in it slices each snippet out of the real file, so code is right by construction.", "deep": "SKILL.md step 4 describes a generator in the scratchpad with a `code(file, a, b, highlight, notes)` helper; examples/jw-ask-flow.gen.py is the model, and so is the script that produced this lesson. Because snippets are sliced, never typed, only the line numbers can go wrong, and the next stage catches those for snippets. Line numbers written into prose or a node's `files` are not checked (see Weak spots), which is why the `ln()` helper in this lesson's generator looks each one up. Then Claude runs build.py.", "confidence": "evidenced", "state": [{"name": "lesson.json", "value": "mode \"architecture\", 8 nodes, 8 edges, 3 flows", "changed": true}, {"name": "snippets", "value": "sliced from real files by code()", "changed": true}], "scene": {"name": "transform", "caption": "gen.py slices snippets, writes lesson.json", "items": ["code(file, a, b)", "lesson.json"], "props": [{"prop": "process", "label": "gen.py"}]}}, {"node": "validator", "title": "Check the shape", "simple": "build.py reads the JSON and checks it. Missing text, unknown node ids and bad scene names are errors. Odd but legal things are warnings.", "deep": "`validate()` runs every rule in one pass and collects `errs` and `warns` (scripts/build.py:324-439). Nothing is thrown, even for a field of the wrong type, so one build reports every problem at once. Warnings never stop the build, which is why SKILL.md says to read them anyway.", "confidence": "evidenced", "state": [{"name": "errs", "value": "[]", "changed": true}, {"name": "warns", "value": "[]", "changed": true}], "scene": {"name": "gate", "caption": "errors stop the build, warnings pass", "items": ["lesson.json", "unknown node id"], "props": [{"prop": "shield", "label": "validate()"}]}}, {"node": "validator", "title": "Compare each snippet with its file", "simple": "With `--check-src`, build.py opens the real file and compares the snippet line by line. Any difference is an error.", "deep": "The block only runs when a repo was given (scripts/build.py:483). It slices the real file at the snippet's start line and length, then compares line by line after trimming trailing spaces. A line that is only `...` is skipped, so a lesson can elide code. A file that is shorter than the snippet is a mismatch as well. The error names the first five wrong line numbers.", "confidence": "evidenced", "code": {"file": "scripts/build.py", "start": 483, "lang": "python", "src": "    if repo and c.get(\"file\"):\n        if not isinstance(c[\"file\"], str):\n            errs.append(f\"{where}: code.file must be a string\")\n            return\n        p = Path(repo) / c[\"file\"]\n        if not p.exists():\n            p = Path(c[\"file\"]).expanduser()\n        if not p.exists():\n            errs.append(f\"{where}: cannot find {c['file']} to verify the snippet\")\n            return\n        real = p.read_text(errors=\"replace\").splitlines()[start - 1:start - 1 + n]\n        mine = c[\"src\"].rstrip(\"\\n\").split(\"\\n\")\n        norm = lambda s: s.rstrip()\n        bad = [start + i for i, (a, b) in enumerate(zip(mine, real)) if norm(a) != norm(b) and not re.fullmatch(r\"\\s*(\\.\\.\\.|…|# \\.\\.\\.|// \\.\\.\\.)\\s*\", a)]\n        if len(real) < len(mine) or bad:\n            errs.append(f\"{where}: snippet does not match {c['file']} at lines {bad[:5] or 'end of file'}\")", "highlight": [493, 495, 496, 498], "notes": {"495": "Trailing spaces are trimmed on both sides before comparing.", "496": "Lines that are only `...` are skipped, so a snippet may elide code.", "498": "Any difference, or a file that ends early, is a build error."}}, "predict": {"q": "A snippet matches the real file except that one of its lines has extra spaces at the end. What does the build do?", "options": ["It passes, trailing spaces are ignored", "It fails, lines must match exactly", "It passes but prints a warning"], "answer": 0, "why": "`norm = lambda s: s.rstrip()` (scripts/build.py:495) trims each line on both sides before the comparison, so only differences in the visible text count."}, "state": [{"name": "mine", "value": "c['src'] split into lines", "changed": true}, {"name": "real", "value": "file lines[start-1 : start-1+n]", "changed": true}, {"name": "bad", "value": "[]  (an empty list means a match)", "changed": true}], "scene": {"name": "watch", "caption": "check_code diffs snippets vs the real file", "items": ["snippet lines"], "props": [{"prop": "file", "label": "scripts/build.py"}]}}, {"node": "assembler", "title": "Fill the template, then write the page", "simple": "build.py first expands the include lines in the theme, then drops in the title and the lesson in one pass. The lesson is made safe first and nothing it inserts is read again, so lesson text cannot be mistaken for an instruction.", "deep": "`render()` (scripts/build.py:501) serialises the lesson on one line (scripts/build.py:503), rewrites every `<\/` to `<\\/` and turns the `<` of any `\u003c!--` or `\u003cscript` into `\\u003c` (scripts/build.py:506). Line 529 runs `apply_includes` on the theme text and hands the result to `render()`, which replaces `__TITLE__` and `__LESSON_JSON__` in one `re.sub` pass (scripts/build.py:508). Three things keep lesson text from posing as a directive: includes are expanded before the data is inserted, the data is one line so no lesson string is a whole line on its own, and the single pass never rescans inserted text, so a title containing `__LESSON_JSON__` stays literal. scripts/test-build.py pins each: cli_includes_before_placeholders, title_placeholder_cannot_inject_json and comment_open_is_escaped_and_roundtrips.", "confidence": "evidenced", "code": {"file": "scripts/build.py", "start": 501, "lang": "python", "src": "def render(template, title, lesson):\n    \"\"\"Fill __TITLE__ and __LESSON_JSON__ in one pass, so text inserted for one is never rescanned for the other.\"\"\"\n    data = json.dumps(lesson, ensure_ascii=False).replace(\"<\/\", \"<\\\\/\")\n    # Inside \u003cscript> a literal `\u003c!--` followed later by `\u003cscript` switches the HTML parser into the\n    # \"script data double escaped\" state and swallows the closing tag. \\u003c is the same character to JSON.parse.\n    data = re.sub(r\"<(?=!--|script)\", r\"\\\\u003c\", data, flags=re.I)\n    values = {\"__TITLE__\": html.escape(title), \"__LESSON_JSON__\": data}\n    return re.sub(\"|\".join(PLACEHOLDERS), lambda m: values[m.group(0)], template)", "highlight": [503, 506, 508], "notes": {"503": "Every `<\/` becomes `<\\/`, so no lesson text can end the data script early.", "506": "A `<` before `!--` or `script` becomes `\\u003c`, so the page cannot go blank.", "508": "One pass fills the title and the data; inserted text is never rescanned."}}, "predict": {"q": "A step of a lesson quotes the include line `\u003c!-- lens:include scenes.js -->` as text. What does the built page contain at that spot?", "options": ["That text, unchanged", "The scenes.js file pasted in", "No page: the build stops on it"], "answer": 0, "why": "Includes are expanded in the theme before the lesson is inserted, and the insert is one pass whose output is never rescanned, so lesson text is never expanded."}, "state": [{"name": "data", "value": "the lesson on one line, <\/ and \u003c!-- escaped", "changed": true}, {"name": "page", "value": "theme + parts + title + data", "changed": true}, {"name": "out", "value": "one .html file, no other files", "changed": true}], "scene": {"name": "carry", "caption": "one re.sub pass fills in the lesson", "items": ["lesson JSON"], "props": [{"prop": "braces", "label": "lesson JSON"}, {"prop": "browser", "label": "theme page"}]}}, {"node": "theme", "title": "Open the page and draw it", "simple": "You open the file. The page reads the lesson from its own script tag, then draws the map, the flows and every other section that has something to show.", "deep": "`JSON.parse` of the script tag gives `L` (assets/themes/zine.html:541). The boot line renders every section from it (assets/themes/zine.html:1296); a section with no data hides itself and drops out of the contents rail. In architecture mode `ARCH` is true (assets/themes/zine.html:547), which changes the labels and adds the Interfaces, Invariants and Pressure sections. The sketch theme does the same, and also draws each node's context plate from the edges when you click it.", "confidence": "evidenced", "state": [{"name": "L", "value": "the parsed lesson object", "changed": true}, {"name": "ARCH", "value": "true", "changed": true}, {"name": "S.depth", "value": "\"simple\"  (the default)", "changed": true}], "scene": {"name": "fork", "caption": "L.mode relabels: traces become Flows", "items": ["code", "architecture"], "props": [{"prop": "braces", "label": "lesson JSON"}]}}, {"node": "store", "title": "Pick up where you left off", "simple": "The page looks in the browser's memory for this lesson. If you stopped partway last time, it offers a Jump back in button.", "deep": "Initial state is read from localStorage (assets/themes/zine.html:552). Each stop you visit saves `last` (assets/themes/zine.html:982), and the Welcome back banner appears only when the saved step is past the first (assets/themes/zine.html:1299). A fresh browser or cleared storage gives the defaults. scripts/smoke.mjs clears storage on purpose so every run starts the same.", "confidence": "evidenced", "state": [{"name": "lens:lens-architecture:last", "value": "{\"trace\":0,\"step\":3}", "changed": true}, {"name": "resume banner", "value": "shown (step 3 > 0)", "changed": true}], "scene": {"name": "lookup", "caption": "the page offers Jump back in", "items": ["lens:<id>:last"], "props": [{"prop": "database", "label": "localStorage"}]}}]}, {"title": "A reader selects text and asks Claude", "trigger": "serve.py is running. You open the link it printed, `http://127.0.0.1:4174/<lesson>.html#k=KEY`, select a sentence and press A.", "steps": [{"node": "store", "title": "Keep the key, hide the key", "simple": "The link carries a secret key after the `#`. The page saves it in browser memory and removes it from the address bar.", "deep": "serve.py creates the key once and keeps it in a private file (scripts/serve.py:46-51). The page reads `k=` from `location.hash`, saves it as `lens:key` and rewrites the address bar without it (assets/themes/zine.html:1168). If storage throws, the key stays in memory for this load only (assets/themes/zine.html:1169).", "confidence": "evidenced", "state": [{"name": "lens:key", "value": "\"Qm3x...(32 chars)\"", "changed": true}, {"name": "location.hash", "value": "\"\"", "changed": true}], "scene": {"name": "store", "caption": "the #fragment key moves to lens:key", "items": ["k=KEY"], "props": [{"prop": "database", "label": "lens:key"}]}}, {"node": "theme", "title": "Selection becomes a question", "simple": "When you select text, the page records the words and where you were reading, like stop 3 or the Invariants section. Pressing A or the pop-up opens the panel.", "deep": "`selInfo()` keeps the trimmed text (at least 2 characters, cut at 1,500; assets/themes/zine.html:1200), but only from inside the main article. `whereOf()` turns the spot into words such as `stop 3` or `the \"Invariants\" section`. If the helper was not found (a plain file), the same gesture copies a ready-made question to the clipboard instead (assets/themes/zine.html:1218).", "confidence": "evidenced", "state": [{"name": "quote", "value": "\"A watcher thread peeks at the connection\"", "changed": true}, {"name": "where", "value": "\"the Invariants section\"", "changed": true}], "scene": {"name": "carry", "caption": "selected words plus where you were", "items": ["quote + where"], "props": [{"prop": "browser", "label": "article"}, {"prop": "envelope", "label": "ask panel"}]}}, {"node": "theme", "title": "Send the question", "simple": "The page sends the question to the helper and shows an empty answer that fills as text arrives. A tab can run one question at a time.", "deep": "`send()` refuses to start while one is running (assets/themes/zine.html:1240). It POSTs to the relative URL `/__lens/ask`, so only the helper that served the page can answer, with `Content-Type: application/json` and the `X-Lens-Key` header, and passes an AbortController signal so Stop can cancel it (assets/themes/zine.html:1253). The first question carries no session; a follow-up sends the saved one.", "confidence": "evidenced", "state": [{"name": "ASK.busy", "value": "AbortController", "changed": true}, {"name": "ASK.session", "value": "null (first question)"}], "scene": {"name": "handoff", "caption": "send() posts with the key, then waits", "items": ["POST /__lens/ask"], "props": [{"prop": "browser", "label": "theme page"}, {"prop": "server", "label": "serve.py"}]}}, {"node": "helper", "title": "Two gates: origin, then key", "simple": "The helper first checks that the request really comes from its own page. Only then does it compare the key. After that it validates every field.", "deep": "`_same_origin()` (scripts/serve.py:105-110) requires the Host header and any Origin header to be 127.0.0.1 or localhost on this server's port. That blocks other sites and DNS rebinding. Next the key is compared in constant time (scripts/serve.py:142). The session id must look like a UUID (scripts/serve.py:157), so a crafted value can never be read by claude as a command line flag.", "confidence": "evidenced", "code": {"file": "scripts/serve.py", "start": 137, "lang": "python", "src": "    def do_POST(self):\n        if not self._same_origin():\n            return self._send(403, {\"error\": \"forbidden\"})\n        if self.path != \"/__lens/ask\":\n            return self._send(404, {\"error\": \"not found\"})\n        if not secrets.compare_digest(self.headers.get(\"X-Lens-Key\") or \"\", self.server.cfg[\"key\"]):\n            return self._send(403, {\"error\": \"This tab has no key for the lens helper. Reopen the lesson from the link serve.py printed.\"})\n        if not (self.headers.get(\"Content-Type\") or \"\").startswith(\"application/json\"):\n            return self._send(415, {\"error\": \"send JSON\"})\n        try:\n            req = json.loads(self.rfile.read(min(int(self.headers.get(\"Content-Length\") or 0), 200_000)))\n        except ValueError:\n            return self._send(400, {\"error\": \"bad JSON\"})\n        if not isinstance(req, dict) or not all(isinstance(req.get(k) or \"\", str) for k in (\"q\", \"model\", \"session\", \"lesson\", \"quote\", \"where\")):\n            return self._send(400, {\"error\": \"bad request\"})\n        model, session = req.get(\"model\") or self.server.cfg[\"model\"], req.get(\"session\")\n        if model not in MODELS:\n            return self._send(400, {\"error\": f\"model must be one of {', '.join(MODELS)}\"})\n        if not (req.get(\"q\") or \"\").strip():\n            return self._send(400, {\"error\": \"empty question\"})\n        if session and not re.fullmatch(r\"[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\", session):\n            return self._send(400, {\"error\": \"bad session id\"})", "highlight": [138, 142, 157], "notes": {"138": "Host and Origin must be this server's own address. This runs before the key is even looked at.", "142": "Constant-time comparison of the X-Lens-Key header.", "157": "Only a UUID-shaped session id is accepted."}}, "predict": {"q": "A web page on another site posts to http://127.0.0.1:4174/__lens/ask with a correct copy of your key. What does the helper answer?", "options": ["403: the Origin is not this server", "200: a correct key is enough", "415: the body is not JSON"], "answer": 0, "why": "The origin check runs first (scripts/serve.py:138). The browser attaches the other site's Origin, which is not in the allowed set, so the key is never compared. A leaked key alone is not enough from another site."}, "state": [{"name": "Host", "value": "\"127.0.0.1:4174\""}, {"name": "X-Lens-Key", "value": "equals the token file", "changed": true}, {"name": "model", "value": "\"haiku\""}], "scene": {"name": "gate", "caption": "Origin is checked first, then the key", "items": ["X-Lens-Key", "foreign Origin"], "props": [{"prop": "server", "label": "serve.py"}]}}, {"node": "helper", "title": "Start claude, read-only", "simple": "The helper starts `claude -p` in the explained repo. The flags give it three read tools and switch off settings, hooks and memory. Your question goes in on stdin.", "deep": "`claude_cmd()` lists the flags (scripts/serve.py:57-66). `build_prompt()` (scripts/serve.py:35) joins the where line, the selected quote in triple quotes and the question. Popen gets `cwd=repo`, stdout piped, stderr to a temp file and `start_new_session=True`, so the whole process tree shares one group (scripts/serve.py:177).", "confidence": "evidenced", "code": {"file": "scripts/serve.py", "start": 57, "lang": "python", "src": "def claude_cmd(model, session, system):\n    cmd = [os.environ.get(\"LENS_CLAUDE\") or shutil.which(\"claude\") or \"claude\", \"-p\", \"--model\", model,\n           # no settings, hooks or MCP from the explained repo (it may be untrusted); no auto-memory, so\n           # answers come from the code, not from your private session notes\n           \"--tools\", \"Read,Grep,Glob\", \"--setting-sources\", \"\", \"--strict-mcp-config\",\n           \"--settings\", '{\"autoMemoryEnabled\": false, \"disableAllHooks\": true}',\n           \"--system-prompt\", system, \"--output-format\", \"stream-json\", \"--verbose\", \"--include-partial-messages\"]\n    if session:\n        cmd += [\"--resume\", session]\n    return cmd", "highlight": [61, 62, 65], "notes": {"61": "Three read tools. No Bash, no Edit, no Write.", "62": "No hooks and no auto-memory, so answers come from the code.", "65": "A follow-up continues the same Claude session."}}, "state": [{"name": "cmd", "value": "claude -p --model haiku --tools Read,Grep,Glob ...", "changed": true}, {"name": "cwd", "value": "the explained repo", "changed": true}], "scene": {"name": "handoff", "caption": "Popen starts claude -p with three read tools", "items": ["prompt on stdin"], "props": [{"prop": "server", "label": "serve.py"}, {"prop": "terminal", "label": "claude -p"}]}}, {"node": "claude", "title": "Claude reads the code and streams", "simple": "Claude searches and reads the real files to answer, and its words arrive in small pieces. Each file it opens is reported so the panel can say Reading and the file name.", "deep": "The system prompt (TUTOR, scripts/serve.py:26) tells it to answer first, read code instead of guessing, cite path:line, say plainly if the lesson is wrong, and never offer edits. That prompt is the soft layer. The hard layer is the tool list: with only Read, Grep and Glob, Claude has nothing to edit with, whatever it is asked. Partial messages are on, so text arrives as deltas.", "confidence": "evidenced", "state": [{"name": "tools", "value": "Read, Grep, Glob"}, {"name": "output", "value": "stream-json, one event per line", "changed": true}], "scene": {"name": "wait", "caption": "claude reads files, then streams text", "items": ["text deltas"], "props": [{"prop": "terminal", "label": "claude -p"}]}}, {"node": "helper", "title": "Turn the stream into small events", "simple": "The helper converts Claude's detailed stream into five simple event types, one per line. The session id goes out last, once the turn is saved.", "deep": "`events()` (scripts/serve.py:69) yields `text` for each text delta, `tool` for each tool_use block, and from the final `result` an `error` if it failed and the `session`. `emit()` writes one JSON line and flushes it. If claude exits non-zero without having reported an error, the helper adds one (the last stderr line, or the time-limit message), and every stream ends with `done`.", "confidence": "evidenced", "predict": {"q": "Why does the helper send the session id only after Claude has finished the turn, not at the start?", "options": ["So the page can show the id sooner", "So resuming a stopped turn cannot fail", "So the id is never stored on disk"], "answer": 1, "why": "The comment at scripts/serve.py:94 says it: only once the turn is saved. If you press Stop, no id was sent, so the next question does not try to `--resume` a turn that never finished."}, "state": [{"name": "events, in order", "value": "text, tool, text, session, done", "changed": true}], "scene": {"name": "transform", "caption": "the stream shrinks to five event types", "items": ["stream-json", "NDJSON events"], "props": [{"prop": "process", "label": "events()"}]}}, {"node": "theme", "title": "Draw the answer, keep the thread", "simple": "The page reads the events line by line and draws the answer as it grows. It remembers the session id, so your next question continues the same chat.", "deep": "The loop splits the response on newlines and handles each event (assets/themes/zine.html:1263). The whole answer text is re-rendered on every chunk (assets/themes/zine.html:1264). A stream that ends without `done` shows \"The answer was cut off\" (assets/themes/zine.html:1271). The session lives only in the page object `ASK.session`, not in localStorage, so reloading starts a fresh chat; the model choice, by contrast, is saved.", "confidence": "evidenced", "state": [{"name": "ASK.session", "value": "\"11111111-2222-3333-4444-555555555555\"", "changed": true}, {"name": "text", "value": "the whole answer so far", "changed": true}], "scene": {"name": "watch", "caption": "the answer re-renders on every chunk", "items": ["text, tool, done"], "props": [{"prop": "browser", "label": "answer panel"}]}}]}, {"title": "A reader presses Stop mid-answer", "trigger": "Claude has been silent for 40 seconds, reading files, and you press Stop or close the tab.", "steps": [{"node": "theme", "title": "Cancel the request", "simple": "Stop cancels the request in the browser. The panel says Stopped. Closing the tab does the same thing.", "deep": "The form handler calls `ASK.busy.abort()` while a question is running (assets/themes/zine.html:1278). The fetch rejects with an AbortError, which is shown as Stopped (assets/themes/zine.html:1274). The browser closes its end of the connection.", "confidence": "evidenced", "scene": {"name": "wall", "caption": "abort() hangs up on the helper", "items": ["abort()"], "props": [{"prop": "server", "label": "serve.py"}]}}, {"node": "helper", "title": "Notice the hang-up", "simple": "Claude is quiet, so the helper has nothing to write and would never find out. A watcher thread peeks at the connection twice a second instead.", "deep": "`watch()` loops while claude lives (scripts/serve.py:193). `select` waits at most half a second, then `recv(1, MSG_PEEK)` reads one byte without consuming it. An empty result means the client hung up, so it calls `stop()`. A test closes a socket while a fake claude sleeps and checks that claude and its child both die (scripts/test-serve.py, disconnect).", "confidence": "evidenced", "code": {"file": "scripts/serve.py", "start": 193, "lang": "python", "src": "        def watch():  # the reader pressed Stop or closed the tab while claude was quiet (thinking, reading)\n            while proc.poll() is None:\n                if select.select([self.connection], [], [], 0.5)[0]:\n                    try:\n                        gone = self.connection.recv(1, socket.MSG_PEEK) == b\"\"\n                    except OSError:\n                        gone = True\n                    if gone:\n                        return stop()\n\n        threading.Thread(target=watch, daemon=True).start()", "highlight": [195, 197, 201], "notes": {"195": "Look at the connection every half second, even while claude says nothing.", "197": "Peek one byte without consuming it. Empty bytes means the browser hung up.", "201": "Kill claude and everything it started."}}, "scene": {"name": "watch", "caption": "watch() peeks one byte twice a second", "items": ["MSG_PEEK: b\"\""], "props": [{"prop": "network", "label": "connection"}]}}, {"node": "helper", "title": "Kill the whole process tree", "simple": "The helper kills Claude and everything Claude started, such as search tools. Claude was launched in its own process group, so one signal reaches all of them.", "deep": "`stop()` sends SIGKILL to the process group (scripts/serve.py:183, 185). The same function serves the time-limit timer (scripts/serve.py:190) and the broken-pipe handler. The `finally` block kills anything still alive and calls `proc.wait()` (scripts/serve.py:222), which reaps it so no zombie entry is left behind.", "confidence": "evidenced", "scene": {"name": "fire", "caption": "killpg ends claude and every tool it started", "items": ["child processes"], "props": [{"prop": "terminal", "label": "claude -p"}]}}, {"node": "claude", "title": "Nothing is left running", "simple": "Claude and its helpers are gone. The half answer is discarded. The session id was never sent, so the next question will not resume the stopped turn.", "deep": "The `session` event is yielded only after claude's final `result` (scripts/serve.py:94), which never came, so `ASK.session` is whatever it was before this question. A follow-up after Stop therefore resumes the last completed turn, or starts fresh if there was none.", "confidence": "evidenced", "state": [{"name": "claude + its children", "value": "dead and reaped", "changed": true}, {"name": "ASK.session", "value": "unchanged by this question"}], "scene": {"name": "handoff", "caption": "proc.wait() reaps it; no session id sent", "items": ["exit, reaped"], "props": [{"prop": "terminal", "label": "claude -p"}, {"prop": "server", "label": "serve.py"}]}}]}], "invariants": [{"rule": "A snippet shown in a lesson equals the real file at the stated lines, trailing spaces aside.", "evidence": "scripts/build.py:493-498, and only when --check-src is given", "node": "validator", "breaks": "The build exits with \"snippet does not match FILE at lines [...]\" and no page is written. Without --check-src nothing compares, and an invented snippet ships (see Weak spots).", "confidence": "evidenced", "scene": {"name": "lookup", "caption": "snippet = real file, only with --check-src", "items": ["snippet"], "props": [{"prop": "file", "label": "scripts/build.py"}]}}, {"rule": "Lesson text can never act as a template directive.", "evidence": "Includes are expanded in the theme before the lesson is inserted (scripts/build.py:529); title and lesson fill in one pass (scripts/build.py:508); a part may not contain `__TITLE__` or `__LESSON_JSON__` (scripts/build.py:42)", "node": "assembler", "breaks": "A lesson that quotes an include line would have a file pasted into it, or the build would stop on a missing part. scripts/test-build.py pins the order with cli_includes_before_placeholders and the one-pass fill with title_placeholder_cannot_inject_json.", "confidence": "evidenced", "scene": {"name": "wall", "caption": "a quoted include line stays plain text", "items": ["lens:include text"], "props": [{"prop": "package", "label": "theme parts"}]}}, {"rule": "Lesson text cannot end or hide the data script: `<\/` becomes `<\\/`; `\u003c!--` and `\u003cscript` lose their `<`.", "evidence": "scripts/build.py:503-506", "node": "assembler", "breaks": "Unescaped, a step that mentions a closing script tag cuts the JSON off mid-string: the page throws and draws nothing. With only `<\/` escaped, a step holding `\u003c!--` and later `\u003cscript` blanks the page with no error at all. I ran both in headless Chromium. scripts/test-build.py pins the second with comment_open_is_escaped_and_roundtrips.", "confidence": "evidenced", "scene": {"caption": "render() escapes <\/ in the lesson data", "draw": [{"op": "packet", "x": 4.0, "y": 1.6, "label": "<\/script>", "c": "red", "id": "raw"}, {"op": "packet", "x": 4.0, "y": 6.4, "label": "<\\/script>", "c": "blue", "id": "safe"}, {"op": "arrow", "from": "raw", "to": "safe", "bend": 0.2}, {"op": "text", "x": 7.8, "y": 1.6, "t": "render()", "c": "blue"}, {"op": "blot", "x": 7.6, "y": 4.0, "s": 0.9, "mood": "proud", "arms": [[4.4, 3.9], [9.2, 4.6]]}, {"op": "prop", "name": "browser", "x": 13.6, "y": 5.8, "size": 2.0, "label": "page draws", "id": "pg"}, {"op": "arrow", "from": "safe", "to": "pg", "c": "blue", "bend": 0.3}]}}, {"rule": "Only a page served from the helper's own address, holding the key, can ask a question.", "evidence": "Host and Origin must be 127.0.0.1 or localhost on the server port (scripts/serve.py:105-110), then X-Lens-Key must match (scripts/serve.py:142)", "node": "helper", "breaks": "Any website open in your browser could post questions and make your machine run claude in your repo (a cross-site or DNS-rebinding attack). scripts/test-serve.py has one test per rejection.", "confidence": "evidenced", "scene": {"caption": "own Host, then X-Lens-Key; else 403", "draw": [{"op": "packet", "x": 2.4, "y": 3.2, "label": "other site", "c": "red", "tilt": -0.1, "id": "bad"}, {"op": "packet", "x": 2.4, "y": 5.8, "label": "127.0.0.1", "c": "blue", "id": "ok"}, {"op": "gate", "x": 7.6, "y": 7.6, "h": 3.4, "len": 2.6}, {"op": "text", "x": 2.6, "y": 8.4, "t": "403", "c": "red", "size": "l"}, {"op": "blot", "x": 10.2, "y": 5.6, "s": 0.9, "mood": "proud", "arms": [[8.6, 4.8], [10.1, 3.1]]}, {"op": "prop", "name": "key", "x": 10.0, "y": 2.2, "size": 1.6, "id": "key"}, {"op": "text", "x": 12.8, "y": 2.3, "t": "X-Lens-Key", "c": "blue"}, {"op": "prop", "name": "server", "x": 14.2, "y": 5.4, "size": 2.2, "label": "serve.py", "id": "sv"}]}}, {"rule": "claude runs with only Read, Grep and Glob, and without the explained repo's settings, hooks, MCP servers or memory.", "evidence": "scripts/serve.py:57-66", "node": "helper", "breaks": "A repo you are reading may be untrusted: its own hooks could run code while you read a lesson, or a stray edit tool could change files. The comment at scripts/serve.py:59 gives the same reason.", "confidence": "evidenced", "scene": {"caption": "Read, Grep, Glob only: no edit tool", "draw": [{"op": "packet", "x": 2.2, "y": 1.7, "label": "Read", "c": "blue", "id": "t1"}, {"op": "packet", "x": 2.2, "y": 3.3, "label": "Grep", "c": "blue", "id": "t2"}, {"op": "packet", "x": 2.2, "y": 4.9, "label": "Glob", "c": "blue", "id": "t3"}, {"op": "prop", "name": "terminal", "x": 8.4, "y": 3.4, "size": 2.4, "label": "claude -p", "id": "cl"}, {"op": "arrow", "from": "t1", "to": "cl", "c": "blue", "bend": 0.15}, {"op": "arrow", "from": "t2", "to": "cl", "c": "blue"}, {"op": "arrow", "from": "t3", "to": "cl", "c": "blue", "bend": -0.15}, {"op": "wall", "x": 9.8, "y": 5.8, "w": 0.9, "h": 2.8}, {"op": "packet", "x": 13.0, "y": 6.2, "label": "Edit", "c": "red", "id": "e1"}, {"op": "packet", "x": 13.0, "y": 7.6, "label": "Write, Bash", "c": "red", "id": "e2"}, {"op": "blot", "x": 6.4, "y": 6.9, "s": 0.7, "mood": "proud", "arms": [[5.6, 5.8], [9.7, 6.6]]}]}}], "pressure": [{"title": "Every lesson carries its own copy of the theme", "node": "assembler", "limit": "About 108 KB of theme per lesson (zine.html), 111 KB for the jw example. The sketch theme is 113 KB and splices in the icon library (parts/props.js, 17 KB) and the Blot library (parts/scenes.js, 67 KB) on top, so its pages are larger still.", "signal": "The .lens/ folder grows by roughly 100 KB per lesson.", "mitigation": "Nothing is needed at dozens of lessons. Past that, a shared theme file would shrink pages but give up the one-file property.", "severity": "low", "confidence": "inferred", "scene": {"name": "store", "caption": "every lesson file repeats the whole theme", "items": ["zine.html 108 KB"], "props": [{"prop": "folder", "label": ".lens/ folder"}]}}, {"title": "The map is a fixed grid of fixed-size boxes", "node": "theme", "limit": "4 to 10 nodes read well; the build warns outside 2 to 14 (scripts/build.py:338). Edges are single curves between box sides, so the theme never routes around a box.", "signal": "A build warning, or an edge visibly running through a box on the map.", "mitigation": "Split into an overview lesson plus component lessons (SKILL.md principle 6), or set `col` and `row` by hand until the lines are clear.", "severity": "medium", "confidence": "evidenced", "scene": {"caption": "a fixed grid: build warns outside 2 to 14", "draw": [{"op": "box", "x": 1.0, "y": 1.2, "w": 2.6, "h": 1.3, "label": "writer"}, {"op": "box", "x": 4.6, "y": 1.2, "w": 2.6, "h": 1.3, "label": "source"}, {"op": "box", "x": 8.2, "y": 1.2, "w": 2.6, "h": 1.3, "label": "validator", "id": "mid"}, {"op": "box", "x": 1.0, "y": 5.4, "w": 2.6, "h": 1.3, "label": "assembler", "id": "a"}, {"op": "box", "x": 4.6, "y": 5.4, "w": 2.6, "h": 1.3, "label": "theme"}, {"op": "box", "x": 8.2, "y": 5.4, "w": 2.6, "h": 1.3, "label": "helper", "id": "b"}, {"op": "arrow", "from": [3.7, 5.62], "to": [8.1, 5.62], "c": "red", "bend": 0}, {"op": "text", "x": 6.0, "y": 7.8, "t": "the edge runs through a box", "c": "red"}, {"op": "blot", "x": 13.4, "y": 5.2, "s": 0.85, "mood": "worried", "arms": [[12.2, 4.6], [14.6, 4.4]]}, {"op": "text", "x": 13.4, "y": 8.2, "t": "warns outside 2 to 14", "c": "blue", "anchor": "middle"}]}}, {"title": "One claude process per question, no global cap", "node": "helper", "limit": "Each tab runs one question at a time (assets/themes/zine.html:1240); serve.py itself has no cap (no semaphore or pool found), only the 300-second time limit (scripts/serve.py:24).", "signal": "Several `claude -p` processes in `ps`, or Claude usage-limit messages arriving as red error lines in the panel.", "mitigation": "Lower LENS_ASK_TIMEOUT. A small semaphore around the ask handler would cap concurrency; it is not built.", "severity": "low", "confidence": "inferred", "scene": {"caption": "one claude -p per question, no cap", "draw": [{"op": "packet", "x": 2.0, "y": 4.4, "label": "question", "id": "q"}, {"op": "prop", "name": "server", "x": 6.8, "y": 4.4, "size": 2.4, "label": "serve.py", "id": "sv"}, {"op": "arrow", "from": "q", "to": "sv"}, {"op": "prop", "name": "terminal", "x": 13.8, "y": 1.6, "size": 1.6, "label": "claude -p", "id": "c1"}, {"op": "prop", "name": "terminal", "x": 13.8, "y": 4.4, "size": 1.6, "label": "claude -p", "id": "c2"}, {"op": "prop", "name": "terminal", "x": 13.8, "y": 7.2, "size": 1.6, "label": "claude -p", "id": "c3"}, {"op": "arrow", "from": "sv", "to": "c1", "bend": -0.2}, {"op": "arrow", "from": "sv", "to": "c2"}, {"op": "arrow", "from": "sv", "to": "c3", "bend": 0.2}, {"op": "text", "x": 10.8, "y": 7.9, "t": "no cap", "c": "red", "size": "l", "rot": -6}, {"op": "blot", "x": 3.2, "y": 7.0, "s": 0.7, "mood": "worried", "arms": [[2.5, 5.9], [3.9, 5.9]]}]}}], "whatifs": [{"title": "Open the file without the helper", "change": "You double-click the .html, or serve.py is not running.", "outcome": "The page only looks for the helper over http, so asking stays off. The Ask buttons become Copy question and put a ready-made question on the clipboard to paste into Claude yourself (assets/themes/zine.html:1218). The map, flows, quiz and progress all still work. Progress is stored per origin, so the file copy and the http://127.0.0.1 copy keep separate progress (tried in headless Chromium: a stop saved on the file page was absent at http://127.0.0.1).", "lesson": "The helper is an optional layer. A lesson page has to be useful alone.", "node": "helper", "affects": ["theme", "store"], "confidence": "evidenced", "scene": {"caption": "no helper: Ask becomes Copy question", "draw": [{"op": "prop", "name": "browser", "x": 2.4, "y": 2.2, "size": 2.2, "label": "lesson page", "id": "pg"}, {"op": "prop", "name": "server", "x": 13.6, "y": 1.8, "size": 2.2, "label": "serve.py", "id": "sv"}, {"op": "line", "pts": [[12.4, 0.6000000000000001], [14.799999999999999, 3.0]], "c": "red", "w": 3}, {"op": "line", "pts": [[14.799999999999999, 0.6000000000000001], [12.4, 3.0]], "c": "red", "w": 3}, {"op": "arrow", "from": "pg", "to": "sv", "c": "red", "dash": true, "label": "POST /__lens/ask"}, {"op": "box", "x": 5.8, "y": 4.9, "w": 3.8, "h": 1.4, "label": "Copy question", "id": "cq"}, {"op": "arrow", "from": "pg", "to": "cq", "c": "blue", "bend": 0.3}, {"op": "prop", "name": "terminal", "x": 14.0, "y": 6.0, "size": 2.0, "label": "claude", "id": "cl"}, {"op": "blot", "x": 11.4, "y": 5.6, "s": 0.85, "mood": "happy", "arms": [[10.0, 5.6], [12.8, 6.0]]}]}}, {"title": "Claude goes quiet for five minutes", "change": "claude hangs on a slow tool or a bad connection and prints nothing.", "outcome": "The timer fires after 300 seconds (scripts/serve.py:190), kills the process group, and the stream gets one error line, \"No answer within the 300-second limit, so it was stopped.\", then done. The panel shows it in red, the thread is freed, and the next question works. scripts/test-serve.py runs this with a 2-second limit.", "lesson": "Every child process needs its own deadline, not just the request that started it.", "node": "claude", "affects": ["helper", "theme"], "confidence": "evidenced", "scene": {"caption": "300 s of silence, then claude is killed", "draw": [{"op": "clock", "x": 8.0, "y": 2.4, "s": 1.4, "label": "300 s", "id": "clk"}, {"op": "prop", "name": "terminal", "x": 2.6, "y": 6.0, "size": 2.0, "label": "claude -p", "id": "cl"}, {"op": "text", "x": 2.6, "y": 3.7, "t": "z z z", "c": "blue", "size": "l", "rot": -8}, {"op": "arrow", "from": "clk", "to": "cl", "c": "red", "bend": 0.3, "label": "killpg"}, {"op": "blot", "x": 12.8, "y": 5.4, "s": 0.9, "mood": "happy", "arms": [[11.4, 4.6], [14.2, 4.4]]}, {"op": "text", "x": 12.6, "y": 8.3, "t": "No answer within the 300-second limit", "c": "red"}]}}, {"title": "The browser blocks localStorage", "change": "A private window, a cleared profile or a locked-down browser makes storage throw.", "outcome": "Reads fall back to defaults and writes are swallowed (assets/themes/zine.html:557), so the lesson works but forgets Plain or Deep, your stop and your quiz. The ask key is kept in memory for that one load (assets/themes/zine.html:1169), so asking works until you reload. After a reload the key is gone and the helper answers 403 with \"Reopen the lesson from the link serve.py printed\".", "lesson": "Treat persistence as a bonus, never as a requirement for the page to work.", "node": "store", "affects": ["theme", "helper"], "confidence": "evidenced", "scene": {"caption": "storage blocked: progress is forgotten", "draw": [{"op": "prop", "name": "database", "x": 8.0, "y": 2.0, "size": 2.4, "label": "localStorage", "id": "ls"}, {"op": "prop", "name": "lock", "x": 9.4, "y": 2.7, "size": 1.0}, {"op": "prop", "name": "browser", "x": 2.4, "y": 6.2, "size": 2.0, "label": "lesson page", "id": "pg"}, {"op": "arrow", "from": "pg", "to": "ls", "c": "red", "dash": true, "bend": -0.2, "label": "write swallowed"}, {"op": "packet", "x": 11.0, "y": 5.0, "label": "ask key", "c": "blue", "id": "key"}, {"op": "blot", "x": 13.4, "y": 5.8, "s": 0.9, "mood": "worried", "arms": [[12.3, 5.2], [14.6, 5.2]]}, {"op": "text", "x": 11.8, "y": 8.3, "t": "kept in memory until reload", "c": "blue"}]}}, {"title": "A lesson names an icon the library does not have", "change": "A node says `\"prop\": \"jetpack\"`, or a scene lists a prop with that name, but props.js has no such icon.", "outcome": "The build still succeeds: check_prop() prints `prop 'jetpack' is not in the prop library; a generic box is drawn` (scripts/build.py:78) and exits 0. In the sketch page the library falls back to a plain rounded box with a handle, and a node with the unknown prop gets that box in its context plate. The label is still drawn. I built a two-node lesson with `jetpack` to see the warning; zine ignores `prop`, so that theme shows nothing different.", "lesson": "A soft fallback keeps the page up, but it only helps if someone reads the build warnings.", "node": "validator", "affects": ["theme"], "confidence": "evidenced", "scene": {"caption": "unknown prop: a plain box is drawn", "draw": [{"op": "packet", "x": 2.4, "y": 1.6, "label": "jetpack", "c": "red", "tilt": -0.08, "id": "jp"}, {"op": "cabinet", "x": 3.4, "y": 7.4, "s": 0.8, "label": "props.js", "id": "ps"}, {"op": "arrow", "from": "jp", "to": "ps", "dash": true, "label": "not found"}, {"op": "blot", "x": 8.2, "y": 5.2, "s": 0.9, "mood": "worried", "look": [-0.3, 0.1], "arms": [[7.0, 4.4], [9.8, 4.0]]}, {"op": "magnifier", "x": 6.2, "y": 4.2, "s": 0.8}, {"op": "box", "x": 11.6, "y": 2.6, "w": 3.2, "h": 1.6, "label": "jetpack", "id": "gb"}, {"op": "text", "x": 13.2, "y": 5.4, "t": "a generic box", "c": "blue"}, {"op": "text", "x": 13.2, "y": 6.2, "t": "build still ok", "c": "blue"}]}}], "decisions": [{"title": "Lessons are data, not model-written HTML", "chosen": "Claude writes a JSON file. Fixed theme files turn it into the page.", "simple": "A page the model writes could look different every time and be broken in ways nobody checks. Data can be checked before anything is drawn.", "deep": "SKILL.md says it outright: produce lesson data, the template does the rest. That one split is what lets build.py validate (scripts/build.py:324), lets two themes render the same lesson, and let a lesson be rebuilt in a new theme without touching its content. The reasons here are my reading of the design, not stated in the repo.", "context": "A model is strong on facts and prose and weak on hundreds of lines of interaction code. Readers want the same keys and behaviour in every lesson. The same lesson should work in more than one look and teach in more than one mode.", "consequences": "Every new capability needs three edits: a schema field, validator rules and a renderer change in every theme. That is how modes, scenes, invariants and pressure points were just added. A lesson cannot do anything the schema lacks. In return: checks at build time, swappable themes and old lessons that keep working.", "alternatives": [{"name": "The model writes the whole HTML page", "tradeoff": "Total freedom, but each page is large, unchecked and different, and a bug fix means regenerating every lesson."}, {"name": "Markdown plus a static site generator", "tradeoff": "Easy to write and read, but there is no structure to validate and nothing to step through: no flows, state or guess gates."}], "confidence": "inferred", "scene": {"caption": "Claude writes lesson.json; themes draw", "draw": [{"op": "prop", "name": "model", "x": 2.2, "y": 4.4, "size": 2.2, "label": "Claude", "id": "cl"}, {"op": "prop", "name": "braces", "x": 7.2, "y": 4.4, "size": 2.0, "label": "lesson.json", "id": "js"}, {"op": "arrow", "from": "cl", "to": "js", "c": "blue"}, {"op": "prop", "name": "browser", "x": 13.4, "y": 1.9, "size": 1.8, "label": "zine", "id": "z"}, {"op": "prop", "name": "browser", "x": 13.4, "y": 6.4, "size": 1.8, "label": "sketch", "id": "s"}, {"op": "arrow", "from": "js", "to": "z", "c": "blue", "bend": -0.2}, {"op": "arrow", "from": "js", "to": "s", "c": "blue", "bend": 0.2}, {"op": "packet", "x": 4.8, "y": 1.2, "label": "model-made HTML", "c": "red"}, {"op": "text", "x": 4.8, "y": 2.1, "t": "not this", "c": "red"}, {"op": "blot", "x": 10.4, "y": 4.4, "s": 0.6, "mood": "proud", "arms": [[9.6, 3.4], [10.6, 5.2]]}]}}, {"title": "Themes are single files; shared code is spliced in at build time", "chosen": "One self-contained HTML file per theme. build.py replaces include lines with files from assets/themes/parts/ (scripts/build.py:34-45).", "simple": "Each theme is one file, so a lesson opens anywhere. When two themes need the same code, the build copies it in rather than the page loading it later.", "deep": "reference/themes.md describes a theme as one self-contained file and parts as the way themes share code, for example parts/props.js and parts/scenes.js. The splice is plain text replacement, which is why a part may not contain the two placeholders. Why this way is my reading: the page must work from a plain file with no neighbours.", "context": "Lessons should open from a file, be emailable and be publishable as one file. Two themes may want the same large mascot and icon libraries.", "consequences": "Every built page repeats the shared code (pressure point 1). A part is spliced as raw text, so it is not checked as part of any theme. A theme grows large: zine.html alone is 1309 lines.", "alternatives": [{"name": "Load shared scripts at runtime", "tradeoff": "Pages stay small, but a lesson then needs its neighbours to open and cannot travel as one file."}, {"name": "Copy the library into each theme", "tradeoff": "No build step needed, but the copies drift apart the first time one is fixed."}, {"name": "Use a bundler", "tradeoff": "Real modules, but it adds a dependency and a toolchain to a skill that is two Python files and some HTML."}], "confidence": "inferred", "scene": {"name": "handoff", "caption": "build.py splices parts/ into the theme", "items": ["scenes.js"], "props": [{"prop": "package", "label": "parts/"}, {"prop": "browser", "label": "sketch.html"}]}}, {"title": "Ask through the user's own `claude -p`, not an API key", "chosen": "serve.py starts the `claude` command for each question, under the reader's own login.", "simple": "Asking about a lesson uses the account you already have. There is no key to paste and no billing to set up in this tool.", "deep": "The docstring states it: questions run through your own Claude Code login, no API key, in the repo the lesson explains, with read-only tools (scripts/serve.py:6-8). Follow-ups use `--resume` with the session id the stream reports.", "context": "Answers should come from this repo's real code, which needs file-reading tools, and the tool should not hold secrets.", "consequences": "The helper parses Claude Code's stream-json by hand (scripts/serve.py:69-95), so a format change in the CLI can empty the answers (see Weak spots). Each question pays process start-up. Safety rests on getting the flags in scripts/serve.py:57-66 right, and the tests run a fake claude (scripts/testdata/fake-claude.py), not the real one.", "alternatives": [{"name": "Call the API with a stored key", "tradeoff": "Direct and fast, but it needs key storage, billing and your own tool loop to read files."}, {"name": "Only copy a question to the clipboard", "tradeoff": "Zero risk and zero setup, but manual; it is what the page falls back to without the helper."}], "confidence": "evidenced", "scene": {"caption": "claude -p under your login, no API key", "draw": [{"op": "prop", "name": "key", "x": 8.0, "y": 1.6, "size": 1.6, "label": "API key", "id": "ak"}, {"op": "line", "pts": [[7.0, 0.6000000000000001], [9.0, 2.6]], "c": "red", "w": 3}, {"op": "line", "pts": [[9.0, 0.6000000000000001], [7.0, 2.6]], "c": "red", "w": 3}, {"op": "prop", "name": "user", "x": 2.4, "y": 5.0, "size": 2.2, "label": "your login", "id": "u"}, {"op": "prop", "name": "terminal", "x": 13.4, "y": 5.0, "size": 2.2, "label": "claude -p", "id": "cl"}, {"op": "arrow", "from": "u", "to": "cl", "c": "blue", "label": "inherited", "bend": -0.2}, {"op": "blot", "x": 8.0, "y": 6.3, "s": 0.8, "mood": "happy", "arms": [[6.8, 5.6], [9.2, 5.6]]}]}}], "risks": [{"title": "The snippet check is opt-in", "where": "scripts/build.py:481-483", "what": "Run build.py without --check-src and a wrong or invented snippet builds fine. I tried it: a snippet reading `totally wrong` for scripts/build.py line 1 printed `ok:` and exited 0. The same lesson with --check-src failed with exit 1.", "fix": "Print a warning when a lesson contains snippets but --check-src was not given, or default the repo to the current folder.", "severity": "medium", "confidence": "evidenced", "scene": {"caption": "no --check-src: a wrong snippet passes", "draw": [{"op": "ground", "y": 7.9, "x1": 0.5, "x2": 15.5}, {"op": "box", "x": 1.0, "y": 2.0, "w": 3.6, "h": 1.5, "label": "totally wrong", "c": "red", "id": "bad"}, {"op": "machine", "x": 6.4, "y": 1.6, "w": 3.0, "h": 3.0, "label": "build.py", "id": "bp"}, {"op": "arrow", "from": "bad", "to": "bp", "dash": true}, {"op": "packet", "x": 13.4, "y": 3.4, "label": "ok: wrote", "c": "blue", "id": "ok"}, {"op": "arrow", "from": "bp", "to": "ok", "c": "blue"}, {"op": "blot", "x": 9.0, "y": 6.1, "s": 0.8, "mood": "blank", "look": [0.3, 0], "arms": [[7.8, 6.6], [10.4, 5.6]]}, {"op": "magnifier", "x": 6.4, "y": 6.9, "s": 0.7}, {"op": "text", "x": 12.8, "y": 7.2, "t": "--check-src not given", "c": "red", "anchor": "middle"}]}}, {"title": "Line numbers outside a snippet are never checked", "where": "scripts/build.py:340-356", "what": "With --check-src, build.py compares `code` snippets and nothing else. A node's `files` ranges and every file:line written in prose are never read. I built this lesson with a node `files` of scripts/build.py:9000-9999, a missing file scripts/nope.py:1-2 and a prose citation of scripts/build.py:9999: it printed `ok:`, no warning, exit 0. A wrong snippet in the same lesson exited 1. SKILL.md principle 1 warns about this, but nothing enforces it.", "fix": "Have --check-src confirm that each `files` entry names a real file and a range inside it, or at least print a warning that prose citations are unchecked. Until then, derive every number with ln(), as this lesson's generator does.", "severity": "medium", "confidence": "evidenced", "scene": {"name": "lookup", "caption": "file ranges and prose line numbers unread", "items": ["build.py:9999"], "props": [{"prop": "file", "label": "node files"}]}}, {"title": "The helper reads Claude Code output by hand", "where": "scripts/serve.py:69-95", "what": "`events()` picks fields out of stream-json and skips lines it cannot parse. If a CLI update renames them, answers would arrive empty and the page would say only \"No answer came back\" (assets/themes/zine.html:1272), not the cause. The tests use a fake claude that emits today's shape, so they cannot notice.", "fix": "Log unrecognised event types to stderr, and run one live check against the real CLI after updating it.", "severity": "medium", "confidence": "inferred", "scene": {"caption": "events() parses by hand; a rename breaks it", "draw": [{"op": "packet", "x": 3.4, "y": 0.9, "label": "text", "id": "e1"}, {"op": "packet", "x": 6.0, "y": 0.9, "label": "tool", "id": "e2"}, {"op": "packet", "x": 11.8, "y": 1.6, "label": "renamed", "c": "red", "tilt": 0.2, "id": "e3"}, {"op": "machine", "x": 4.8, "y": 3.5, "w": 3.6, "h": 2.3, "label": "events()", "id": "ev"}, {"op": "arrow", "from": "e1", "to": "ev", "bend": 0.2}, {"op": "arrow", "from": "e2", "to": "ev"}, {"op": "arrow", "from": "e3", "to": [13.8, 5.0], "c": "red", "bend": 0.4, "label": "skipped"}, {"op": "box", "x": 5.4, "y": 7.0, "w": 3.6, "h": 1.2, "label": "answer panel", "id": "ap"}, {"op": "arrow", "from": "ev", "to": "ap", "c": "blue", "dash": true}, {"op": "blot", "x": 1.8, "y": 5.2, "s": 0.8, "mood": "worried", "arms": [[3.0, 4.4], [0.9, 6.3]]}, {"op": "text", "x": 12.4, "y": 8.2, "t": "No answer came back", "c": "red", "anchor": "middle"}]}}, {"title": "build.py learns the icon names by regex over props.js", "where": "scripts/build.py:48-62", "what": "`props_in()` reads `names: [...]` and `alias: {...}` from props.js as text, so no JS runs (assets/themes/parts/props.js:15). I changed a scratch copy to `names: Object.keys(ICONS)`: `camera`, a real icon, drew a false unknown-prop warning. I also emptied `alias`: then `jetpack` built with no warning at all, because an empty set switches the check off. The comment in props.js asks editors to keep both as plain literals, and nothing tests that.", "fix": "Have the build print a warning when the prop library parses to no names, or load the names through node instead of a regex.", "severity": "low", "confidence": "evidenced", "scene": {"name": "watch", "caption": "unparsed names turn the prop warning off", "items": ["names: [...]"], "props": [{"prop": "braces", "label": "props.js"}]}}], "quiz": [{"q": "You rebuild a lesson without --check-src and one snippet was typed wrong. What happens?", "options": ["The build passes and ships the wrong snippet", "The build fails with a snippet mismatch error", "The build passes but warns about that snippet"], "answer": 0, "why": "The comparison sits inside `if repo and c.get(\"file\")` (scripts/build.py:483). With no repo, only the structure is checked, so the wrong snippet ships silently."}, {"q": "Why is every `<\/` in the lesson JSON rewritten to `<\\/` before it goes into the page?", "options": ["So the file is smaller to download", "So search engines skip the lesson text", "So text cannot end the data script early"], "answer": 2, "why": "The lesson sits inside a script element, which a browser ends at the first closing script tag. Rewriting `<\/` (scripts/build.py:503) makes that impossible, and JSON.parse reads `<\\/` as `<\/` again."}, {"q": "You fix a typo in one quiz question and rebuild with the same id. What do returning readers see?", "options": ["Everything is kept; answers match by position", "Their quiz answers reset; the last stop is kept", "The whole lesson restarts, including the stop"], "answer": 1, "why": "The quiz key includes a hash of the quiz text (assets/themes/zine.html:553), so changed text means a new key and empty answers. Last stop and Plain or Deep are keyed by lesson id only, so they survive."}, {"q": "What actually stops the ask helper from letting Claude edit your files?", "options": ["The tutor prompt says Claude cannot change anything", "The browser hides edit buttons in the panel", "The tool list contains only Read, Grep and Glob"], "answer": 2, "why": "The tool list on the command line (scripts/serve.py:61) is the hard limit: no edit tool exists in that run. The prompt is only a second, soft layer."}, {"q": "You close the tab while Claude is thinking and silent. What notices?", "options": ["The timer, five minutes later", "A watcher thread peeking at the socket", "The next write to the page fails"], "answer": 1, "why": "Claude is silent, so there is no write to fail and the timer is far away. `watch()` (scripts/serve.py:193) peeks at the connection twice a second and kills the process group when it sees the hang-up."}, {"q": "You open the sketch page of an architecture lesson and click a node that has no `scene`. What is drawn at the top of its note?", "options": ["Nothing: only nodes with a scene get a picture", "A context plate built from the node's edges and neighbours", "The scene of the node it is connected to"], "answer": 1, "why": "ctxPlate() runs when the node has no scene (assets/themes/sketch.html:942). It puts the node's own `prop` in the middle, up to two neighbours on each side, and each edge's `payload` on the arrows (assets/themes/sketch.html:655-663)."}], "glossary": [{"term": "NDJSON", "def": "Newline-delimited JSON: one complete JSON object per line, so a reader can act on each line as it arrives."}, {"term": "stream-json", "def": "Claude Code's output mode that prints one JSON event per line while the answer is being produced."}, {"term": "localStorage", "def": "Small key-value storage inside the browser, kept per origin, that survives closing the tab."}, {"term": "origin", "def": "Scheme, host and port of a page, such as http://127.0.0.1:4174. Browsers keep each origin storage and permissions separate."}, {"term": "DNS rebinding", "def": "A trick where a hostile site's name is made to point at 127.0.0.1 so the browser lets its page talk to local servers. A Host check blocks it."}, {"term": "process group", "def": "A set of related processes that one signal can reach together. Killing the group also kills helpers that claude started."}, {"term": "fragment", "def": "The part of a link after the #. Browsers keep it to themselves and never send it to the server."}]}</script>
+<script>
+(() => {
+const L = JSON.parse(document.getElementById('lesson').textContent);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nodes = L.nodes || [], edges = L.edges || [], traces = L.traces || [], EXPS = L.whatifs || [], QS = L.quiz || [];
+const DECS = L.decisions || [], RISKS = L.risks || [], GLOSS = L.glossary || [];
+const ARCH = L.mode === 'architecture', INVS = L.invariants || [], PRESS = L.pressure || [];
+const hasMeta = e => ARCH && !!(e.protocol || e.payload || e.guarantee || typeof e.sync === 'boolean');
+const IFACES = edges.map((e, i) => i).filter(i => hasMeta(edges[i])); // edges that carry a contract; only these are clickable and listed
+const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const KEY = 'lens:' + (L.id || L.title);
+const QKEY = 'quiz:' + hash(JSON.stringify(QS));
+const PKEY = 'answered:' + hash(JSON.stringify(traces.map(t => t.steps.map(s => s.predict || null))));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(KEY + ':' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(KEY + ':' + k, JSON.stringify(v)); } catch {} }
+};
+const S = {
+  depth: store.get('depth', 'simple'), trace: store.get('trace', 0), step: 0, last: store.get('last', null),
+  mode: 'route', node: null, origin: null, exp: null, edge: null, mark: null, ran: {},
+  answered: store.get(PKEY, {}), quiz: store.get(QKEY, {}), qi: 0, qorder: null, seen: {}
+};
+if (!traces[S.trace]) S.trace = 0;
+{ const th = store.get('theme', null); if (th) document.documentElement.dataset.theme = th; }
+const motionOK = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (motionOK) document.documentElement.classList.add('motion');
+
+// ---------- authored drawings ----------
+function mascot(mood = 'happy') {
+  const eyes = mood === 'think' ? '<circle cx="34" cy="38" r="3.4" fill="#1B1A17"/><circle cx="53" cy="36" r="3.4" fill="#1B1A17"/>'
+    : mood === 'oops' ? '<path d="M30 35l7 6M37 35l-7 6M49 33l7 6M56 33l-7 6" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>'
+    : '<circle cx="34" cy="40" r="3.4" fill="#1B1A17"/><circle cx="53" cy="38" r="3.4" fill="#1B1A17"/>';
+  const whites = mood === 'oops' ? '' : '<ellipse cx="33" cy="39" rx="7" ry="8" fill="#fff" stroke="#1B1A17" stroke-width="2"/><ellipse cx="52" cy="37" rx="7" ry="8" fill="#fff" stroke="#1B1A17" stroke-width="2"/>';
+  const mouth = { happy: '<path d="M33 53c5 6 14 6 19-1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    think: '<path d="M38 55c3-1 7-1 10 1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    oops: '<path d="M33 56c3-3 5 0 8-2s5 1 8-1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    worry: '<path d="M34 57c5-5 13-5 17 0" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/><path d="M26 27l11 4M58 26l-10 4" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>' }[mood] || '';
+  const extra = { think: '<path d="M80 14c0-6 9-6 9 0 0 4-5 4-5 9M84 28v1" fill="none" stroke="#E0458A" stroke-width="3" stroke-linecap="round"/>',
+    happy: '<path d="M84 16l3-7M90 24l7-3M86 32l6 2" stroke="#1FA898" stroke-width="3" stroke-linecap="round"/>',
+    oops: '<path d="M70 26c3 5 5 8 2 10s-6-1-4-5z" fill="#7CC8F0" stroke="#1B1A17" stroke-width="1.6"/>',
+    worry: '<path d="M80 18l4 9M88 15l1 8" stroke="#E0458A" stroke-width="3" stroke-linecap="round"/>' }[mood] || '';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M64 66l22 22" stroke="#1B1A17" stroke-width="11" stroke-linecap="round"/><path d="M64 66l22 22" stroke="#FFD84D" stroke-width="6" stroke-linecap="round"/>` +
+    `<circle cx="43" cy="44" r="31" fill="#D3F1EC" stroke="#1FA898" stroke-width="6"/><circle cx="43" cy="44" r="34.5" fill="none" stroke="#1B1A17" stroke-width="2.4"/>` +
+    `<path d="M24 28c4-7 11-11 18-11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>${whites}${eyes}${mouth}${extra}</svg>`;
+}
+const ICON = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.3l1.7 1.6M17.1 17.1l1.7 1.7M5.2 18.7l1.7-1.6M17.1 6.9l1.7-1.6"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.4 8.4 0 0 1 9.4 4a8.6 8.6 0 1 0 10.6 10.6z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8.5h9.5a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5H9a1.5 1.5 0 0 1-1.5-1.5V10A1.5 1.5 0 0 1 9 8.5z"/><path d="M15.8 8.4V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9.4A1.5 1.5 0 0 0 5 16h2.4"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.2s-6.6-6-6.6-11.1a6.6 6.6 0 0 1 13.2 0c0 5.1-6.6 11.1-6.6 11.1z"/><circle cx="12" cy="10" r="2.4"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6.3l11.6 11.4M17.8 6.1L6.2 17.9"/></svg>',
+  star: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M16 3.5v25M4.5 9.5l23 13M27.5 9.5l-23 13"/></svg>',
+  arrow: '<svg viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 18C17 19 9 15 5 6"/><path d="M2.5 11.5 4.6 4.8l6.6 2.3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M7 4.6v14.8l12-7.5z"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.6c2.6-1.6 12.4-1.9 15.4-.2 1.6 1 1.5 7.6.3 9-1.6 1.7-6.2 1.6-8.4 1.7L6.8 20l.6-3.9c-2.2-.3-3.4-.8-3.8-2.3-.6-2.3-.6-7.2.6-8.2z"/><path d="M8.6 10.6h.1M12 10.4h.1M15.4 10.6h.1"/></svg>'
+};
+// One button, two jobs: asks in the side panel when served by serve.py, copies a question when opened as a file.
+const askBtn = attr => `<button class="btn quiet" ${attr}><span class="if-ask">${ICON.chat} Ask Claude about this</span><span class="if-copy">${ICON.copy} Copy question for Claude</span></button>`;
+const ring = n => `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27" fill="var(--card)"/><path class="ring" d="M32 4.5c15.6-.4 27.9 11.6 27.6 27.3C59.3 47.7 47 59.8 31.5 59.6 16 59.4 4.3 47 4.6 31.4 4.9 16.6 16.8 5.4 30 5.2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span style="position:relative">${n}</span>`;
+
+// ---------- text helpers ----------
+const gloss = GLOSS.filter(g => g && typeof g.term === 'string' && g.term.trim()).sort((a, b) => b.term.length - a.term.length);
+const glossRe = gloss.length ? new RegExp('\\b(' + gloss.map(g => g.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi') : null;
+const glossDef = Object.fromEntries(gloss.map(g => [g.term.toLowerCase(), g.def]));
+function rich(t) { // glossary terms are matched on the raw text and each piece is escaped afterwards, so they can never match inside an entity
+  if (!t) return '';
+  return String(t).split(/(`[^`]+`)/).map(part => {
+    if (/^`[^`]+`$/.test(part)) return '<code>' + esc(part.slice(1, -1)) + '</code>';
+    if (!glossRe) return esc(part);
+    let out = '', last = 0, m; glossRe.lastIndex = 0;
+    while ((m = glossRe.exec(part))) { out += esc(part.slice(last, m.index)) + `<span class="term" tabindex="0" data-def="${esc(glossDef[m[0].toLowerCase()] || '')}">${esc(m[0])}</span>`; last = m.index + m[0].length; }
+    return out + esc(part.slice(last));
+  }).join('');
+}
+const paras = t => (t || '').split(/\n\n+/).map(p => `<p>${rich(p)}</p>`).join('');
+const pick = o => o ? (S.depth === 'deep' ? (o.deep || o.simple) : (o.simple || o.deep)) : '';
+const CONF = { evidenced: ['seen in code', 'Read directly in the code, docs or tests'], inferred: ['likely', 'A reasonable reading of the code, not stated anywhere'], uncertain: ['a guess', 'One of several possible explanations'] };
+const conf = c => CONF[c] ? `<span class="stamp ${c}" title="${CONF[c][1]}">${CONF[c][0]}</span>` : '';
+const nodeName = id => esc(nodeById[id]?.label || id);
+const nLabel = id => nodeById[id]?.label || id;
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+// ---------- code ----------
+const KW = new Set('if else elif for while return function def class const let var import from export async await try catch except finally raise throw new fn pub struct impl match case switch break continue in of do then fi done esac local echo type interface extends implements self this None null true false True False nil package func go defer yield with as not and or use mod static public private protected'.split(' '));
+function tint(line, lang) {
+  const hashc = /^(py|python|sh|bash|zsh|shell|rb|ruby|yaml|yml|toml|r|perl|make|makefile|dockerfile|conf)$/i.test(lang || '');
+  const re = hashc ? /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g
+                   : /(\/\/.*$|--\s.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    if (m[1]) out += `<span class="tk-c">${esc(m[1])}</span>`;
+    else if (m[2]) out += `<span class="tk-s">${esc(m[2])}</span>`;
+    else if (m[3]) out += `<span class="tk-n">${esc(m[3])}</span>`;
+    else out += KW.has(m[4]) ? `<span class="tk-k">${esc(m[4])}</span>` : esc(m[4]);
+    last = re.lastIndex;
+  }
+  return out + esc(line.slice(last));
+}
+function codeBlock(c) {
+  if (!c || !c.src) return '';
+  const start = parseInt(c.start, 10) || 1, hl = new Set((c.highlight || []).map(Number)), notes = c.notes || {};
+  const lines = c.src.replace(/\n$/, '').split('\n'), end = start + lines.length - 1;
+  const rows = lines.map((ln, i) => {
+    const no = start + i, note = notes[no] ?? notes[String(no)];
+    return `<div class="ln${hl.has(no) ? ' hl' : ''}"><span class="n">${no}</span><span class="t">${tint(ln, c.lang) || ' '}</span></div>` +
+      (note ? `<div class="nt">${ICON.arrow}<span>${rich(note)}</span></div>` : '');
+  }).join('');
+  return `<figure class="code"><figcaption><span class="file">${esc(c.file || '')}</span><span class="lines-n">${end > start ? `lines ${start}–${end}` : `line ${start}`}</span></figcaption><div class="rows">${rows}</div></figure>`;
+}
+
+// ---------- the sketched map ----------
+const zones = (L.layers && L.layers.length) ? L.layers : [{ id: '_', name: '' }];
+const grid = (() => {
+  const cols = zones.map(z => nodes.filter(n => (n.layer || '_') === z.id));
+  nodes.filter(n => !zones.some(z => z.id === (n.layer || '_'))).forEach(n => cols[cols.length - 1].push(n));
+  const g = {}; cols.forEach((col, ci) => col.forEach((n, ri) => { g[n.id] = { c: n.col ?? ci, r: n.row ?? ri }; }));
+  return g;
+})();
+const nCols = Math.max(1, ...Object.values(grid).map(p => p.c + 1)), nRows = Math.max(1, ...Object.values(grid).map(p => p.r + 1));
+let M = null; // current geometry
+const meas = document.createElement('canvas').getContext('2d');
+const tw = (t, font) => { meas.font = font; return meas.measureText(t).width; };
+function geometry(width) {
+  const lastCol = nCols - 1, sideW = Math.max(0, ...edges.filter(e => e.label && grid[e.from] && grid[e.to] && grid[e.from].c === grid[e.to].c && grid[e.from].c === lastCol).map(e => tw(e.label, '400 14px "Shantell Sans", cursive')));
+  const fan = Math.max(0, ...edges.map((e, i) => grid[e.from] && grid[e.to] && grid[e.from].c === lastCol && grid[e.to].c === lastCol ? slotOf[i].k * BEND_STEP * .75 : 0));
+  const PAD = 18, PR = (sideW ? Math.round(sideW + 72) : 58) + Math.round(fan), TOP = zones.some(z => z.name) ? 46 : 18, CG = Math.max(66, Math.min(92, width * .07));
+  const NW = Math.max(150, (width - PAD - PR - (nCols - 1) * CG) / nCols), NH = 112, RG = 44;
+  const pos = {}; for (const id in grid) pos[id] = { x: PAD + grid[id].c * (NW + CG), y: TOP + grid[id].r * (NH + RG), col: grid[id].c };
+  const W = PAD + PR + nCols * NW + (nCols - 1) * CG, H = TOP + nRows * NH + (nRows - 1) * RG + PAD + 4;
+  return { PAD, TOP, CG, NW, NH, W, H, pos };
+}
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const seedOf = s => parseInt(hash(String(s)), 36);
+const f1 = v => Math.round(v * 10) / 10;
+function wl(r, x1, y1, x2, y2, amp = 1.5) {
+  const j = () => (r() - .5) * 2 * amp, mx = (x1 + x2) / 2 + j() * 1.4, my = (y1 + y2) / 2 + j() * 1.4;
+  return `M${f1(x1 + j())},${f1(y1 + j())} Q${f1(mx)},${f1(my)} ${f1(x2 + j())},${f1(y2 + j())}`;
+}
+function roughRect(x, y, w, h, seed, passes = 2) {
+  const r = rng(seed); let d = '';
+  for (let p = 0; p < passes; p++) {
+    const o = 2 + r() * 2;
+    d += wl(r, x - o, y, x + w + o, y) + wl(r, x + w, y - o, x + w, y + h + o) + wl(r, x + w + o, y + h, x - o, y + h) + wl(r, x, y + h + o, x, y - o);
+  }
+  return d;
+}
+function softRect(x, y, w, h, seed) {
+  const r = rng(seed + 7), j = () => (r() - .5) * 3;
+  return `M${f1(x + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + h + j())} L${f1(x + j())},${f1(y + h + j())}Z`;
+}
+// edges between the same two nodes (either direction, or repeated) fan out so each has its own curve and its own hit area
+const slotOf = (() => { const groups = {}, out = edges.map(() => ({ k: 0, n: 1 }));
+  edges.forEach((e, i) => { (groups[[String(e.from), String(e.to)].sort().join('\n')] ||= []).push(i); });
+  Object.values(groups).forEach(g => g.forEach((i, k) => { out[i] = { k, n: g.length }; })); return out; })();
+const slotShift = ({ k, n }) => n < 2 ? 0 : (k - (n - 1) / 2) * Math.min(30, 80 / (n - 1));
+const BEND_STEP = 40;
+function curve(a, b, slot = { k: 0, n: 1 }) {
+  const A = M.pos[a], B = M.pos[b]; if (!A || !B) return null;
+  const { NW, NH } = M, sh = slotShift(slot);
+  if (A.col === B.col) {
+    const x = A.x + NW, y1 = A.y + NH / 2 + sh, y2 = B.y + NH / 2 + sh, bend = 34 + Math.abs(y2 - y1) * .16 + slot.k * BEND_STEP;
+    return { p: [x, y1, x + bend, y1, x + bend, y2, x, y2], mx: x + bend * .75 + 6, my: (y1 + y2) / 2 + 5, anchor: 'start' };
+  }
+  const fwd = B.x > A.x, x1 = fwd ? A.x + NW : A.x, x2 = fwd ? B.x : B.x + NW, y1 = A.y + NH / 2 + sh, y2 = B.y + NH / 2 + sh, dx = (x2 - x1) / 2;
+  // A fanned-out edge also moves up or down its node side (sh). On a steep curve that barely separates it, so its middle is bowed
+  // along the curve's normal (the same normal for both directions) until the middle sits sh away from where the single edge would.
+  const cy = B.y - A.y, len = Math.hypot(x2 - x1, cy) || 1; let nx = -cy / len, ny = (x2 - x1) / len; if (ny < 0 || (ny === 0 && nx < 0)) { nx = -nx; ny = -ny; }
+  const bow = sh * (1 - ny) / .75, ex = bow * nx, ey = bow * ny, p = [x1, y1, x1 + dx + ex, y1 + ey, x2 - dx + ex, y2 + ey, x2, y2];
+  const t = .5, u = 1 - t, bx = u*u*u*p[0] + 3*u*u*t*p[2] + 3*u*t*t*p[4] + t*t*t*p[6], by = u*u*u*p[1] + 3*u*u*t*p[3] + 3*u*t*t*p[5] + t*t*t*p[7];
+  return { p, mx: bx, my: by - 8, anchor: 'middle' };
+}
+const cubicD = p => `M${f1(p[0])},${f1(p[1])} C${f1(p[2])},${f1(p[3])} ${f1(p[4])},${f1(p[5])} ${f1(p[6])},${f1(p[7])}`;
+function roughCurve(p, seed) {
+  const r = rng(seed); let d = '';
+  for (let k = 0; k < 2; k++) { const j = a => (r() - .5) * 2 * a; d += cubicD([p[0] + j(.8), p[1] + j(.8), p[2] + j(3), p[3] + j(3), p[4] + j(3), p[5] + j(3), p[6] + j(.6), p[7] + j(.6)]) + ' '; }
+  return d;
+}
+function head(p, rev) {
+  const [ex, ey, cx, cy] = rev ? [p[0], p[1], p[2], p[3]] : [p[6], p[7], p[4], p[5]];
+  const a = Math.atan2(ey - cy, ex - cx), L1 = 13;
+  const pt = s => `${f1(ex - L1 * Math.cos(a + s))},${f1(ey - L1 * Math.sin(a + s))}`;
+  return `M${pt(.45)} L${f1(ex)},${f1(ey)} L${pt(-.45)}`;
+}
+const edgeTip = e => `${nLabel(e.from)} to ${nLabel(e.to)}${e.protocol ? ', ' + e.protocol : ''}${typeof e.sync === 'boolean' ? (e.sync ? ', sync' : ', async') : ''}`;
+const edgeBetween = (a, b) => { const f = edges.findIndex(e => e.from === a && e.to === b); return f >= 0 ? f : edges.findIndex(e => e.from === b && e.to === a); }; // index; the edge that runs the way the route goes wins
+const LBL = '700 18px "Atkinson Hyperlegible Next", system-ui, sans-serif', KND = '400 15px "Shantell Sans", cursive', ZN = '700 16px "Shantell Sans", cursive';
+function fit(t, max, font) { if (tw(t, font) <= max) return t; while (t.length > 1 && tw(t + '…', font) > max) t = t.slice(0, -1); return t.trimEnd() + '…'; }
+function wrapLabel(text, max, font = LBL, most = 2) {
+  const words = String(text).split(/\s+/), out = []; let cur = '';
+  words.forEach(w => { const next = (cur + ' ' + w).trim(); if (tw(next, font) > max && cur) { out.push(cur); cur = w; } else cur = next; });
+  if (cur) out.push(cur);
+  if (out.length > most) { out[most - 1] = out.slice(most - 1).join(' '); out.length = most; }
+  return out.map(l => fit(l, max, font));
+}
+let restoring = false;
+function drawMap() {
+  const svg = $('#map'); if (!svg) return;
+  const wrap = svg.parentElement, width = Math.max(900, wrap.clientWidth);
+  M = geometry(width);
+  const { NW, NH, W, H, pos, PAD, CG } = M;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H);
+  let s = `<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="9" height="9" style="fill:var(--teal-soft)"/><line x1="0" y1="0" x2="0" y2="9" style="stroke:var(--teal);stroke-width:3.2;opacity:.55"/></pattern>` +
+    `<pattern id="hatchP" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(-40)"><rect width="9" height="9" style="fill:var(--pink-soft)"/><line x1="0" y1="0" x2="0" y2="9" style="stroke:var(--pink);stroke-width:3;opacity:.6"/></pattern></defs>`;
+  zones.forEach((z, i) => { if (!z.name) return;
+    const x = PAD + i * (NW + CG) - 12;
+    s += `<g class="zone"><path d="${roughRect(x, 6, NW + 24, H - 12, seedOf('z' + z.id), 1)}"/><text x="${x + 12}" y="32">${esc(fit(z.name, NW, ZN))}</text></g>`; });
+  let labels = '';
+  edges.forEach((e, ei) => { const c = curve(e.from, e.to, slotOf[ei]); if (!c) return; const sd = seedOf(e.from + '>' + e.to), link = hasMeta(e);
+    s += `<g class="edge${ARCH && e.sync === false ? ' async' : ''}${link ? ' link' : ''}" data-ei="${ei}" data-from="${esc(e.from)}" data-to="${esc(e.to)}"${link ? ` tabindex="0" role="button" aria-label="${esc('Connection: ' + edgeTip(e))}"` : ''}><path class="wire" d="${roughCurve(c.p, sd)}"/><path class="head" d="${head(c.p)}"/>` +
+      (link ? `<path class="hitarea" d="${cubicD(c.p)}"/><title>${esc(edgeTip(e))}</title>` : '') + `</g>`;
+    if (e.label) labels += `<text class="elabel" data-from="${esc(e.from)}" data-to="${esc(e.to)}" x="${f1(c.mx)}" y="${f1(c.my)}" text-anchor="${c.anchor}">${esc(e.label)}</text>`; });
+  s += `<g id="routeLayer"></g>`;
+  const room = NW - 26;
+  nodes.forEach(n => { const p = pos[n.id]; if (!p) return; const sd = seedOf(n.id), lines = wrapLabel(n.label, room, LBL, 3);
+    const kinds = n.kind ? wrapLabel(n.kind, room, KND, lines.length > 2 ? 1 : 2) : [];
+    const ly = Math.round((NH - (lines.length * 23 + kinds.length * 20)) / 2) + 17;
+    s += `<g class="node" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}" transform="translate(${f1(p.x)},${f1(p.y)})">` +
+      `<path class="fill" d="${softRect(0, 0, NW, NH, sd)}"/><path class="hatch" d="${softRect(0, 0, NW, NH, sd)}"/><path class="stroke" d="${roughRect(0, 0, NW, NH, sd)}"/>` +
+      lines.map((t, i) => `<text class="lbl" x="14" y="${ly + i * 23}">${esc(t)}</text>`).join('') +
+      kinds.map((t, i) => `<text class="kind" x="14" y="${ly + lines.length * 23 + 3 + i * 20}">${esc(t)}</text>`).join('') + `<title>${esc(n.label)}${n.kind ? ' (' + esc(n.kind) + ')' : ''}</title></g>`; });
+  const had = svg.contains(document.activeElement) ? document.activeElement : null, keep = had && (had.dataset.ei != null ? `.edge[data-ei="${had.dataset.ei}"]` : had.dataset.id != null ? `.node[data-id="${CSS.escape(had.dataset.id)}"]` : null);
+  svg.innerHTML = s + `<g class="labels">${labels}</g>`;
+  if (keep) { restoring = true; $(keep, svg)?.focus({ preventScroll: true }); restoring = false; } // the redraw replaces every element, so give keyboard focus back to the same one (restoring: that focusin must not close a tooltip)
+  // nudge edge labels that land on top of each other
+  const placed = [];
+  $$('.elabel', svg).forEach(t => { let b = t.getBBox(), tries = 0;
+    while (tries++ < 6 && placed.some(q => b.x < q.x + q.width && q.x < b.x + b.width && b.y < q.y + q.height && q.y < b.y + b.height)) { t.setAttribute('y', +t.getAttribute('y') + 17); b = t.getBBox(); }
+    placed.push(b); });
+  $$('.node', svg).forEach(g => {
+    const go = () => openNode(g.dataset.id);
+    g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  $$('.edge.link', svg).forEach(g => {
+    const go = () => selectEdge(+g.dataset.ei);
+    g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  routeDrawn = -1; paintMap(false);
+}
+function dependents(id) {
+  const seen = new Set([id]), q = [id];
+  while (q.length) { const cur = q.shift(); edges.forEach(e => { if (e.to === cur && !seen.has(e.from)) { seen.add(e.from); q.push(e.from); } }); }
+  return seen;
+}
+let routeDrawn = -1;
+function paintMap(animate = true) {
+  if (!M) return;
+  const svg = $('#map'), steps = traces[S.trace]?.steps || [];
+  let hit = null, origin = null;
+  if (S.exp != null) { const w = EXPS[S.exp]; hit = new Set([...(w.affects || []), w.node].filter(Boolean)); origin = w.node; }
+  else if (S.mode === 'impact' && S.origin) { hit = dependents(S.origin); origin = S.origin; }
+  const upto = steps.slice(0, S.step + 1), visited = new Set(upto.map(s => s.node)), current = steps[S.step]?.node;
+  const layer = $('#routeLayer');
+  if (hit) { layer.innerHTML = ''; routeDrawn = -1; }
+  else if (S.step !== routeDrawn) {
+    let r = '';
+    for (let i = 1; i < steps.length; i++) { // the whole trip, faint, so the route is visible before you start
+      const a = steps[i - 1].node, b = steps[i].node; if (a === b) continue;
+      const ei = edgeBetween(a, b), e = edges[ei], c = e && curve(e.from, e.to, slotOf[ei]); if (c) r += `<path class="ghost" d="${cubicD(c.p)}"/>`;
+    }
+    for (let i = 1; i < upto.length; i++) {
+      const a = upto[i - 1].node, b = upto[i].node; if (a === b) continue;
+      const ei = edgeBetween(a, b), e = edges[ei], c = e && curve(e.from, e.to, slotOf[ei]); if (!c) continue;
+      const fresh = animate && motionOK && i > routeDrawn;
+      r += `<path class="route${fresh ? ' draw' : ''}" pathLength="1" d="${cubicD(e.from === a ? c.p : [c.p[6], c.p[7], c.p[4], c.p[5], c.p[2], c.p[3], c.p[0], c.p[1]])}"${fresh ? ` style="animation-delay:${Math.max(0, i - Math.max(1, routeDrawn + 1)) * .18}s"` : ''}/>`;
+    }
+    layer.innerHTML = r; routeDrawn = S.step;
+  }
+  $$('.node', svg).forEach(g => {
+    const id = g.dataset.id;
+    g.classList.toggle('active', !hit && id === current);
+    g.classList.toggle('onroute', !hit && visited.has(id));
+    g.classList.toggle('picked', !hit && id === S.node);
+    g.classList.toggle('hit', !!hit && hit.has(id) && id !== origin);
+    g.classList.toggle('origin', !!hit && id === origin);
+    g.classList.toggle('dim', !!hit && !hit.has(id) && id !== origin);
+    g.classList.toggle('marked', !hit && S.mark?.node === id);
+    g.classList.toggle('endpoint', !hit && S.edge != null && (edges[S.edge]?.from === id || edges[S.edge]?.to === id));
+  });
+  $$('.edge', svg).forEach(g => {
+    const on = !!hit && hit.has(g.dataset.from) && (hit.has(g.dataset.to) || g.dataset.to === origin);
+    g.classList.toggle('hit', on); g.classList.toggle('dimmed', !!hit && !on); g.classList.toggle('sel', !hit && S.edge === +g.dataset.ei);
+  });
+  $$('#s-interfaces tbody tr').forEach(tr => tr.classList.toggle('on', !hit && S.edge === +tr.dataset.ei));
+  $$('.elabel', svg).forEach(t => t.classList.toggle('dimmed', !!hit && !(hit.has(t.dataset.from) && (hit.has(t.dataset.to) || t.dataset.to === origin))));
+  const t = traces[S.trace];
+  $('#mapHint').innerHTML = S.exp != null ? `Pink shows what <b>${rich(EXPS[S.exp].title)}</b> would damage. <a href="#" id="clearExp">Clear it</a>`
+    : hit ? `Pink shows everything that depends on <b>${nodeName(origin)}</b>. Change it and these could break.`
+    : S.mark ? `Yellow marks <b>${nodeName(S.mark.node)}</b>, which ${S.mark.what}. <a href="#" id="clearMark">Clear it</a>`
+    : S.edge != null && edges[S.edge] ? `The thick teal arrow is the connection from <b>${nodeName(edges[S.edge].from)}</b> to <b>${nodeName(edges[S.edge].to)}</b>. Click a box to read about it.`
+    : S.mode === 'impact' ? 'Click any box to see what depends on it.'
+    : t ? `The teal line is <b>${esc(t.title)}</b> up to stop ${S.step + 1}. Click any box to read about it.${IFACES.length ? ' Click an arrow to see what crosses it.' : ''}` : `Click any box to read about it.${IFACES.length ? ' Click an arrow to see what crosses it.' : ''}`;
+  $('#clearExp')?.addEventListener('click', e => { e.preventDefault(); S.exp = null; paintMap(); });
+  $('#clearMark')?.addEventListener('click', e => { e.preventDefault(); S.mark = null; paintMap(); });
+}
+
+// ---------- component note ----------
+function renderEdge(box, e) {
+  const link = id => `<a href="#" data-node="${esc(id)}">${nodeName(id)}</a>`;
+  const rows = [['protocol', e.protocol], ['calls', typeof e.sync === 'boolean' ? (e.sync ? 'sync: the caller waits for the reply' : 'async: fire and forget, the caller moves on') : ''], ['payload', e.payload], ['guarantee', e.guarantee]].filter(r => r[1]);
+  box.innerHTML = `<button class="icon-btn close" id="closeNode" aria-label="Close">${ICON.x}</button><h3>${nodeName(e.from)} → ${nodeName(e.to)}</h3>` +
+    `<div class="kindline">connection${e.label ? ' · ' + esc(e.label) : ''}</div>` +
+    `<div class="node-grid"><div><dl class="links edge-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl></div>` +
+    `<div><div class="side-h">Between</div><div style="font-size:17px">${link(e.from)} and ${link(e.to)}</div><div class="stop-actions">${askBtn('id="askNode"')}</div></div></div>`;
+  box.hidden = false;
+  $('#closeNode').onclick = () => { S.edge = null; renderNode(); paintMap(); };
+  $('#askNode').onclick = () => askAbout(`the connection from ${nLabel(e.from)} to ${nLabel(e.to)}`);
+}
+function renderNode() {
+  const box = $('#nodeNote'), n = nodeById[S.node];
+  if (!n && S.edge != null && edges[S.edge]) { renderEdge(box, edges[S.edge]); return; }
+  if (!n) { box.hidden = true; box.innerHTML = ''; return; }
+  const out = edges.filter(e => e.from === n.id), inc = edges.filter(e => e.to === n.id);
+  const link = (id, label) => `<a href="#" data-node="${esc(id)}">${nodeName(id)}</a>${label ? ` <span style="color:var(--ink-3)">(${esc(label)})</span>` : ''}`;
+  const at = []; traces.forEach((t, ti) => t.steps.forEach((s, si) => { if (s.node === n.id) at.push([ti, si, s.title]); }));
+  const dep = dependents(n.id).size - 1;
+  let main = `<div class="narr">${paras(pick(n))}</div>`;
+  if (n.analogy) main += `<div class="aside">${ICON.star}<span>${rich(n.analogy)}</span></div>`;
+  const arch = [['Owns', n.owns], ['Exposes', n.exposes], ['Runs', n.runs], ['Scale', n.scale]].filter(r => r[1]);
+  if (arch.length) main += `<div class="archblock"><div class="side-h">Architecture</div><dl class="links">${arch.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl></div>`;
+  (n.functions || []).forEach((f, i) => { main += `<details class="inside"${i === 0 ? ' open' : ''}><summary>${esc(f.name)}<span>${esc(f.loc || '')}</span></summary><div class="narr" style="margin-top:8px">${paras(pick(f) || f.what)}</div>${codeBlock(f.code)}</details>`; });
+  let side = '';
+  if (inc.length || out.length) side += `<div class="side-h">Wired to</div><dl class="links">${inc.length ? `<dt>gets from</dt><dd>${inc.map(e => link(e.from, e.label)).join(', ')}</dd>` : ''}${out.length ? `<dt>sends to</dt><dd>${out.map(e => link(e.to, e.label)).join(', ')}</dd>` : ''}</dl>`;
+  side += `<div class="side-h">If you change it</div><div style="font-size:17px">${dep ? `${plural(dep, 'other part')} depend${dep === 1 ? 's' : ''} on this. <a href="#" id="showImpact">Show them on the map</a>` : 'Nothing else depends on this.'}</div>`;
+  if (at.length) side += `<div class="side-h">The route stops here</div><div class="at">${at.map(([ti, si, title]) => `<a href="#" data-jump="${ti}:${si}">${traces.length > 1 ? esc(traces[ti].title.split(':')[0]) + ', ' : ''}stop ${si + 1}: ${rich(title)}</a>`).join('')}</div>`;
+  box.innerHTML = `<button class="icon-btn close" id="closeNode" aria-label="Close">${ICON.x}</button><h3>${esc(n.label)} ${conf(n.confidence)}</h3>` +
+    `<div class="kindline">${esc(n.kind || '')}</div>${n.files?.length ? `<div class="files">${n.files.map(esc).join(' · ')}</div>` : ''}` +
+    `<div class="node-grid"><div>${main}</div><div>${side}<div class="stop-actions">${askBtn('id="askNode"')}</div></div></div>`;
+  box.hidden = false; markOverflow(box);
+  $('#closeNode').onclick = () => { S.node = null; renderNode(); paintMap(); };
+  $('#showImpact')?.addEventListener('click', e => { e.preventDefault(); setMode('impact'); S.origin = n.id; paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+  $('#askNode').onclick = () => askAbout(`the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`);
+  $$('[data-jump]', box).forEach(a => a.onclick = e => { e.preventDefault(); const [t, s] = a.dataset.jump.split(':').map(Number); jumpTo(t, s); });
+}
+function selectEdge(i, scrollMap) {
+  S.edge = i; S.node = null; S.exp = null; S.mark = null; renderNode(); paintMap(); // impact mode (S.origin) stays: the edge note is read beside it
+  if (scrollMap) $('#s-map').scrollIntoView({ block: 'start' }); else $('#nodeNote').scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'nearest' });
+}
+function openNode(id) {
+  S.exp = null; S.edge = null; S.mark = null;
+  if (S.mode === 'impact') { S.origin = S.origin === id ? null : id; }
+  S.node = id; renderNode(); paintMap();
+  if (S.mode !== 'impact') $('#nodeNote').scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'nearest' });
+}
+document.addEventListener('click', e => { const a = e.target.closest('a[data-node]'); if (!a) return; e.preventDefault(); openNode(a.dataset.node); });
+
+function renderMapSection() {
+  if (!nodes.length) { // nothing to draw: a code lesson drops the section, an architecture lesson says so
+    const sec = $('#s-map'); sec.hidden = !ARCH;
+    sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>The map</h2></div><p class="sec-intro empty-map">No parts have been added to this map yet.</p>` : '') + `<div class="node-note" id="nodeNote" hidden></div>`; return;
+  }
+  $('#s-map').innerHTML = `<div class="map-top"><h2>The map</h2><div class="map-hint" id="mapHint"></div>
+      <div class="pill" id="mapMode" role="group" aria-label="Map mode"><button data-m="route">Follow the route</button><button data-m="impact">What depends on it?</button></div></div>
+    <div class="map-card"><div class="mapwrap"><svg id="map" role="img" aria-label="System map"></svg></div>
+      <div class="map-foot"><span>${L.legend ? rich(L.legend) : 'Arrows point from the caller to what it calls or hands data to.'}</span><span><i></i>route so far, dotted ahead</span><span><i class="p"></i>impact or damage</span>${ARCH && edges.some(e => e.sync === false) ? '<span><i class="d"></i>dashed arrow: async, the caller does not wait</span>' : ''}<span>hatched: the current stop</span></div></div>
+    <div class="node-note" id="nodeNote" hidden></div>`;
+  $$('#mapMode button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+}
+
+// ---------- the trip ----------
+function stopHTML(tr, i) {
+  const st = tr.steps[i], key = S.trace + ':' + i, a = S.answered[key], gated = st.predict && a == null;
+  let h = `<article class="stop" id="stop-${i}" data-i="${i}"><div class="num">${ring(i + 1)}</div><div class="stop-body">`;
+  h += `<div class="stop-head"><h3 class="stop-title">${rich(st.title)}</h3>${conf(st.confidence)}</div>`;
+  h += `<div class="stop-meta"><span>in <a href="#" data-node="${esc(st.node)}">${nodeName(st.node)}</a></span><a href="#" data-showmap="${i}">see it on the map</a></div>`;
+  let gate = '';
+  if (st.predict) {
+    const ok = a === st.predict.answer;
+    gate += `<div class="turn${a != null ? ' done' : ''}"><div class="masc">${mascot(a == null ? 'think' : ok ? 'happy' : 'oops')}</div><div>
+      <div class="q">${rich(st.predict.q)}</div>
+      <div class="choices">${st.predict.options.map((o, j) => `<button class="choice ${a == null ? '' : j === st.predict.answer ? 'right' : j === a ? 'wrong' : ''}" data-p="${j}" data-stop="${i}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>
+      ${a != null ? `<div class="verdict ${ok ? 'ok' : 'no'}"><b>${ok ? 'Right.' : 'Not quite.'}</b>${rich(st.predict.why)}</div>` : ''}</div></div>`;
+  }
+  const memo = st.state?.length
+    ? `<dl>${st.state.map(v => { const masked = gated && v.changed;
+        return `<div class="mv${masked ? ' masked' : v.changed ? ' new' : ''}"><dt>${esc(v.name)}${v.changed && !masked ? '<span class="newtag">new</span>' : ''}</dt><dd>${masked ? '' : `<span>${esc(v.value)}</span>`}</dd></div>`; }).join('')}</dl>${gated && st.state.some(v => v.changed) ? '<p class="memo-lock">New values appear after your guess.</p>' : ''}`
+    : `<p class="memo-empty">Nothing new is stored at this stop.</p>`;
+  const showMemo = !ARCH || st.state?.length; // a flow step with nothing in memory gets no sticky note
+  h += `<div class="cols${showMemo ? '' : ' solo'}"><div class="col-main">${gate}`;
+  h += gated ? `<p class="gate-wait">Read the code, make your guess, and the explanation appears.</p><div class="narr blurred" aria-hidden="true">${paras(pick(st))}</div>` : `<div class="narr">${paras(pick(st))}</div>`;
+  h += codeBlock(st.code);
+  if (st.aside && !gated) h += `<div class="aside">${ICON.star}<span>${rich(st.aside)}</span></div>`;
+  h += `<div class="stop-actions">${askBtn(`data-ask="${i}"`)}</div>`;
+  h += `</div>${showMemo ? `<aside class="memo"><div class="memo-note"><div class="memo-h">In memory now</div>${memo}</div></aside>` : ''}</div></div></article>`;
+  return h;
+}
+function renderTrip() {
+  const sec = $('#s-trip'), tr = traces[S.trace];
+  if (!tr) { sec.hidden = true; return; }
+  let h = ARCH ? `<div class="sec-head"><h2>Flows</h2></div><p class="sec-intro">Follow one request through the system, one hop at a time. Where a step changes state, the sticky note shows what.</p>`
+    : `<div class="sec-head"><h2>The trip</h2></div><p class="sec-intro">Follow one real input through the code, one stop at a time. The sticky note shows what is in memory at each stop.</p>`;
+  if (traces.length > 1) h += `<div class="tabs" role="tablist">${traces.map((t, i) => `<button role="tab" data-tr="${i}" aria-selected="${i === S.trace}">${esc(t.title)}</button>`).join('')}</div>`;
+  if (tr.trigger) h += `<div class="trigger"><span class="lab">It starts when</span><span>${rich(tr.trigger.replace(/^You /, 'you '))}</span></div>`;
+  h += `<div class="trip">${tr.steps.map((_, i) => stopHTML(tr, i)).join('')}</div>`;
+  sec.innerHTML = h;
+  $$('[data-tr]', sec).forEach(b => b.onclick = () => { S.trace = +b.dataset.tr; S.step = 0; store.set('trace', S.trace); S.seen = {}; renderTrip(); renderRail(); paintMap(); sec.scrollIntoView({ block: 'start' }); });
+  bindTrip(); observeStops(); markStops(); markOverflow(sec);
+}
+function bindTrip() {
+  const sec = $('#s-trip');
+  $$('[data-p]', sec).forEach(b => b.onclick = () => answer(+b.dataset.stop, +b.dataset.p));
+  $$('[data-ask]', sec).forEach(b => b.onclick = () => askAbout(stopWhere(+b.dataset.ask)));
+  $$('[data-showmap]', sec).forEach(a => a.onclick = e => { e.preventDefault(); setStep(+a.dataset.showmap); setMode('route'); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+function stopWhere(i, inCode) {
+  const tr = traces[S.trace], st = tr.steps[i];
+  return `${tr.title}, stop ${i + 1} ("${st.title}")${st.code?.file ? `${inCode ? ', in the code from' : ', code in'} ${st.code.file}:${parseInt(st.code.start, 10) || 1}` : ''}`;
+}
+function markOverflow(root = document) {
+  $$('.code .rows', root).forEach(r => { const upd = () => r.classList.toggle('more', r.scrollLeft + r.clientWidth < r.scrollWidth - 4); upd(); r.onscroll = upd; });
+}
+function rerenderStop(i) {
+  const tr = traces[S.trace], old = $('#stop-' + i); if (!old) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = stopHTML(tr, i); const fresh = tmp.firstElementChild;
+  old.replaceWith(fresh); bindTrip(); observeStops(); markStops(); markOverflow(fresh);
+}
+function answer(i, j) {
+  const st = traces[S.trace]?.steps[i]; if (!st?.predict || S.answered[S.trace + ':' + i] != null || j >= st.predict.options.length) return;
+  S.answered[S.trace + ':' + i] = j; store.set(PKEY, S.answered); rerenderStop(i); renderRail();
+}
+let io, navT;
+const holdNav = () => { S.nav = true; S.resync = false; clearTimeout(navT); navT = setTimeout(() => { S.nav = false; }, 250); }; // while the page scrolls to a stop we chose, scrolling must not choose another
+let syncT;
+const syncStep = () => { const hi = innerHeight * .42, on = $$('.stop').filter(el => el.getBoundingClientRect().top <= hi).pop(); if (on) setStep(+on.dataset.i, true); }; // the stop under the observer's reading band (-38% .. -58%)
+// the hold covers only scrolling WE caused: the user's own wheel, touch, scrollbar or scroll key ends it, and once they stop scrolling the step is re-read from the page
+const userScroll = () => { if (!S.nav) return; S.nav = false; clearTimeout(navT); S.resync = true; };
+['wheel', 'touchmove', 'pointerdown'].forEach(ev => addEventListener(ev, userScroll, { passive: true, capture: true }));
+addEventListener('keydown', e => { if (/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End| )$/.test(e.key)) userScroll(); }, true);
+addEventListener('scroll', () => { if (S.nav) holdNav(); else if (S.resync) { clearTimeout(syncT); syncT = setTimeout(() => { S.resync = false; syncStep(); }, 150); } }, { passive: true });
+function observeStops() {
+  io?.disconnect();
+  io = new IntersectionObserver(ents => {
+    ents.forEach(e => { if (e.isIntersecting) { const i = +e.target.dataset.i; e.target.classList.add('seen'); if (!S.nav) setStep(i, true); } });
+  }, { rootMargin: '-38% 0px -58% 0px' });
+  $$('.stop').forEach(el => { io.observe(el); if (S.seen[el.dataset.i]) el.classList.add('seen'); });
+}
+function setStep(i, fromScroll) {
+  const tr = traces[S.trace]; if (!tr) return;
+  i = Math.max(0, Math.min(i, tr.steps.length - 1)); S.seen[i] = true;
+  if (i === S.step && fromScroll) return;
+  S.step = i; store.set('last', { trace: S.trace, step: i }); store.set('trace', S.trace);
+  markStops(); renderRail(); paintMap();
+}
+function markStops() { $$('.stop').forEach(el => { const i = +el.dataset.i; el.classList.toggle('here', i === S.step); el.classList.toggle('past', i < S.step); }); }
+function stepBy(d) { const n = traces[S.trace]?.steps.length || 0, i = Math.max(0, Math.min(S.step + d, n - 1)); if (i !== S.step) jumpTo(S.trace, i); } // J/K at either end move nothing, so they must not wipe painted state either
+function clearTransient() { S.exp = null; S.mark = null; if (S.edge != null) { S.edge = null; renderNode(); } } // damage, a mark or a selected connection give way to the route
+function jumpTo(t, i) {
+  holdNav(); clearTransient();
+  if (t !== S.trace) { S.trace = t; store.set('trace', t); S.seen = {}; renderTrip(); }
+  setStep(i); const el = $('#stop-' + i); el?.scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'start' });
+}
+
+// ---------- break it ----------
+function renderExps() {
+  const sec = $('#s-break'); if (!EXPS.length) { sec.hidden = true; return; }
+  sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>Failure modes</h2></div><p class="sec-intro">Each failure mode is one realistic thing going wrong. Guess how far it spreads, then reveal the blast radius.</p>`
+    : `<div class="sec-head"><h2>Break it</h2></div><p class="sec-intro">Each experiment is one realistic change. Guess what breaks, then run it.</p>`) + `<div class="exps">${EXPS.map((w, i) => {
+    const ran = S.ran[i];
+    return `<div class="exp"><div class="change"><h3>${rich(w.title)}</h3><div>${rich(w.change)}</div></div>
+      <div class="result${ran ? ' shown' : ''}">${ran
+        ? `<div class="what">${ARCH ? 'Blast radius' : 'What happens'} ${conf(w.confidence)}</div><div>${rich(w.outcome)}</div>${w.lesson ? `<div class="takeaway">${rich(w.lesson)}</div>` : ''}${(w.affects?.length || w.node) ? `<button class="btn" data-show="${i}">${ICON.pin} Show the damage on the map</button>` : ''}`
+        : `<div class="guess">${ARCH ? 'How far do you think it spreads?' : 'What do you think breaks?'}</div><button class="btn go" data-run="${i}">${ICON.play} ${ARCH ? 'Reveal the blast radius' : 'Run the experiment'}</button>`}</div></div>`; }).join('')}</div>`;
+  $$('[data-run]', sec).forEach(b => b.onclick = () => { S.ran[b.dataset.run] = true; renderExps(); $(`[data-show="${b.dataset.run}"]`)?.focus(); });
+  $$('[data-show]', sec).forEach(b => b.onclick = () => { S.mode = 'route'; S.origin = null; syncMode(); S.exp = +b.dataset.show; S.mark = null; S.edge = null; renderNode(); paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+
+// ---------- why ----------
+function renderDecs() {
+  const sec = $('#s-why'); if (!DECS.length) { sec.hidden = true; return; }
+  sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>Decisions</h2></div><p class="sec-intro">The forces behind each choice, what we now live with, and what the alternatives would have cost.</p>`
+    : `<div class="sec-head"><h2>Why it's built this way</h2></div><p class="sec-intro">The choices behind the code, and what the alternatives would have cost.</p>`) +
+    DECS.map(d => `<div class="dec"><h3>${rich(d.title)} ${conf(d.confidence)}</h3>
+      ${d.context ? `<div class="dec-ctx"><span class="lab">The forces</span>${rich(d.context)}</div>` : ''}
+      <div class="chosen-wrap"><span class="lab">${ARCH ? 'What we chose' : 'What the code does'}</span><span class="chosen">${rich(d.chosen)}</span></div>
+      <div class="narr">${paras(pick(d) || d.why)}</div>
+      ${d.consequences ? `<div class="dec-cons"><span class="lab">What we live with</span>${rich(d.consequences)}</div>` : ''}
+      ${(d.alternatives || []).length ? `<table class="alts"><thead><tr><th>Could have used</th><th>Trade-off</th></tr></thead><tbody>${d.alternatives.map(a => `<tr><td>${esc(a.name)}</td><td>${rich(a.tradeoff)}</td></tr>`).join('')}</tbody></table>` : ''}</div>`).join('');
+}
+
+// ---------- weak spots ----------
+function renderRisks() {
+  const sec = $('#s-weak'); if (!RISKS.length) { sec.hidden = true; return; }
+  const order = { high: 0, medium: 1, low: 2 };
+  sec.innerHTML = `<div class="sec-head risks-head">${mascot('worry')}<h2>Weak spots</h2></div><p class="sec-intro">${ARCH ? 'Places the design is likely to hurt, worst first, each with the smallest fix.' : 'Real problems found while reading the code, worst first, each with the smallest fix.'}</p><div class="risks">` +
+    RISKS.slice().sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3)).map(r => `<div class="risk">
+      <div class="sev ${esc(r.severity)}">${esc(r.severity || '')}</div>
+      <div><h3>${rich(r.title)} ${conf(r.confidence)}</h3>${r.where ? `<div class="loc">${esc(r.where)}</div>` : ''}<p>${rich(r.what)}</p>${r.fix ? `<div class="fix"><b>Smallest fix:</b>${rich(r.fix)}</div>` : ''}</div></div>`).join('') + `</div>`;
+}
+
+// ---------- interfaces, invariants, pressure points (architecture) ----------
+function renderIfaces() {
+  const sec = $('#s-interfaces'); if (!IFACES.length) { sec.hidden = true; return; }
+  const cell = (label, v) => v ? `<td data-label="${label}">${rich(v)}</td>` : `<td data-label="${label}" class="none">—</td>`;
+  sec.innerHTML = `<div class="sec-head"><h2>Interfaces</h2></div><p class="sec-intro">Every connection on the map: how it is made, whether the caller waits, what crosses it and what is promised. Click one to see it on the map.</p>
+    <div class="iface-card"><table class="ifaces"><thead><tr><th>Connection</th><th>Protocol</th><th>Calls</th><th>Payload</th><th>Guarantee</th></tr></thead><tbody>${IFACES.map(i => { const e = edges[i];
+      return `<tr data-ei="${i}"><td data-label="Connection"><button class="iface-go" data-edge="${i}">${nodeName(e.from)} → ${nodeName(e.to)}</button></td>${cell('Protocol', e.protocol)}` +
+        (typeof e.sync === 'boolean' ? `<td data-label="Calls"><span class="mode ${e.sync ? 'sync' : 'async'}">${e.sync ? 'sync' : 'async'}</span></td>` : `<td data-label="Calls" class="none">—</td>`) +
+        `${cell('Payload', e.payload)}${cell('Guarantee', e.guarantee)}</tr>`; }).join('')}</tbody></table></div>`;
+  $$('[data-edge]', sec).forEach(b => b.onclick = () => selectEdge(+b.dataset.edge, true));
+}
+function markOnMap(node, what) { S.mark = { node, what }; S.exp = null; S.edge = null; S.mode = 'route'; S.origin = null; syncMode(); renderNode(); paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); }
+function renderInvs() {
+  const sec = $('#s-invariants'); if (!INVS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Invariants</h2></div><p class="sec-intro">Rules that must always hold for the system to be correct, who enforces each one, and what goes wrong when it is broken.</p><div class="invs">` +
+    INVS.map((v, i) => `<div class="inv"><div class="num">${ring(i + 1)}</div><div><h3>${rich(v.rule)} ${conf(v.confidence)}</h3>
+      <div class="enf">Enforced at <a href="#" data-node="${esc(v.node)}">${nodeName(v.node)}</a></div>${v.evidence ? `<div class="enf ev">Enforced by: ${rich(v.evidence)}</div>` : ''}
+      <p class="breaks"><b>If it breaks:</b> ${rich(v.breaks)}</p>
+      <button class="btn quiet" data-mark="${i}">${ICON.pin} Show it on the map</button></div></div>`).join('') + `</div>`;
+  $$('[data-mark]', sec).forEach(b => b.onclick = () => markOnMap(INVS[+b.dataset.mark].node, 'enforces this rule'));
+}
+function renderPress() {
+  const sec = $('#s-pressure'); if (!PRESS.length) { sec.hidden = true; return; }
+  const order = { high: 0, medium: 1, low: 2 }, list = PRESS.slice().sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+  sec.innerHTML = `<div class="sec-head"><h2>Pressure points</h2></div><p class="sec-intro">Where the design will strain first as load or data grows: the limit, how you would notice, and what to do about it. Worst first.</p><div class="press-list">` +
+    list.map(p => { const rows = [['limit', p.limit], ['you would notice', p.signal], ['mitigation', p.mitigation]].filter(r => r[1]);
+      return `<div class="press"><div class="sev ${esc(p.severity)}">${esc(p.severity || '')}</div><div><h3>${rich(p.title)} ${conf(p.confidence)}</h3>
+      <div class="enf">At <a href="#" data-node="${esc(p.node)}">${nodeName(p.node)}</a></div>
+      <dl class="links">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl>
+      <button class="btn quiet" data-mark="${PRESS.indexOf(p)}">${ICON.pin} Show it on the map</button></div></div>`; }).join('') + `</div>`;
+  $$('[data-mark]', sec).forEach(b => b.onclick = () => markOnMap(PRESS[+b.dataset.mark].node, 'is under this pressure'));
+}
+
+// ---------- quiz ----------
+function quizOrder() { const rank = i => S.quiz[i] == null ? 1 : S.quiz[i] === QS[i].answer ? 2 : 0; return QS.map((_, i) => i).sort((a, b) => rank(a) - rank(b) || a - b); }
+function renderQuiz() {
+  const sec = $('#s-quiz'); if (!QS.length) { sec.hidden = true; return; }
+  if (!S.qorder) { S.qorder = quizOrder(); S.qi = S.qorder.findIndex(i => S.quiz[i] == null); }
+  const right = QS.filter((q, i) => S.quiz[i] === q.answer).length, missed = QS.filter((q, i) => S.quiz[i] != null && S.quiz[i] !== q.answer).length;
+  let h = `<div class="sec-head"><h2>Check yourself</h2></div><p class="sec-intro">${QS.length} questions that need understanding, not memory. Questions you miss come back first next time.</p><div class="quiz">`;
+  h += `<div class="pips">${S.qorder.map((qi, k) => `<button class="pip ${S.quiz[qi] == null ? '' : S.quiz[qi] === QS[qi].answer ? 'right' : 'wrong'}${k === S.qi ? ' cur' : ''}" data-k="${k}" aria-label="Question ${k + 1}"></button>`).join('')}</div>`;
+  if (S.qi < 0) {
+    h += `<div class="qcard"><div class="score-row">${mascot(right === QS.length ? 'happy' : 'oops')}<div><div class="score">${right}<small> of ${QS.length}</small></div>
+      <p style="margin-top:10px">${right === QS.length ? 'All correct. Come back in a few days and try again without looking at the map.' : `You missed ${missed}. Walk those stops again, then retry them.`}</p></div></div>
+      <div class="qnav">${missed ? `<button class="btn go" id="retryMissed">Retry the ${missed} I missed</button>` : ''}<button class="btn" id="restart">Start over</button></div></div>`;
+  } else {
+    const qi = S.qorder[S.qi], q = QS[qi], a = S.quiz[qi], more = S.qorder.some(i => S.quiz[i] == null);
+    h += `<div class="qcard"><div class="qnum">Question ${S.qi + 1} of ${QS.length}</div><div class="qtext">${rich(q.q)}</div><div class="choices">${q.options.map((o, j) =>
+      `<button class="choice ${a == null ? '' : j === q.answer ? 'right' : j === a ? 'wrong' : ''}" data-a="${j}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>` +
+      (a != null ? `<div class="verdict ${a === q.answer ? 'ok' : 'no'}"><b>${a === q.answer ? 'Right.' : 'Not quite.'}</b>${rich(q.why)}</div><div class="qnav"><button class="btn go" id="qnext">${more ? 'Next question' : 'See my score'}</button></div>` : '') + `</div>`;
+  }
+  sec.innerHTML = h + `</div>`;
+  $$('.pip', sec).forEach(b => b.onclick = () => { S.qi = +b.dataset.k; renderQuiz(); });
+  $$('[data-a]', sec).forEach(b => b.onclick = () => qanswer(+b.dataset.a));
+  $('#qnext')?.addEventListener('click', qnext);
+  $('#retryMissed')?.addEventListener('click', () => { QS.forEach((q, i) => { if (S.quiz[i] != null && S.quiz[i] !== q.answer) delete S.quiz[i]; }); store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+  $('#restart')?.addEventListener('click', () => { S.quiz = {}; store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+}
+function qanswer(j) {
+  if (S.qi < 0) return; const qi = S.qorder[S.qi]; if (S.quiz[qi] != null || j >= QS[qi].options.length) return;
+  S.quiz[qi] = j; store.set(QKEY, S.quiz); renderQuiz(); renderRail(); $('#qnext')?.focus({ preventScroll: true });
+}
+function qnext() { const later = S.qorder.findIndex((qi, k) => k > S.qi && S.quiz[qi] == null); S.qi = later >= 0 ? later : S.qorder.findIndex(qi => S.quiz[qi] == null); renderQuiz(); }
+
+// ---------- glossary ----------
+function renderTerms() {
+  const sec = $('#s-terms'); if (!GLOSS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Words to know</h2></div><p class="sec-intro">Dotted words anywhere on the page show these definitions when you hover them.</p><dl class="terms">${GLOSS.map(g => `<div><dt>${esc(g.term)}</dt><dd>${esc(g.def)}</dd></div>`).join('')}</dl>`;
+}
+const tip = $('#tip');
+function showTip(el) { const r = el.getBoundingClientRect(); tip.innerHTML = `<b>${esc(el.textContent)}</b>: ${esc(el.dataset.def)}`; tip.classList.add('on');
+  const tw = tip.offsetWidth, th = tip.offsetHeight; let x = Math.min(Math.max(12, r.left + r.width / 2 - tw / 2), innerWidth - tw - 12), y = r.top - th - 10; if (y < 8) y = r.bottom + 10;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+const hideTip = () => tip.classList.remove('on');
+document.addEventListener('mouseover', e => { const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+document.addEventListener('focusin', e => { if (restoring) return; const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
+
+// ---------- rail ----------
+const SECS = [['s-map', 'The map', () => nodes.length || ARCH], ['s-trip', ARCH ? 'Flows' : 'The trip', () => traces.length], ['s-interfaces', 'Interfaces', () => IFACES.length], ['s-invariants', 'Invariants', () => INVS.length],
+  ['s-pressure', 'Pressure points', () => PRESS.length], ['s-break', ARCH ? 'Failure modes' : 'Break it', () => EXPS.length], ['s-why', ARCH ? 'Decisions' : 'Why this way', () => DECS.length],
+  ['s-weak', 'Weak spots', () => RISKS.length], ['s-quiz', 'Check yourself', () => QS.length], ['s-terms', 'Words to know', () => GLOSS.length]];
+let curSec = 's-map';
+function renderRail() {
+  const tr = traces[S.trace];
+  let h = `<div class="rail-brand">${mascot('happy')}<span>lens</span></div><ul class="toc">`;
+  SECS.filter(s => s[2]()).forEach(([id, name]) => {
+    const cnt = id === 's-quiz' ? `<span class="cnt">${Object.keys(S.quiz).length}/${QS.length}</span>` : id === 's-trip' && tr ? `<span class="cnt">${S.step + 1}/${tr.steps.length}</span>` : '';
+    h += `<li><a href="#${id}" class="${curSec === id ? 'on' : ''}">${name}${cnt}</a>`;
+    if (id === 's-trip' && tr) {
+      h += `<ol class="stops"><span class="fill"></span>${tr.steps.map((s, i) => { const gate = s.predict && S.answered[S.trace + ':' + i] == null;
+        return `<li class="${i < S.step ? 'done' : i === S.step ? 'here' : ''}${gate ? ' gate' : ''}"><span class="dot"></span><a href="#stop-${i}" data-go="${i}" data-lens-stop="${i}">${esc(s.title.replace(/`/g, ''))}</a></li>`; }).join('')}</ol>`;
+    }
+    h += `</li>`;
+  });
+  h += `</ul><div class="rail-foot"><div class="pill" role="group" aria-label="Detail level">${['simple', 'deep'].map(d => `<button data-d="${d}" aria-pressed="${S.depth === d}">${d === 'simple' ? 'Plain' : 'Deep'}</button>`).join('')}</div>
+    <div class="keys"><span><kbd>J</kbd><kbd>K</kbd> next / previous stop</span><span><kbd>P</kbd><kbd>D</kbd> plain / deep</span><span><kbd>1</kbd>–<kbd>3</kbd> answer a guess</span><span><kbd>A</kbd> ask about the selection</span></div></div>`;
+  const rail = $('#rail'); rail.innerHTML = h;
+  const here = $('.stops li.here', rail), fill = $('.stops .fill', rail);
+  if (here && fill) fill.style.setProperty('--h', Math.max(0, here.offsetTop + 8) + 'px');
+  $$('[data-go]', rail).forEach(a => a.onclick = e => { e.preventDefault(); jumpTo(S.trace, +a.dataset.go); });
+  $$('.rail-foot [data-d]', rail).forEach(b => b.onclick = () => setDepth(b.dataset.d));
+}
+const secIO = new IntersectionObserver(ents => { ents.forEach(e => { if (e.isIntersecting) { curSec = e.target.id; $$('.toc>li>a', $('#rail')).forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + curSec)); } }); }, { rootMargin: '-30% 0px -65% 0px' });
+
+// ---------- chrome ----------
+function syncMode() { $$('#mapMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode)); }
+function setMode(m) { S.mode = m; S.exp = null; S.mark = null; if (m === 'route') S.origin = null; syncMode(); paintMap(); }
+function setDepth(d) {
+  S.depth = d; store.set('depth', d);
+  $$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
+  const y = scrollY; renderTrip(); renderNode(); renderDecs(); renderRail(); scrollTo(0, y);
+}
+let tt; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2000); }
+function copy(text) {
+  const done = () => toast('Question copied. Paste it into Claude and finish it.');
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { prompt('Copy this:', text); } ta.remove(); };
+  navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(done, fallback) : fallback();
+}
+function themeIcon() { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; $('#themeBtn').innerHTML = dark ? ICON.sun : ICON.moon; return dark; }
+$('#themeBtn').onclick = () => { const dark = themeIcon(); document.documentElement.dataset.theme = dark ? 'light' : 'dark'; store.set('theme', document.documentElement.dataset.theme); themeIcon(); };
+$$('#depth button').forEach(b => b.onclick = () => setDepth(b.dataset.d));
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const num = /^[1-9]$/.test(e.key) ? +e.key - 1 : null, k = e.key.toLowerCase();
+  if (curSec === 's-quiz') { if (num != null) { qanswer(num); return; } if (e.key === 'Enter' && $('#qnext') && !e.target.closest('button,a')) { e.preventDefault(); qnext(); return; } }
+  if (k === 'arrowright' || k === 'j') { e.preventDefault(); stepBy(1); }
+  else if (k === 'arrowleft' || k === 'k') { e.preventDefault(); stepBy(-1); }
+  else if (k === 'p') setDepth('simple'); else if (k === 'd') setDepth('deep');
+  else if (k === 'a') { e.preventDefault(); if (!askSelection()) curSec === 's-trip' && traces[S.trace] ? askAbout(stopWhere(S.step)) : ASK.on ? openAsk() : toast('Select some text first, then press A.'); }
+  else if (num != null && curSec === 's-trip') answer(S.step, num);
+});
+
+// ---------- ask claude ----------
+// serve.py answers POST /__lens/ask with NDJSON events; without it (file://) every ask copies a question instead.
+const ASK = { on: false, models: ['haiku', 'sonnet'], model: store.get('model', 'haiku'), session: null, pending: null, busy: null, key: '' };
+{ // serve.py's link carries its key in the #fragment; keep it for this origin and tidy the address bar
+  const m = location.hash.match(/(?:^#|&)k=([\w-]+)/);
+  try { if (m) localStorage.setItem('lens:key', m[1]); ASK.key = localStorage.getItem('lens:key') || ''; } catch { ASK.key = m?.[1] || ''; }
+  if (m) history.replaceState(null, '', location.pathname + location.search);
+}
+const askBox = $('#ask'), askLog = $('#askLog'), askIn = $('#askIn'), askPop = $('#askPop');
+const modelName = m => m[0].toUpperCase() + m.slice(1);
+const inl = s => esc(s).split(/(`[^`]+`)/).map(p => /^`[^`]+`$/.test(p) ? `<code>${p.slice(1, -1)}</code>`
+  : p.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s.,;:!?)]|$)/g, '$1<i>$2</i>')).join('');
+const LI = /^\s*([-*]|\d+\.)\s+/;
+function md(t) {
+  // Small, escape-first markdown: fenced code, paragraphs, bullet and numbered lists, `code`, **bold**.
+  return String(t).split('```').map((b, i) => i % 2 ? `<pre><code>${esc(b.replace(/^[\w+-]*\n/, '').replace(/\n$/, ''))}</code></pre>`
+    : b.split(/\n{2,}/).filter(p => p.trim()).map(p => {
+      let out = '', run = [], kind = null;
+      const flush = () => { if (!run.length) return; const ol = /^\s*\d/.test(run[0]);
+        out += kind === 'p' ? `<p>${run.map(inl).join('<br>')}</p>` : `<${ol ? 'ol' : 'ul'}>${run.map(l => `<li>${inl(l.replace(LI, ''))}</li>`).join('')}</${ol ? 'ol' : 'ul'}>`; run = []; };
+      p.split('\n').forEach(l => { const k = LI.test(l) ? 'li' : 'p'; if (k !== kind) { flush(); kind = k; } run.push(k === 'p' ? l.replace(/^#+\s*/, '') : l); });
+      flush(); return out; }).join('')).join('');
+}
+function whereOf(el) {
+  const stop = el.closest('.stop');
+  if (stop && traces[S.trace]) return stopWhere(+stop.dataset.i, !!el.closest('figure.code'));
+  if (el.closest('#nodeNote') && S.edge != null && edges[S.edge]) return `the connection from ${nLabel(edges[S.edge].from)} to ${nLabel(edges[S.edge].to)}`;
+  const n = el.closest('#nodeNote') && nodeById[S.node];
+  if (n) return `the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`;
+  const sec = el.closest('section.sec'), name = SECS.find(s => s[0] === sec?.id)?.[1];
+  return name ? `the "${name}" section` : 'the lesson introduction';
+}
+function selInfo() {
+  const s = getSelection(); if (!s || s.isCollapsed || !s.rangeCount) return null;
+  const text = s.toString().trim(), r = s.getRangeAt(0), a = r.commonAncestorContainer, el = a.nodeType === 1 ? a : a.parentElement;
+  if (text.length < 2 || !el?.closest('main') || el.closest('[aria-hidden="true"]')) return null;
+  return { quote: text.slice(0, 1500), where: whereOf(el), rect: r.getBoundingClientRect() };
+}
+let selNow = null, selT;
+function placePop() {
+  selNow = selInfo(); askPop.classList.toggle('on', !!selNow); if (!selNow) return;
+  askPop.innerHTML = ASK.on ? `${ICON.chat} Ask Claude <kbd>A</kbd>` : `${ICON.copy} Copy question <kbd>A</kbd>`;
+  const r = selNow.rect, w = askPop.offsetWidth, h = askPop.offsetHeight;
+  let y = r.top - h - 12; if (y < 8) y = r.bottom + 12;
+  askPop.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+  askPop.style.top = Math.min(Math.max(8, y), innerHeight - h - 8) + 'px';
+}
+document.addEventListener('selectionchange', () => { clearTimeout(selT); selT = setTimeout(placePop, 160); });
+addEventListener('scroll', () => { if (selNow) placePop(); }, { passive: true });
+askPop.addEventListener('mousedown', e => e.preventDefault()); // keep the selection while clicking
+askPop.onclick = () => askSelection();
+function askSelection() { const s = selNow || selInfo(); if (!s) return false; askPop.classList.remove('on'); askAbout(s.where, s.quote); getSelection().removeAllRanges(); return true; }
+
+function askAbout(where, quote) {
+  if (!ASK.on) return copy(`About the "${L.title}" lesson, ${where}${quote ? `, this part:\n"${quote}"\n\n` : ': '}`);
+  ASK.pending = { where, quote }; $('.ask-pending', askLog)?.remove(); $('.ask-empty', askLog)?.remove();
+  const d = document.createElement('div'); d.className = 'ask-pending';
+  d.innerHTML = (quote ? `<div class="ask-quote"><span class="where">${esc(where)}</span>${esc(quote)}</div>` : `<div class="ask-about">About ${esc(where)}</div>`) +
+    `<div class="ask-chips" style="margin-top:12px">${[['Explain it simply', 'Explain this in plain words.'], ['Why this way?', 'Why is it done this way, and what would go wrong otherwise?'], ['Show me the code', 'Show me where this happens in the code.']]
+      .map(([l, q]) => `<button type="button" data-q="${esc(q)}">${l}</button>`).join('')}</div>`;
+  askLog.appendChild(d); $$('[data-q]', d).forEach(b => b.onclick = () => send(b.dataset.q));
+  openAsk(); d.scrollIntoView({ block: 'nearest' });
+}
+function openAsk() {
+  askBox.classList.add('on'); document.body.classList.add('asking'); askBox.removeAttribute('inert');
+  if (!askLog.children.length) askLog.innerHTML = `<div class="ask-empty">${mascot('think')}<span>Select any text in the lesson and press <b>Ask Claude</b> (or <kbd>A</kbd>), or just type a question. ${modelName(ASK.model)} answers from this repo's real code.</span></div>`;
+  askIn.focus({ preventScroll: true });
+}
+function closeAsk() { askBox.classList.remove('on'); document.body.classList.remove('asking'); askBox.setAttribute('inert', ''); } // an answer in progress keeps streaming
+function syncAsk() {
+  $$('#askModel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.model === ASK.model));
+  $('#askSend').textContent = ASK.busy ? 'Stop' : 'Send'; $('#askSend').classList.toggle('go', !ASK.busy);
+}
+const toolLabel = v => { const [tool, ...rest] = v.split(' '), arg = rest.join(' '), short = arg.split('/').slice(-2).join('/');
+  return tool === 'Read' ? `Reading ${short}…` : tool === 'Grep' ? `Searching the code for “${arg}”…` : tool === 'Glob' ? `Looking for files like ${arg}…` : `${tool}…`; };
+async function send(q) {
+  if (ASK.busy) return toast('Wait for this answer, or press Stop.');
+  q = q.trim() || (ASK.pending ? 'Explain this in plain words.' : ''); if (!q) return;
+  const ctx = ASK.pending || {}; ASK.pending = null; askIn.value = '';
+  const pend = $('.ask-pending', askLog); if (pend) { $('.ask-chips', pend)?.remove(); pend.className = 'ask-sent'; }
+  $('.ask-empty', askLog)?.remove();
+  askLog.insertAdjacentHTML('beforeend', `<div class="ask-me">${esc(q)}</div><div class="ask-ai"><div class="who">${modelName(ASK.model)}</div><div class="body"></div><div class="ask-status">${modelName(ASK.model)} is thinking…</div></div>`);
+  const ai = askLog.lastElementChild, body = $('.body', ai), status = $('.ask-status', ai);
+  const near = () => askLog.scrollHeight - askLog.scrollTop - askLog.clientHeight < 80, stick = () => { askLog.scrollTop = askLog.scrollHeight; };
+  stick();
+  const ctrl = new AbortController(); ASK.busy = ctrl; syncAsk();
+  let text = '', failed = false, finished = false;
+  const fail = m => { failed = true; status.textContent = ''; body.insertAdjacentHTML('beforeend', `<p class="ask-err">${esc(m)}</p>`); };
+  try {
+    const r = await fetch('/__lens/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lens-Key': ASK.key }, signal: ctrl.signal,
+      body: JSON.stringify({ q, model: ASK.model, session: ASK.session, lesson: L.title, quote: ctx.quote, where: ctx.where }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `The helper answered ${r.status}.`);
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (!line.trim()) continue;
+        const ev = JSON.parse(line), stuck = near();
+        if (ev.t === 'session') ASK.session = ev.v;
+        else if (ev.t === 'text') { text += ev.v; body.innerHTML = md(text); status.textContent = ''; }
+        else if (ev.t === 'tool') status.textContent = toolLabel(ev.v);
+        else if (ev.t === 'error') fail(ev.v);
+        else if (ev.t === 'done') finished = true;
+        if (stuck) stick();
+      }
+    }
+    if (!finished && !failed) fail('The answer was cut off. Ask again, or press New chat.');
+    else if (!text && !failed) fail('No answer came back. Try again, or switch model.');
+  } catch (e) {
+    if (e.name === 'AbortError') status.textContent = 'Stopped.';
+    else fail(/fetch/i.test(e.message) ? 'Lost the connection to serve.py. Is it still running?' : e.message);
+  } finally { ASK.busy = null; syncAsk(); }
+}
+$('#askForm').onsubmit = e => { e.preventDefault(); ASK.busy ? ASK.busy.abort() : send(askIn.value); };
+askIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!ASK.busy) send(askIn.value); } });
+$('#askClose').innerHTML = ICON.x; $('#askClose').onclick = closeAsk;
+$('#askNew').onclick = () => { ASK.busy?.abort(); ASK.session = null; ASK.pending = null; askLog.innerHTML = ''; openAsk(); };
+$$('#askModel button').forEach(b => b.onclick = () => { ASK.model = b.dataset.model; store.set('model', ASK.model); syncAsk(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && askBox.classList.contains('on')) closeAsk(); });
+askBox.setAttribute('inert', ''); syncAsk();
+if (location.protocol.startsWith('http')) fetch('/__lens/health').then(r => r.ok ? r.json() : null).then(h => {
+  if (!h?.lens) return;
+  ASK.on = true; ASK.models = h.models; if (!h.models.includes(ASK.model)) ASK.model = h.model;
+  $$('#askModel button').forEach(b => { b.hidden = !h.models.includes(b.dataset.model); }); document.body.classList.add('can-ask'); syncAsk();
+}).catch(() => {});
+
+// ---------- boot ----------
+{ const i = L.title.indexOf(': '); $('#title').innerHTML = i > 0 ? `${rich(L.title.slice(0, i + 1))} <span class="swipe">${rich(L.title.slice(i + 2))}</span>` : rich(L.title); } $('#subtitle').innerHTML = rich(L.subtitle || '');
+$('#heroMascot').innerHTML = mascot('happy'); themeIcon();
+$$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === S.depth));
+$('#end').innerHTML = `${mascot('happy')}<span>That's the whole ${ARCH ? 'system' : 'trip'}. Come back in a few days and take the quiz again before reading anything.</span>`;
+renderMapSection(); syncMode(); renderTrip(); renderIfaces(); renderInvs(); renderPress(); renderExps(); renderDecs(); renderRisks(); renderQuiz(); renderTerms(); renderRail();
+drawMap(); renderNode();
+$$('section.sec').forEach(s => secIO.observe(s));
+if (S.last && traces[S.last.trace] && S.last.step > 0) {
+  const t = traces[S.last.trace], st = t.steps[S.last.step];
+  if (st) { $('#resume').innerHTML = `<div class="resume"><span>Welcome back. You stopped at <b>stop ${S.last.step + 1}${traces.length > 1 ? ' of ' + esc(t.title) : ''}: ${rich(st.title)}</b></span><button class="btn go" id="resumeBtn">Jump back in</button></div>`;
+    $('#resumeBtn').onclick = () => { $('#resume').innerHTML = ''; jumpTo(S.last.trace, S.last.step); }; }
+}
+document.fonts?.ready.then(() => drawMap());
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { drawMap(); markOverflow(); }, 120); }).observe($('#s-map'));
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,736 @@
+{
+  "schema": 1,
+  "id": "1017-notes-offline-mode",
+  "slug": "notes-offline-mode",
+  "title": "Offline mode for the notes app",
+  "owner": "user",
+  "size": "quick",
+  "stage": "ideate",
+  "rev": 26,
+  "created": "2026-10-17T16:49:08Z",
+  "updated": "2026-10-17T16:49:10Z",
+  "repo": "/home/user/Developer/notes",
+  "published": null,
+  "approved": null,
+  "tldr": "",
+  "frontier": [
+    "Q1",
+    "Q2",
+    "Q3",
+    "Q4",
+    "Q5"
+  ],
+  "progress": {
+    "settled": 0,
+    "total": 5
+  },
+  "requests": [
+    {
+      "ref": "e-8a175ea5aa14",
+      "type": "merge",
+      "node": "I4",
+      "lane": null,
+      "text": "",
+      "at": "2026-10-17T16:49:10Z"
+    },
+    {
+      "ref": "e-2260d0c75517",
+      "type": "twist",
+      "node": "I2",
+      "lane": null,
+      "text": "What if the cache also queued edits?",
+      "at": "2026-10-17T16:49:10Z"
+    }
+  ],
+  "recent": [
+    {
+      "rev": 26,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "session",
+      "source": "build",
+      "type": "research_status",
+      "node": "RS1",
+      "summary": "RS1 running"
+    },
+    {
+      "rev": 25,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "RS1",
+      "summary": "added RS1: Check sync libraries for I1"
+    },
+    {
+      "rev": 24,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "user",
+      "source": "page",
+      "type": "twist",
+      "node": "I2",
+      "summary": "twist on I2"
+    },
+    {
+      "rev": 23,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "user",
+      "source": "page",
+      "type": "merge",
+      "node": "I1",
+      "summary": "merged I1 + I2 into I4"
+    },
+    {
+      "rev": 22,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "user",
+      "source": "page",
+      "type": "kill",
+      "node": "I3",
+      "summary": "killed I3: Needs a server change and months of work"
+    },
+    {
+      "rev": 21,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "user",
+      "source": "page",
+      "type": "boost",
+      "node": "I2",
+      "summary": "boosted I2 (1)"
+    },
+    {
+      "rev": 20,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "user",
+      "source": "page",
+      "type": "boost",
+      "node": "I1",
+      "summary": "boosted I1 (2)"
+    },
+    {
+      "rev": 19,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I3",
+      "summary": "I3 fails K4"
+    },
+    {
+      "rev": 18,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I2",
+      "summary": "I2 passes K4"
+    },
+    {
+      "rev": 17,
+      "at": "2026-10-17T16:49:10Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I1",
+      "summary": "I1 passes K4"
+    },
+    {
+      "rev": 16,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I3",
+      "summary": "scored I3 on K1: 1.5 (session)"
+    },
+    {
+      "rev": 15,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I2",
+      "summary": "scored I2 on K3: 5 (session)"
+    },
+    {
+      "rev": 14,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I2",
+      "summary": "scored I2 on K2: 4.5 (session)"
+    },
+    {
+      "rev": 13,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I2",
+      "summary": "scored I2 on K1: 5 (session)"
+    },
+    {
+      "rev": 12,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I1",
+      "summary": "scored I1 on K3: 3 (session)"
+    },
+    {
+      "rev": 11,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I1",
+      "summary": "scored I1 on K2: 3.5 (research)"
+    },
+    {
+      "rev": 10,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "score",
+      "node": "I1",
+      "summary": "scored I1 on K1: 4 (session)"
+    },
+    {
+      "rev": 9,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "I1",
+      "summary": "updated I1"
+    },
+    {
+      "rev": 8,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "I3",
+      "summary": "added I3: Operation log with CRDT merge"
+    },
+    {
+      "rev": 7,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "I2",
+      "summary": "added I2: Read-only offline cache"
+    },
+    {
+      "rev": 6,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "I1",
+      "summary": "added I1: Local-first store with background sync"
+    },
+    {
+      "rev": 5,
+      "at": "2026-10-17T16:49:09Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "K4",
+      "summary": "added K4: Works without a server-side change"
+    },
+    {
+      "rev": 4,
+      "at": "2026-10-17T16:49:08Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "K3",
+      "summary": "added K3: Needs little new infrastructure"
+    },
+    {
+      "rev": 3,
+      "at": "2026-10-17T16:49:08Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "K2",
+      "summary": "added K2: Edits are never lost on a clash"
+    },
+    {
+      "rev": 2,
+      "at": "2026-10-17T16:49:08Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "K1",
+      "summary": "added K1: Fits the two-week appetite"
+    },
+    {
+      "rev": 1,
+      "at": "2026-10-17T16:49:08Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "set",
+      "node": null,
+      "summary": "set stage to ideate"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem, what happens, and what do they do today?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 0,
+      "by": "session",
+      "by_default": false,
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person and gives every later question something to be checked against.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": []
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 0,
+      "by": "session",
+      "by_default": false,
+      "lane": "who",
+      "why": "Decides which flows, devices and skill levels the design has to serve.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "Just me or my team",
+          "why": "We are the user, so feedback is immediate"
+        },
+        {
+          "key": "b",
+          "label": "Our existing users",
+          "why": "A known group we can ask"
+        },
+        {
+          "key": "c",
+          "label": "A new kind of user",
+          "why": "We have to find them first"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": []
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 0,
+      "by": "session",
+      "by_default": false,
+      "lane": "scope",
+      "why": "The appetite is a budget, not an estimate: the solution is shaped to fit it, and scope is cut before time is extended.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": "A small, sharp fix"
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": "One focused slice"
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": "A real feature with a walking skeleton"
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": "A big bet; needs hard scope cuts"
+        }
+      ],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": []
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 0,
+      "by": "session",
+      "by_default": false,
+      "lane": "scope",
+      "why": "No-gos stop agents and people from building the tempting extras; a plan without them tends to grow.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": []
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 0,
+      "by": "session",
+      "by_default": false,
+      "lane": "why",
+      "why": "Success must be checkable after shipping, so each criterion needs a measure and a threshold.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": []
+    },
+    {
+      "id": "K1",
+      "kind": "rubric",
+      "label": "Fits the two-week appetite",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 2,
+      "by": "session",
+      "by_default": false,
+      "group": "weighted",
+      "weight": 30,
+      "default_weight": 30,
+      "origin": "the user's words"
+    },
+    {
+      "id": "K2",
+      "kind": "rubric",
+      "label": "Edits are never lost on a clash",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 3,
+      "by": "session",
+      "by_default": false,
+      "group": "weighted",
+      "weight": 25,
+      "default_weight": 25,
+      "origin": "support tickets about overwritten notes"
+    },
+    {
+      "id": "K3",
+      "kind": "rubric",
+      "label": "Needs little new infrastructure",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 4,
+      "by": "session",
+      "by_default": false,
+      "group": "lens",
+      "weight": 0,
+      "default_weight": 0,
+      "origin": "eng review"
+    },
+    {
+      "id": "K4",
+      "kind": "rubric",
+      "label": "Works without a server-side change",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 5,
+      "by": "session",
+      "by_default": false,
+      "group": "gate",
+      "weight": 0,
+      "default_weight": 0,
+      "origin": "backend team's go/no-go doc"
+    },
+    {
+      "id": "I1",
+      "kind": "idea",
+      "label": "Local-first store with background sync",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 23,
+      "by": "user",
+      "by_default": false,
+      "hook": "A local-first store with background sync",
+      "pitch": "Every note lives in an on-device database first. A sync worker pushes and pulls changes when the network is back, and a clash keeps both versions side by side.",
+      "who": "Commuters and field workers who write notes with no signal",
+      "win": "The airplane-mode demo: edit, reconnect, nothing is lost",
+      "tier": "Tier 1",
+      "checks": {
+        "allowed": {
+          "verdict": "ok",
+          "label": "Allowed",
+          "note": "No rule against local storage"
+        },
+        "exists": {
+          "verdict": "warn",
+          "label": "Similar apps exist",
+          "note": "Two competitors ship offline editing"
+        },
+        "feasible": {
+          "verdict": "ok",
+          "label": "Feasible",
+          "note": "SQLite is already bundled"
+        }
+      },
+      "scores": {
+        "K1": {
+          "value": 4,
+          "label": "Good",
+          "rationale": "Sync worker is the long pole but fits two weeks.",
+          "sources": [],
+          "basis": "session",
+          "rev": 10
+        },
+        "K2": {
+          "value": 3.5,
+          "label": "Fair",
+          "rationale": "Side-by-side versions keep both edits; the merge UI is basic.",
+          "sources": [
+            "https://example.com/offline-first-patterns"
+          ],
+          "basis": "research",
+          "rev": 11
+        },
+        "K3": {
+          "value": 3,
+          "label": "Fair",
+          "rationale": "Needs a queue and a retry policy.",
+          "sources": [],
+          "basis": "session",
+          "rev": 12
+        }
+      },
+      "gates": {
+        "K4": {
+          "pass": true,
+          "note": "Uses the existing sync endpoints.",
+          "sources": [
+            "notes/backend-go-no-go.md"
+          ],
+          "basis": "session",
+          "rev": 17
+        }
+      },
+      "boost": 2,
+      "kill_reason": "",
+      "merged_from": [],
+      "merged_into": "I4",
+      "twists": [],
+      "sources": [
+        "notes/offline-brief.md"
+      ]
+    },
+    {
+      "id": "I2",
+      "kind": "idea",
+      "label": "Read-only offline cache",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 24,
+      "by": "user",
+      "by_default": false,
+      "hook": "A read-only offline cache",
+      "pitch": "Cache the last 200 opened notes for reading. Edits stay disabled offline and the banner says so.",
+      "who": "People who only look notes up on the go",
+      "win": "Ships in days and removes the blank screen on the train",
+      "tier": "Tier 1",
+      "checks": null,
+      "scores": {
+        "K1": {
+          "value": 5,
+          "label": "Great",
+          "rationale": "Pure client change.",
+          "sources": [],
+          "basis": "session",
+          "rev": 13
+        },
+        "K2": {
+          "value": 4.5,
+          "label": "Great",
+          "rationale": "No offline edits, so nothing to lose.",
+          "sources": [],
+          "basis": "session",
+          "rev": 14
+        },
+        "K3": {
+          "value": 5,
+          "label": "Great",
+          "rationale": "A cache and a banner.",
+          "sources": [],
+          "basis": "session",
+          "rev": 15
+        }
+      },
+      "gates": {
+        "K4": {
+          "pass": true,
+          "note": "Read-only, no endpoint changes.",
+          "sources": [
+            "notes/backend-go-no-go.md"
+          ],
+          "basis": "session",
+          "rev": 18
+        }
+      },
+      "boost": 1,
+      "kill_reason": "",
+      "merged_from": [],
+      "merged_into": "I4",
+      "twists": [],
+      "sources": [
+        "notes/offline-brief.md"
+      ]
+    },
+    {
+      "id": "I3",
+      "kind": "idea",
+      "label": "Operation log with CRDT merge",
+      "body": "",
+      "status": "killed",
+      "depends_on": [],
+      "refs": [],
+      "rev": 22,
+      "by": "user",
+      "by_default": false,
+      "hook": "An operation log merged by CRDTs",
+      "pitch": "Record every keystroke as an operation and merge logs from all devices without conflicts.",
+      "who": "Teams who edit one note from several devices",
+      "win": "No clash can ever happen",
+      "tier": "Tier 2",
+      "checks": null,
+      "scores": {
+        "K1": {
+          "value": 1.5,
+          "label": "Poor",
+          "rationale": "Months of work for a tiny team.",
+          "sources": [],
+          "basis": "session",
+          "rev": 16
+        }
+      },
+      "gates": {
+        "K4": {
+          "pass": false,
+          "note": "Needs a new operations endpoint on the server.",
+          "sources": [
+            "notes/backend-go-no-go.md"
+          ],
+          "basis": "session",
+          "rev": 19
+        }
+      },
+      "boost": 0,
+      "kill_reason": "Needs a server change and months of work",
+      "merged_from": [],
+      "merged_into": null,
+      "twists": [],
+      "sources": [
+        "notes/offline-brief.md"
+      ]
+    },
+    {
+      "id": "I4",
+      "kind": "idea",
+      "label": "Local-first store with background sync + Read-only offline cache",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 23,
+      "by": "user",
+      "by_default": false,
+      "hook": "",
+      "pitch": "",
+      "who": "",
+      "win": "",
+      "tier": "Draft",
+      "checks": null,
+      "scores": {},
+      "gates": {},
+      "boost": 0,
+      "kill_reason": "",
+      "merged_from": [
+        "I1",
+        "I2"
+      ],
+      "merged_into": null,
+      "twists": [],
+      "sources": []
+    },
+    {
+      "id": "RS1",
+      "kind": "research",
+      "label": "Check sync libraries for I1",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "rev": 26,
+      "by": "session",
+      "by_default": false,
+      "scope": "idea",
+      "targets": [
+        "I1"
+      ],
+      "question": "",
+      "vehicle": "workflow",
+      "run": "wf-8c21",
+      "state": "running",
+      "report": "",
+      "note": "Reading sync library docs"
+    }
+  ]
+}

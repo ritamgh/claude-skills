@@ -1,0 +1,50 @@
+{
+  "_comment": "Merge these entries into your existing settings, do not replace them, and omit this property. The hq mod needs no entry here: Claude Code loads it from ~/.claude/mods/hq, where install.sh links it. enableWorkflows is needed for the saved workflows.",
+  "enableWorkflows": true,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/reinject-ledger.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "out=$(\"$HOME/.claude/bin/crew\" ls --open 2>/dev/null); [ -z \"$out\" ] || printf 'Open crew tasks (see crew skill, section 9):\\n%s\\n' \"$out\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/crew-answer-hook.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/guard-tmux-kill.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

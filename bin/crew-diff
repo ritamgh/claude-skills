@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# crew-diff — `crew diff ID [--focus] [--print]`: show a task's changes in nvim (diffview.nvim) in a tmux pane
+# right of the task lead's Claude pane. Called by `crew` (dispatch only); logic lives here.
+#   Range: meta branch= + base= -> `DiffviewOpen <base>...<branch>`; no branch= -> uncommitted changes (`DiffviewOpen`).
+#   Reuse: $CREW_ROOT/.diff/<lead> = `pane_id<TAB>socket`. While that pane still runs nvim and the socket exists, the
+#   nvim is driven with `--remote-expr 'luaeval(...)'` (one diffview per task range, see below); keys are never sent to
+#   any pane (the lead's is Claude).
+# Exit: 0 ok, 2 usage / no such task / nothing to diff, 3 no tmux, 4 nvim or diffview.nvim missing, 5 tmux/nvim failed.
+set -euo pipefail
+
+CREW_ROOT="${CREW_ROOT:-$HOME/.claude/crew}"
+CREW_SESSIONS="${CREW_SESSIONS:-$HOME/.claude/sessions}"
+CREW_BIN=$(dirname "$(readlink -f "$0")")
+
+usage() { echo "usage: crew diff ID [--focus] [--print]" >&2; exit 2; }
+fail() { local code=$1; shift; echo "crew diff: $*" >&2; exit "$code"; }
+meta_get() { grep -E "^$2=" "$1/meta" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+rev_ok() { git -C "$1" rev-parse --verify -q "$2^{commit}" >/dev/null 2>&1; }
+
+focus=0 print=0 id=""
+for a in "$@"; do
+  case "$a" in
+    --focus) focus=1 ;;
+    --print) print=1 ;;
+    -h | --help) usage ;;
+    -*) fail 2 "unknown option '$a'" ;;
+    *) [ -z "$id" ] || usage; id=$a ;;
+  esac
+done
+[ -n "$id" ] || usage
+case "$id" in . | .. | */*) fail 2 "bad task id '$id'" ;; esac
+d=$CREW_ROOT/$id
+[ -d "$d" ] || fail 2 "no task '$id'"
+
+# --- what to show ---
+worktree=$(meta_get "$d" worktree) repo=$(meta_get "$d" repo) branch=$(meta_get "$d" branch) base=$(meta_get "$d" base)
+lead=$(meta_get "$d" lead) lead_sid=$(meta_get "$d" lead_sid)
+dir=""
+for c in "$worktree" "$repo"; do
+  if [[ "$c" = /* ]] && [ -d "$c" ]; then dir=$c; break; fi
+done
+[ -n "$dir" ] || fail 2 "task $id has no worktree or repo folder to diff"
+git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || fail 2 "$dir is not a git repository"
+
+# branch names with # = , (legal in git, rare here) are refused on purpose: the ref ends up in an ex command
+ref_re='^[A-Za-z0-9_@+][A-Za-z0-9._/@^~+-]*$'
+if [ -n "$branch" ]; then
+  [[ "$branch" =~ $ref_re ]] || fail 2 "branch '$branch' is not a plain ref name"
+  rev_ok "$dir" "$branch" || fail 2 "branch '$branch' does not exist in $dir"
+  cands=("$base" "$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)" main master)
+  base=""
+  for c in "${cands[@]}"; do
+    [ -n "$c" ] && [[ "$c" =~ $ref_re ]] && rev_ok "$dir" "$c" && { base=$c; break; }
+  done
+  [ -n "$base" ] || fail 2 "no base for $branch: meta base=, origin/HEAD, main and master are all missing"
+  ex="DiffviewOpen $base...$branch"
+else
+  ex="DiffviewOpen"
+fi
+
+# --- where to show it ---
+tmux_up() { command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; }
+pane_runs_nvim() { [ "$(tmux display-message -p -t "$1" '#{pane_current_command}' 2>/dev/null || true)" = nvim ]; }
+
+# the tmux pane id of the lead's live Claude session (bin tmux-map), else nothing
+lead_pane() {
+  local m=${CREW_TMUX_MAP:-$CREW_BIN/../mods/hq/bin/tmux-map} rows target
+  [ -n "$lead" ] && [ -x "$m" ] || return 0
+  rows=$(CREW_SESSIONS="$CREW_SESSIONS" "$m" 2>/dev/null | N=$lead awk -F'\t' '$1 == ENVIRON["N"] && $2 != "" {print $2 "\t" $7}' || true)
+  if [ -n "$rows" ] && [ "$(wc -l <<<"$rows")" -gt 1 ] && [ -n "$lead_sid" ]; then   # two sessions with one name: the one with this sessionId
+    rows=$(S="/$lead_sid.jsonl" awk -F'\t' '{n = length(ENVIRON["S"])} substr($2, length($2) - n + 1) == ENVIRON["S"]' <<<"$rows")
+  fi
+  if [ -n "$rows" ] && [ "$(wc -l <<<"$rows")" -eq 1 ]; then
+    target=$(cut -f1 <<<"$rows")
+    tmux display-message -p -t "$target" '#{pane_id}' 2>/dev/null || true
+  fi
+}
+
+leadpane=""
+if tmux_up; then leadpane=$(lead_pane); fi
+key=${lead//[^A-Za-z0-9._-]/_}
+case "$key" in '' | . | ..) key="" ;; esac   # not usable as a file name: no lead
+if [ -z "$leadpane" ] || [ -z "$key" ]; then key=window-$id; leadpane=""; fi
+state=$CREW_ROOT/.diff/$key
+sockdir=${XDG_RUNTIME_DIR:-}
+if [ ! -d "$sockdir" ]; then sockdir=/tmp/crew-diff-$(id -u); fi
+sock=$sockdir/crew-diff-$key.sock
+# unix socket paths cap at ~104-108 bytes: a long key gets a short hashed name in the same dir
+if [ ${#sock} -gt 100 ]; then sock=$sockdir/crew-diff-$(printf '%s' "$key" | sha1sum | cut -c1-16).sock; fi
+
+# tmux expands #-formats in -c and -n (not in a command's argv): the dir goes through env -C, the window name is sanitised
+wname=diff-${id//[^A-Za-z0-9._-]/_}
+
+# the recorded pane/socket of this key, and whether that pane still runs a reachable nvim
+spane="" ssock="" reuse=0
+load_state() {
+  spane="" ssock="" reuse=0
+  if [ -f "$state" ]; then IFS=$'\t' read -r spane ssock <"$state" || true; fi
+  if [ -n "$spane" ] && [ -S "${ssock:-}" ] && tmux_up && pane_runs_nvim "$spane"; then reuse=1; fi
+}
+
+if [ $print = 1 ]; then
+  load_state
+  echo "task: $id"
+  echo "cwd: $dir"
+  echo "ex: $ex"
+  if [ $reuse = 1 ]; then echo "target: reuse pane $spane"
+  elif [ -n "$leadpane" ]; then echo "target: new pane right of lead $lead ($leadpane)"
+  else echo "target: new window $wname"; fi
+  echo "socket: $([ $reuse = 1 ] && echo "$ssock" || echo "$sock")"
+  exit 0
+fi
+
+# --- run ---
+if [ -z "${CREW_DIFF_SKIP_PLUGIN_CHECK:-}" ]; then
+  command -v nvim >/dev/null 2>&1 || fail 4 "nvim is not installed"
+  [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/lazy/diffview.nvim" ] ||
+    fail 4 "diffview.nvim is not installed: add plugins/diffview.lua to the nvim config and start nvim once"
+fi
+tmux_up || fail 3 "no tmux server reachable"
+
+mkdir -p "$CREW_ROOT/.diff"
+exec 9>"$state.lock"; flock 9   # two calls for one lead must not both create a pane; closed when this command ends
+load_state                      # only now: a call that waited for the lock sees the pane the other one made
+
+# Reuse: the ex command runs in a scratch tab whose cwd is the task's dir (DiffviewOpen opens its own tab and takes its cwd
+# from the current one, and a tcd on the user's tab would change that tab). The dir is data in luaeval's _A, never part of
+# an ex command: nvim expands $VAR and ~ in the argument of :tcd even when it is backslash-escaped, so the scratch tab gets
+# its dir by `tcd .` before and after a vim.uv.chdir. Afterwards the scratch tab is closed, and diffviews of the same
+# repo and range that were open before are closed: one view per task range, no empty tabs. Without diffview.lua (a stub
+# in tests) only the scratch tab is cleaned up. The ex command and the dir reach nvim as vimscript single-quoted
+# strings ('' for a quote, backslashes literal) in luaeval's _A, never inside the lua source.
+reuse_lua='(function(a) local okl, lib = pcall(require, "diffview.lib") local old = {} '
+reuse_lua+='if okl then for _, v in ipairs(lib.views) do old[v] = true end end '
+reuse_lua+='local orig = vim.api.nvim_get_current_tabpage() vim.cmd("tabnew") local scratch = vim.api.nvim_get_current_tabpage() '
+reuse_lua+='vim.cmd("tcd .") local cd, cderr = vim.uv.chdir(a[2]) if cd == 0 then vim.cmd("tcd .") end '
+reuse_lua+='local ok, err = false, "cannot cd to " .. a[2] .. ": " .. tostring(cderr) if cd == 0 then ok, err = pcall(vim.cmd, a[1]) end '
+reuse_lua+='local cur = vim.api.nvim_get_current_tabpage() '
+reuse_lua+='local new = okl and cur ~= scratch and lib.get_current_view() or nil '
+reuse_lua+='if new and not old[new] and new.adapter then '
+reuse_lua+='local DV = require("diffview.scene.views.diff.diff_view").DiffView local stale = {} '
+reuse_lua+='for _, v in ipairs(lib.views) do if v ~= new and old[v] and v.adapter and v:instanceof(DV) and v.tabpage and vim.api.nvim_tabpage_is_valid(v.tabpage) '
+reuse_lua+='and v.rev_arg == new.rev_arg and v.adapter.ctx.toplevel == new.adapter.ctx.toplevel then stale[#stale + 1] = v end end '
+reuse_lua+='for _, v in ipairs(stale) do v:close() end end '
+reuse_lua+='if cur == scratch and vim.api.nvim_tabpage_is_valid(orig) then vim.api.nvim_set_current_tabpage(orig) end '
+reuse_lua+='if vim.api.nvim_tabpage_is_valid(scratch) and #vim.api.nvim_list_tabpages() > 1 then vim.cmd("tabclose " .. vim.api.nvim_tabpage_get_number(scratch)) end '
+reuse_lua+='if not ok then error(err) end return 0 end)(_A)'
+reuse_q=${ex//\'/\'\'} reuse_dq=${dir//\'/\'\'}
+reuse_vim="luaeval('$reuse_lua', ['$reuse_q', '$reuse_dq'])"
+if [ $reuse = 1 ]; then
+  rc=0; err=$(timeout 15 nvim --server "$ssock" --remote-expr "$reuse_vim" 2>&1 >/dev/null) || rc=$?
+  if [ $rc = 0 ]; then
+    pane=$spane how="reused pane $pane"
+  elif [ $rc = 124 ] || timeout 5 nvim --server "$ssock" --remote-expr 1 >/dev/null 2>&1; then
+    fail 5 "nvim at $ssock did not run the command${err:+: $err}"   # reachable (or hung), so not ours to replace
+  else
+    rm -f "$state"; reuse=0   # nobody listens on the recorded socket: forget it and create a pane (once)
+  fi
+fi
+if [ $reuse = 0 ]; then
+  if [ ! -d "$sockdir" ]; then mkdir -m 700 "$sockdir"; fi
+  [ -O "$sockdir" ] || fail 5 "$sockdir is not yours"
+  [ ${#sock} -le 100 ] || fail 5 "socket path too long: $sock"
+  rm -f "$sock"   # a socket of an nvim that is gone
+  if [ -n "$leadpane" ]; then
+    pane=$(tmux split-window -h -d -P -F '#{pane_id}' -t "$leadpane" -l 50% env -C "$dir" nvim --listen "$sock" -c "$ex") ||
+      fail 5 "tmux could not split the lead's pane"
+    how="new pane $pane"
+  else
+    pane=$(tmux new-window -d -P -F '#{pane_id}' -n "$wname" env -C "$dir" nvim --listen "$sock" -c "$ex") ||
+      fail 5 "tmux could not open a window"
+    how="window $wname"
+  fi
+  ready=0   # up to ~3s for nvim to listen; a pane that is already gone means nvim died
+  for ((i = 0; i < 30; i++)); do
+    tmux display-message -p -t "$pane" >/dev/null 2>&1 || break
+    if [ -S "$sock" ] && pane_runs_nvim "$pane"; then ready=1; break; fi
+    sleep 0.1
+  done
+  if [ $ready = 0 ]; then
+    tmux kill-pane -t "$pane" >/dev/null 2>&1 || true
+    fail 5 "nvim did not start (no socket at $sock)"
+  fi
+  printf '%s\t%s\n' "$pane" "$sock" >"$state.tmp" && mv "$state.tmp" "$state"
+  ssock=$sock
+fi
+if [ $focus = 1 ]; then
+  tmux select-window -t "$pane" && tmux select-pane -t "$pane" || fail 5 "tmux could not select $pane"
+fi
+echo "diff: opened $id ($how)"

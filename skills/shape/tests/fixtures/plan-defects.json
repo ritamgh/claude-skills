@@ -1,0 +1,1191 @@
+{
+  "schema": 1,
+  "id": "1020-cli-json-flag",
+  "slug": "cli-json-flag",
+  "title": "Add a --json flag to the inv CLI",
+  "owner": "user",
+  "size": "quick",
+  "stage": "shape",
+  "rev": 40,
+  "created": "2026-10-16T14:00:00Z",
+  "updated": "2026-10-17T03:20:00Z",
+  "repo": "/home/user/Developer/inv",
+  "published": null,
+  "approved": null,
+  "tldr": "Script authors who pipe the inv CLI into other tools cannot parse its aligned text columns. We add a --json flag to inv list and inv show that prints machine-readable JSON and leaves the text output untouched. It works when inv list --json | jq length returns the item count for 1,000 items in under 1 s.",
+  "frontier": [
+    "Q11"
+  ],
+  "progress": {
+    "settled": 10,
+    "total": 11
+  },
+  "requests": [],
+  "recent": [
+    {
+      "rev": 40,
+      "at": "2026-10-17T03:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-004",
+      "summary": "added T-004: Report errors as JSON"
+    },
+    {
+      "rev": 39,
+      "at": "2026-10-17T03:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-003",
+      "summary": "added T-003: Add --json to inv show"
+    },
+    {
+      "rev": 38,
+      "at": "2026-10-17T02:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-002",
+      "summary": "added T-002: Check the JSON rendering speed and fields"
+    },
+    {
+      "rev": 37,
+      "at": "2026-10-17T02:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "T-001",
+      "summary": "added T-001: Add --json to inv list"
+    },
+    {
+      "rev": 36,
+      "at": "2026-10-17T02:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "set",
+      "node": null,
+      "summary": "set stage to shape"
+    },
+    {
+      "rev": 35,
+      "at": "2026-10-17T01:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "B-4",
+      "summary": "added B-4: make test"
+    },
+    {
+      "rev": 34,
+      "at": "2026-10-17T01:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "B-3",
+      "summary": "added B-3: Ask before adding a dependency"
+    },
+    {
+      "rev": 33,
+      "at": "2026-10-17T01:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "B-2",
+      "summary": "added B-2: Never change the text output format"
+    },
+    {
+      "rev": 32,
+      "at": "2026-10-17T00:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "B-1",
+      "summary": "added B-1: Always run the task's check before marking it done"
+    },
+    {
+      "rev": 31,
+      "at": "2026-10-17T00:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "S2",
+      "summary": "added S2: inv show and errors in JSON"
+    },
+    {
+      "rev": 30,
+      "at": "2026-10-17T00:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "S1",
+      "summary": "added S1: Walking skeleton: inv list --json"
+    },
+    {
+      "rev": 29,
+      "at": "2026-10-16T23:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "FR-004",
+      "summary": "added FR-004: Rendering 1,000 items as JSON takes under 1 s"
+    },
+    {
+      "rev": 28,
+      "at": "2026-10-16T23:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "FR-003",
+      "summary": "added FR-003: JSON errors"
+    },
+    {
+      "rev": 27,
+      "at": "2026-10-16T23:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "FR-002",
+      "summary": "added FR-002: inv show ID --json prints one JSON object"
+    },
+    {
+      "rev": 26,
+      "at": "2026-10-16T22:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "FR-001",
+      "summary": "added FR-001: inv list --json prints a JSON array"
+    },
+    {
+      "rev": 25,
+      "at": "2026-10-16T22:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "A-1",
+      "summary": "added A-1: Serialize with the stdlib json module"
+    },
+    {
+      "rev": 24,
+      "at": "2026-10-16T22:00:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q10",
+      "summary": "answered Q10: make test"
+    },
+    {
+      "rev": 23,
+      "at": "2026-10-16T21:40:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q9",
+      "summary": "answered Q9: JSON object on stdout and a non-zero exit"
+    },
+    {
+      "rev": 22,
+      "at": "2026-10-16T21:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "answer",
+      "node": "Q8",
+      "summary": "answered Q8: snake_case"
+    },
+    {
+      "rev": 21,
+      "at": "2026-10-16T21:00:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q7",
+      "summary": "answered Q7: A JSON array"
+    },
+    {
+      "rev": 20,
+      "at": "2026-10-16T20:40:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "answer",
+      "node": "Q6",
+      "summary": "answered Q6: list and show"
+    },
+    {
+      "rev": 19,
+      "at": "2026-10-16T20:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "E-1",
+      "summary": "added E-1: Empty inventory"
+    },
+    {
+      "rev": 18,
+      "at": "2026-10-16T20:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "AS-1",
+      "summary": "added AS-1: Users have jq installed"
+    },
+    {
+      "rev": 17,
+      "at": "2026-10-16T19:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "DEC-2",
+      "summary": "added DEC-2: snake_case keys"
+    },
+    {
+      "rev": 16,
+      "at": "2026-10-16T19:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "DEC-1",
+      "summary": "added DEC-1: A JSON array, not NDJSON"
+    },
+    {
+      "rev": 15,
+      "at": "2026-10-16T19:00:00Z",
+      "by": "user",
+      "source": "page",
+      "type": "edit_label",
+      "node": "SC-002",
+      "summary": "renamed SC-002"
+    },
+    {
+      "rev": 14,
+      "at": "2026-10-16T18:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "SC-002",
+      "summary": "added SC-002"
+    },
+    {
+      "rev": 13,
+      "at": "2026-10-16T18:20:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "SC-001",
+      "summary": "added SC-001"
+    },
+    {
+      "rev": 12,
+      "at": "2026-10-16T18:00:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "NG-2",
+      "summary": "added NG-2: No --json on write commands (add, remove)"
+    },
+    {
+      "rev": 11,
+      "at": "2026-10-16T17:40:00Z",
+      "by": "session",
+      "source": "terminal",
+      "type": "upsert",
+      "node": "NG-1",
+      "summary": "added NG-1: No other output formats such as CSV or YAML"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "Q1",
+      "kind": "question",
+      "label": "Tell one concrete story: who hits the problem and what do they do today?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "why",
+      "why": "A concrete story keeps the PRD about a real person.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "Ana pipes inv list into awk in a nightly job; a longer item name shifts the columns and the job reports wrong totals.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T16:00:00Z",
+        "rev": 6
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "P1"
+      ],
+      "rev": 6,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q2",
+      "kind": "question",
+      "label": "Who is this for?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "who",
+      "why": "Decides which flows matter.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "Developers who script around inv. Not end users at a terminal.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T16:20:00Z",
+        "rev": 7
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "U1"
+      ],
+      "rev": 7,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q3",
+      "kind": "question",
+      "label": "How much time is this worth?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "The appetite is a budget; scope bends to it.",
+      "stage": "frame",
+      "class": "user",
+      "options": [
+        {
+          "key": "a",
+          "label": "1 day",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "1 week",
+          "why": ""
+        },
+        {
+          "key": "c",
+          "label": "2 weeks",
+          "why": ""
+        },
+        {
+          "key": "d",
+          "label": "6 weeks",
+          "why": ""
+        }
+      ],
+      "recommended": null,
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T16:40:00Z",
+        "rev": 8
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "C-1"
+      ],
+      "rev": 8,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q4",
+      "kind": "question",
+      "label": "What is explicitly out of scope?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "No-gos keep agents from building the tempting extras.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "No other formats such as CSV or YAML. No --json on write commands.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T17:00:00Z",
+        "rev": 9
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "rev": 9,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q5",
+      "kind": "question",
+      "label": "How will we know it worked? Give a number we can check.",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "why",
+      "why": "Success must be checkable.",
+      "stage": "frame",
+      "class": "user",
+      "options": [],
+      "recommended": null,
+      "answer": {
+        "choice": null,
+        "text": "inv list --json | jq length returns the item count for 1,000 items in under 1 s, and all 7 text columns appear as fields.",
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T17:20:00Z",
+        "rev": 10
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "G-1",
+        "SC-001",
+        "SC-002"
+      ],
+      "rev": 10,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q6",
+      "kind": "question",
+      "label": "Which commands get --json?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Sets the number of slices.",
+      "stage": "explore",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "list and show",
+          "why": "The two read commands scripts use"
+        },
+        {
+          "key": "b",
+          "label": "Every command",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T20:40:00Z",
+        "rev": 20
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "FR-001",
+        "FR-002"
+      ],
+      "rev": 20,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q7",
+      "kind": "question",
+      "label": "Should list print a JSON array or one object per line?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Decides how jq and streaming tools consume it.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "A JSON array",
+          "why": "Works with jq length and json.load"
+        },
+        {
+          "key": "b",
+          "label": "One object per line (NDJSON)",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T21:00:00Z",
+        "rev": 21
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "DEC-1"
+      ],
+      "rev": 21,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q8",
+      "kind": "question",
+      "label": "How are JSON keys named?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "decisions",
+      "why": "Keys are a public contract once shipped.",
+      "stage": "decide",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "snake_case",
+          "why": "Matches the column names"
+        },
+        {
+          "key": "b",
+          "label": "camelCase",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "session",
+        "source": "terminal",
+        "at": "2026-10-16T21:20:00Z",
+        "rev": 22
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "DEC-2"
+      ],
+      "rev": 22,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q9",
+      "kind": "question",
+      "label": "How do errors look in JSON mode?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Scripts must tell failure from an empty list.",
+      "stage": "decide",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "JSON object on stdout and a non-zero exit",
+          "why": "One stream to parse"
+        },
+        {
+          "key": "b",
+          "label": "Plain text on stderr",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T21:40:00Z",
+        "rev": 23
+      },
+      "priority": 0,
+      "blocking": true,
+      "fills": [
+        "FR-003"
+      ],
+      "rev": 23,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "Q10",
+      "kind": "question",
+      "label": "Which command runs the checks?",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "lane": "tasks",
+      "why": "Every task check names it.",
+      "stage": "shape",
+      "class": "mechanical",
+      "options": [
+        {
+          "key": "a",
+          "label": "make test",
+          "why": "Already wired in the repo"
+        }
+      ],
+      "recommended": "a",
+      "answer": {
+        "choice": "a",
+        "text": null,
+        "by": "user",
+        "source": "page",
+        "at": "2026-10-16T22:00:00Z",
+        "rev": 24
+      },
+      "priority": 0,
+      "blocking": false,
+      "fills": [
+        "B-4"
+      ],
+      "rev": 24,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "P1",
+      "kind": "story",
+      "label": "A longer item name shifts the columns and a nightly job reports wrong totals",
+      "body": "Ana pipes inv list into awk. The text output is for humans and is not stable to parse.",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "evidence": "Two support threads in the last month (#88, #91)",
+      "rev": 6,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "U1",
+      "kind": "user",
+      "label": "Developers who script around inv",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "context": "They run inv from shell scripts and CI jobs.",
+      "rev": 7,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "G-1",
+      "kind": "goal",
+      "label": "Scripts read inv output without parsing text",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "rev": 10,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "SC-001",
+      "kind": "criterion",
+      "label": "inv list --json | jq length returns the item count for 1,000 items in under 1 s",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "verify": "make test T=json_perf",
+      "evidence": "",
+      "goal": "G-1",
+      "rev": 13,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "SC-002",
+      "kind": "criterion",
+      "label": "All 7 columns of the text table appear as fields in the JSON output",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "verify": "make test T=json_fields",
+      "evidence": "",
+      "goal": "G-1",
+      "rev": 15,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "C-1",
+      "kind": "constraint",
+      "label": "Appetite: 1 day",
+      "body": "A budget, not an estimate. Cut scope, not time.",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tag": "appetite",
+      "rev": 8,
+      "by": "user",
+      "by_default": false
+    },
+    {
+      "id": "AS-1",
+      "kind": "assumption",
+      "label": "Users have jq installed",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "validate_by": "Ask in the support threads",
+      "impact": "Docs examples would need another tool",
+      "rev": 18,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "S1",
+      "kind": "slice",
+      "label": "Walking skeleton: inv list --json",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "FR-001",
+        "FR-004"
+      ],
+      "order": 1,
+      "why_priority": "Proves the render path and the performance number",
+      "independent_test": "Run inv list --json | jq length on the 1,000-item fixture",
+      "scenarios": [
+        "Given 3 items, When the user runs inv list --json, Then stdout is a JSON array of 3 objects",
+        "Given 1,000 items, When the user runs inv list --json, Then it finishes in under 1 s"
+      ],
+      "exit": "inv list --json | jq length prints the item count",
+      "rev": 30,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "S2",
+      "kind": "slice",
+      "label": "inv show and errors in JSON",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "FR-002",
+        "FR-003",
+        "FR-006",
+        "FR-007"
+      ],
+      "order": 2,
+      "why_priority": "Completes the read commands",
+      "independent_test": "Run inv show 1 --json and inv show 999 --json",
+      "scenarios": [
+        "Given item 1, When the user runs inv show 1 --json, Then stdout is one JSON object",
+        "Given no item 999, When the user runs inv show 999 --json, Then stdout is a JSON error object and the exit code is non-zero"
+      ],
+      "exit": "Both read commands support --json and report errors as JSON",
+      "rev": 31,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-001",
+      "kind": "requirement",
+      "label": "inv list --json prints a JSON array with one object per item",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 26,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-002",
+      "kind": "requirement",
+      "label": "inv show ID --json prints one JSON object for that item",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 27,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-003",
+      "kind": "requirement",
+      "label": "With --json, an error prints an object with an error message to stdout and exits non-zero",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 28,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-004",
+      "kind": "requirement",
+      "label": "Rendering 1,000 items as JSON takes under 1 s",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": true,
+      "rev": 29,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "E-1",
+      "kind": "edge",
+      "label": "Empty inventory",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "FR-001"
+      ],
+      "expect": "inv list --json prints [] and exits 0.",
+      "rev": 19,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "A-1",
+      "kind": "approach",
+      "label": "Serialize with the stdlib json module through one render(items, fmt) function",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "alternatives": [
+        "A third-party serializer"
+      ],
+      "rev": 25,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-1",
+      "kind": "decision",
+      "label": "A JSON array, not NDJSON",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "Q7"
+      ],
+      "chose": "JSON array",
+      "alternatives": [
+        "NDJSON"
+      ],
+      "why": "jq length and json.load work without extra flags.",
+      "rev": 21,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "DEC-2",
+      "kind": "decision",
+      "label": "snake_case keys",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [
+        "Q8"
+      ],
+      "chose": "snake_case",
+      "alternatives": [
+        "camelCase"
+      ],
+      "why": "Matches the text column names.",
+      "rev": 22,
+      "by": "session",
+      "by_default": true
+    },
+    {
+      "id": "B-1",
+      "kind": "boundary",
+      "label": "Always run the task's check before marking it done",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "always",
+      "rev": 32,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-2",
+      "kind": "boundary",
+      "label": "Never change the text output format",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "never",
+      "rev": 33,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-3",
+      "kind": "boundary",
+      "label": "Ask before adding a dependency",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "ask",
+      "rev": 34,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "B-4",
+      "kind": "boundary",
+      "label": "make test",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "tier": "command",
+      "rev": 35,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-001",
+      "kind": "task",
+      "label": "Add --json to inv list",
+      "body": "",
+      "status": "todo",
+      "depends_on": [],
+      "refs": [
+        "FR-001",
+        "SC-001"
+      ],
+      "slice": "S1",
+      "files": [
+        "inv/cli.py",
+        "inv/render.py",
+        "tests/test_list_json.py"
+      ],
+      "parallel": false,
+      "check": "make test T=list_json",
+      "result": null,
+      "crew": null,
+      "rev": 37,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-002",
+      "kind": "task",
+      "label": "Check the JSON rendering speed and fields",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-001"
+      ],
+      "refs": [
+        "FR-004",
+        "SC-002"
+      ],
+      "slice": "S1",
+      "files": [
+        "tests/test_json_perf.py"
+      ],
+      "parallel": true,
+      "check": "make test T=json_perf",
+      "result": null,
+      "crew": null,
+      "rev": 38,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-003",
+      "kind": "task",
+      "label": "Add --json to inv show",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-001"
+      ],
+      "refs": [
+        "FR-002"
+      ],
+      "slice": "S2",
+      "files": [
+        "inv/cli.py",
+        "tests/test_show_json.py"
+      ],
+      "parallel": false,
+      "check": "make test T=show_json",
+      "result": null,
+      "crew": null,
+      "rev": 39,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-004",
+      "kind": "task",
+      "label": "Report errors as JSON",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-003"
+      ],
+      "refs": [
+        "FR-003",
+        "FR-005",
+        "FR-007"
+      ],
+      "slice": "S2",
+      "files": [
+        "inv/cli.py",
+        "tests/test_json_errors.py"
+      ],
+      "parallel": false,
+      "check": "make test T=json_errors",
+      "result": null,
+      "crew": null,
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "Q11",
+      "kind": "question",
+      "label": "Should list --json take a --pretty flag?",
+      "body": "",
+      "status": "open",
+      "depends_on": [],
+      "refs": [],
+      "lane": "scope",
+      "why": "Decides one more option on the flag.",
+      "stage": "shape",
+      "class": "taste",
+      "options": [
+        {
+          "key": "a",
+          "label": "No, pipe through jq",
+          "why": ""
+        },
+        {
+          "key": "b",
+          "label": "Yes",
+          "why": ""
+        }
+      ],
+      "recommended": "a",
+      "answer": null,
+      "priority": 0,
+      "blocking": true,
+      "fills": [],
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-005",
+      "kind": "requirement",
+      "label": "Keys in the JSON output match the 7 column names of the text table",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-006",
+      "kind": "requirement",
+      "label": "inv list --json prints [] and exits 0 when the inventory has 0 items",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "FR-007",
+      "kind": "requirement",
+      "label": "JSON output is easy to consume from shell scripts",
+      "body": "",
+      "status": "settled",
+      "depends_on": [],
+      "refs": [],
+      "nfr": false,
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    },
+    {
+      "id": "T-005",
+      "kind": "task",
+      "label": "Document the --json flag",
+      "body": "",
+      "status": "todo",
+      "depends_on": [
+        "T-004"
+      ],
+      "refs": [],
+      "slice": "S2",
+      "files": [
+        "README.md"
+      ],
+      "parallel": false,
+      "check": "",
+      "result": null,
+      "crew": null,
+      "rev": 40,
+      "by": "session",
+      "by_default": false
+    }
+  ]
+}

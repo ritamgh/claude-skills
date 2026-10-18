@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# crew-check ID — run the repo's own check for a ship task (the logic behind `crew check`; skill: crew §6).
+#   runs      <worktree>/.crew/check (meta worktree=, else repo=), executable, directly: cwd = that folder, stdin closed,
+#             env CREW_TASK CREW_WORKTREE CREW_REPO CREW_PORT (as the setup hook gets it), under
+#             `timeout ${CREW_CHECK_TIMEOUT:-600}`.
+#   output    the last 200 lines of its stdout+stderr -> $CREW_ROOT/<ID>/check.log
+#   meta      check=pass|fail|timeout|none  check_at=<iso8601>   (through `crew meta`; `crew log ID review` and
+#             `crew show` read it)
+#   stdout    one line: check: pass (3.2s) | check: fail (exit 1, 3.2s) | check: timeout (600s) | check: none (no .crew/check)
+# Exit: 0 pass | 1 fail or timeout | 2 usage, no such task, no folder to run in | 3 none (no executable .crew/check).
+set -euo pipefail
+
+CREW_BIN=$(dirname "$(readlink -f "$0")")
+CREW="$CREW_BIN/crew"
+CREW_ROOT="${CREW_ROOT:-$HOME/.claude/crew}"
+export CREW_ROOT
+
+die() { echo "crew check: $*" >&2; exit 2; }
+meta_get() { grep -E "^$2=" "$1/meta" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+
+[ $# -eq 1 ] && [ "${1#-}" = "$1" ] || die "usage: crew check ID"
+id=$1
+
+d=$("$CREW" dir "$id") || exit 2
+repo=$(meta_get "$d" repo)
+wt=$(meta_get "$d" worktree)
+run_dir=${wt:-$repo}
+[ -n "$run_dir" ] || die "task $id has neither worktree= nor repo= in its meta"
+[ -d "$run_dir" ] || die "$run_dir does not exist"
+
+record() { "$CREW" meta "$id" "check=$1" "check_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; }
+
+script="$run_dir/.crew/check"
+if [ ! -f "$script" ] || [ ! -x "$script" ]; then
+  [ -e "$script" ] && why=".crew/check is not executable" || why="no .crew/check"
+  : >"$d/check.log"
+  record none
+  echo "check: none ($why)"
+  exit 3
+fi
+
+t=${CREW_CHECK_TIMEOUT:-600}
+raw="$d/check.log.raw.$$"
+trap 'rm -f "$raw"' EXIT
+start=$(date +%s.%N)
+rc=0
+(cd "$run_dir" && CREW_TASK="$id" CREW_WORKTREE="$run_dir" CREW_REPO="$repo" CREW_PORT="$(meta_get "$d" port)" \
+  timeout -k 5 "$t" "$script" </dev/null >"$raw" 2>&1) || rc=$?
+secs=$(awk -v a="$start" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+tail -n 200 "$raw" >"$d/check.log"
+
+# 124: timeout stopped it; 137: it ignored TERM and was killed after the grace period
+if [ $rc = 124 ] || { [ $rc = 137 ] && awk -v s="$secs" -v t="$t" 'BEGIN { exit !(s >= t) }'; }; then
+  record timeout
+  echo "check: timeout (${t}s)"
+  exit 1
+elif [ $rc = 0 ]; then
+  record pass
+  echo "check: pass (${secs}s)"
+else
+  record fail
+  echo "check: fail (exit $rc, ${secs}s)"
+  exit 1
+fi

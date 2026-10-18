@@ -1,0 +1,7 @@
+{
+  "name": "hq",
+  "version": "0.1.0",
+  "author": { "name": "claude-skills contributors" },
+  "description": "HQ session view of the crew board: a live pane, a band above the prompt and toasts when a task needs you.",
+  "types": "./types/index.d.ts"
+}

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Merge one card's branch into the current branch and validate it, in one call.
+# Keeps the orchestrator small: full validation output goes to a log file, only the
+# tail is printed, and the ledger line is written only when validation is green.
+#
+# Usage (from the target repo, with the integration branch checked out):
+#   merge-card --into <integration-branch> <slug> <card-id> <branch> -- <validation command> [args...]
+# --into is required and must name the branch that is checked out here; otherwise nothing is changed
+# (a run from the wrong checkout once merged a whole feature branch into main).
+# Exit: 0 merged + green (ledger line written)
+#       3 merge conflicts (conflicted files listed; merge left in progress for you to resolve)
+#       2 bad usage, the checkout is not on --into, or git refused the merge for another reason
+#       other: the validation command's exit status (merge committed, nothing recorded)
+set -euo pipefail
+
+usage() { echo "usage: merge-card --into <integration-branch> <slug> <card-id> <branch> -- <validation command> [args...]" >&2; exit 2; }
+[ $# -ge 7 ] && [ "$1" = "--into" ] && [ "$6" = "--" ] || usage
+into=$2 slug=$3 id=$4 branch=$5
+shift 6
+current=$(git branch --show-current 2>/dev/null || true)
+if [ "$current" != "$into" ]; then
+  echo "merge-card: checkout is on '${current:-HEAD (detached)}', not on the integration branch '$into'; nothing changed" >&2
+  exit 2
+fi
+
+ORCH=${ORCH_ROOT:-$HOME/.claude/orchestration}
+ledger="$ORCH/$slug/ledger.md"
+[ -f "$ledger" ] || { echo "no ledger at $ledger (run jw init $slug first)" >&2; exit 2; }
+git rev-parse --verify --quiet "$branch^{commit}" >/dev/null || { echo "no such branch: $branch" >&2; exit 2; }
+mkdir -p "$ORCH/$slug/runs"
+log="$ORCH/$slug/runs/merge-$id.log"
+
+# Use the repo's identity; fall back to a local one only when none is configured.
+ident=()
+{ git config user.email && git config user.name; } >/dev/null || ident=(-c user.name=claude-orchestrator -c user.email=claude-orchestrator@localhost)
+
+if ! git "${ident[@]}" merge --no-ff --no-edit -m "Merge $branch (card $id)" "$branch" > "$log.git" 2>&1; then
+  conflicts=$(git diff --name-only --diff-filter=U)
+  if [ -n "$conflicts" ]; then
+    echo "merge-card: conflicts merging $branch; resolve, commit, then rerun the validation:" >&2
+    printf '  %s\n' $conflicts >&2
+    exit 3
+  fi
+  tail -n 5 "$log.git" >&2
+  echo "merge-card: git refused the merge (see above); nothing changed" >&2
+  exit 2
+fi
+tail -n 1 "$log.git"
+
+# Render the command the way a person would type it, for the ledger line.
+cmd=""
+for a in "$@"; do
+  case "$a" in *[[:space:]\"\;\|\&]*) cmd="$cmd '$a'" ;; *) cmd="$cmd $a" ;; esac
+done
+cmd=${cmd# }
+
+rc=0
+"$@" > "$log" 2>&1 || rc=$?
+tail -n 5 "$log"
+if [ "$rc" -ne 0 ]; then
+  echo "merge-card: validation exited $rc after merging $branch; NOT recorded (full output: $log)" >&2
+  exit "$rc"
+fi
+
+last=$(grep -v '^[[:space:]]*$' "$log" | tail -n 1 || true)
+line="- Merged $id: $branch ($(git rev-parse --short HEAD)) — $cmd → ${last:-exit 0}"
+# jw appends its run table at the end of the ledger ("keep this section last"), so the
+# line goes just above that section when it exists.
+if grep -q '^## jcode runs' "$ledger"; then
+  tmp=$(mktemp "$ledger.XXXX")
+  awk -v l="$line" '/^## jcode runs/ && !done { print l; print ""; done=1 } { print }' "$ledger" > "$tmp"
+  mv "$tmp" "$ledger"
+else
+  printf '%s\n' "$line" >> "$ledger"
+fi
+echo "ledger: $line"
+
+# Pending wakes: asleep feature owners whose paths this merge touched. Best effort, the exit code stays 0.
+"${CREW_EXE:-$HOME/.claude/bin/crew}" owners --record-wake HEAD^1 --change "$branch (card $id, $(git rev-parse --short HEAD))" 2>/dev/null || true
+
+# Build sync: a ledger line "Plan: <task>" links this orchestration to a /shape plan; a merged card
+# named like a plan task (T-001) is marked done there. Failure only warns, the exit code stays 0.
+plan_task=$(sed -n '/^Plan: /{s///;s/[[:space:]].*//;p;q;}' "$ledger")
+if [ -n "$plan_task" ] && [[ $id =~ ^T-[0-9]{3}$ ]]; then
+  sha=$(git rev-parse --short HEAD)
+  event="{\"type\":\"task_status\",\"node\":\"$id\",\"status\":\"done\",\"ok\":true,\"note\":\"merged $sha\"}"
+  if sync=$("${PLAN_BIN:-$HOME/.claude/bin/plan}" event "$plan_task" --source build --json "$event" 2>&1); then
+    echo "plan: $id marked done in $plan_task"
+  else
+    echo "merge-card: plan sync failed: $sync" >&2
+  fi
+fi

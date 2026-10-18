@@ -1,0 +1,1404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Caveat:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* sketch: a white sketchbook. Black hand-drawn lines, red / orange / blue handwriting, Blot acting out each idea.
+   Blue = route and structure, red = the current stop, damage and wrong, orange = impact and consequence. Dark is a blackboard. */
+:root{
+  --paper:#fff;--paper-2:#F4F4F2;--tint:#F2F2F0;--rule:#D6D6D2;--sel:#D8E5FA;
+  --ink:#111;--ink-2:#3A3A3A;--ink-3:#6C6C6C;--line:#111;
+  --red:#D93A2B;--orange:#E8820C;--blue:#2B6FD9;--red-ink:#C42F21;--orange-ink:#A35700;--blue-ink:#2361C4;
+  --blot:#111;--blot-eye:#fff;
+  --tk-c:#8A8A86;--tk-s:#2361C4;--tk-n:#A35700;--tk-k:#111;
+  --hand:"Caveat","Patrick Hand","Segoe Print","Bradley Hand",cursive;
+  --body:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --wob:7px 10px 6px 11px / 10px 6px 11px 7px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#1A1C1B;--paper-2:#242725;--tint:#262927;--rule:#3B3F3C;--sel:#2C3B55;
+  --ink:#ECE9E1;--ink-2:#CFCBC2;--ink-3:#9D9A93;--line:#ECE9E1;
+  --red:#FF7A6B;--orange:#FFAA4D;--blue:#7AB0FF;--red-ink:#FF8C7E;--orange-ink:#FFB866;--blue-ink:#8DBBFF;
+  --blot:#ECE9E1;--blot-eye:#1A1C1B;
+  --tk-c:#8E8B84;--tk-s:#8DBBFF;--tk-n:#FFB866;--tk-k:#ECE9E1;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#1A1C1B;--paper-2:#242725;--tint:#262927;--rule:#3B3F3C;--sel:#2C3B55;
+  --ink:#ECE9E1;--ink-2:#CFCBC2;--ink-3:#9D9A93;--line:#ECE9E1;
+  --red:#FF7A6B;--orange:#FFAA4D;--blue:#7AB0FF;--red-ink:#FF8C7E;--orange-ink:#FFB866;--blue-ink:#8DBBFF;
+  --blot:#ECE9E1;--blot-eye:#1A1C1B;
+  --tk-c:#8E8B84;--tk-s:#8DBBFF;--tk-n:#FFB866;--tk-k:#ECE9E1;color-scheme:dark;}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+body{margin:0;background-color:var(--paper);color:var(--ink);font:400 18.5px/1.7 var(--body);font-variant-numeric:lining-nums}
+::selection{background:var(--sel);color:var(--ink)}
+:focus-visible{outline:2.5px solid var(--blue);outline-offset:3px;border-radius:6px}
+a{color:var(--ink);text-decoration-thickness:1.5px;text-underline-offset:4px;text-decoration-color:var(--blue)}
+a:hover{text-decoration-color:var(--red)}
+code{font-family:var(--mono);font-size:.84em;overflow-wrap:anywhere;background:var(--tint);padding:.08em .32em;border-radius:4px}
+p{margin:0 0 .85em}
+button{font:inherit;color:inherit}
+html{scrollbar-color:var(--ink-3) transparent}
+::-webkit-scrollbar{width:12px;height:12px}::-webkit-scrollbar-thumb{background:var(--ink-3);border-radius:8px;border:4px solid var(--paper)}
+
+/* ---------- page frame ---------- */
+.page{display:grid;grid-template-columns:210px minmax(0,1fr);gap:72px;max-width:1560px;margin:0 auto;padding:0 56px 140px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:40px 0 24px;display:flex;flex-direction:column;gap:22px;scrollbar-width:thin}
+main{min-width:0;padding-top:40px;overflow-wrap:break-word}
+
+/* ---------- rail ---------- */
+.rail-brand{display:flex;align-items:center;gap:8px;font:700 30px/1 var(--hand);color:var(--ink)}
+.rail-brand svg{width:36px;height:41px}
+.toc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.toc>li>a{display:flex;align-items:baseline;gap:8px;padding:3px 8px;border-radius:8px;font:400 22px/1.3 var(--hand);color:var(--ink-2);text-decoration:none}
+.toc>li>a:hover{color:var(--ink);background:var(--paper-2)}
+.toc>li>a.on{color:var(--ink);font-weight:700;text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:2px;text-underline-offset:6px}
+.toc .cnt{margin-left:auto;font:400 18px var(--hand);color:var(--ink-3)}
+.stops{list-style:none;margin:6px 0 12px 14px;padding:0 0 0 20px;position:relative}
+.stops::before{content:"";position:absolute;left:9px;top:12px;bottom:12px;border-left:1.5px dashed var(--ink-3);opacity:.6}
+.stops .fill{position:absolute;left:8px;top:12px;width:3px;border-radius:2px;background:var(--blue);height:var(--h,0px);transition:height .5s cubic-bezier(.16,1,.3,1)}
+.stops li{position:relative}
+.stops a{display:block;padding:3px 6px 3px 16px;font-size:15px;line-height:1.35;color:var(--ink-3);text-decoration:none;border-radius:8px}
+.stops a:hover{color:var(--ink);background:var(--paper-2)}
+.stops .dot{position:absolute;left:-17px;top:6px;width:15px;height:15px;border-radius:50%;border:1.5px solid var(--ink-3);background:var(--paper);display:grid;place-items:center}
+.stops li.done a{color:var(--ink-2)}
+.stops li.done .dot{background:var(--blue);border-color:var(--blue)}
+.stops li.done .dot::after{content:"";width:6px;height:3px;border:solid var(--paper);border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}
+.stops li.here a{color:var(--ink);font-weight:700}
+.stops li.here .dot{border:2.5px solid var(--red);background:var(--paper)}
+.stops li.gate:not(.done) .dot::after{content:"?";color:var(--red-ink);font:700 13px/1 var(--hand)}
+.rail-foot .keys{display:flex;flex-direction:column;gap:6px}.rail-foot .keys span{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:12px;font:400 14px/1.4 var(--body);color:var(--ink-3)}
+kbd{font:600 12.5px var(--mono);border:1.2px solid var(--ink-3);border-bottom-width:2.5px;border-radius:5px;padding:0 5px;color:var(--ink-2);background:var(--paper)}
+
+/* ---------- controls ---------- */
+.pill{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;padding:3px;background:var(--paper)}
+.pill button{border:0;background:none;padding:4px 14px;border-radius:999px;cursor:pointer;font:600 15px var(--body);color:var(--ink-2)}
+.pill button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.pill button:not([aria-pressed="true"]):hover{background:var(--paper-2)}
+.icon-btn{display:inline-grid;place-items:center;width:42px;height:42px;border:1.5px solid var(--line);border-radius:50%;background:var(--paper);cursor:pointer;color:var(--ink)}
+.icon-btn svg{width:20px;height:20px}
+.icon-btn:hover{background:var(--paper-2)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:var(--wob);background:var(--paper);padding:7px 16px;cursor:pointer;font:600 15.5px var(--body);color:var(--ink);transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px);background:var(--paper-2)}
+.btn.go{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.go:hover{background:var(--blue-ink);border-color:var(--blue-ink);color:#fff}
+.btn.quiet{border-color:transparent;background:none;color:var(--ink-2);padding:6px 10px}
+.btn.quiet:hover{color:var(--ink);background:var(--paper-2)}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
+.btn svg{width:18px;height:18px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 48px;align-items:start;margin-bottom:8px}
+.hero-ctl{display:flex;gap:12px;align-items:center;justify-content:flex-end;grid-column:2;grid-row:1}
+.hero-txt{grid-column:1;grid-row:1 / span 2}
+h1{font:700 clamp(50px,5.4vw,90px)/1 var(--hand);margin:0;max-width:18ch;text-wrap:balance}
+h1 code{font-size:.5em}
+h1 .swipe{color:var(--ink)}
+.swash{display:block;width:min(420px,60%);height:16px;margin:10px 0 24px;color:var(--blue)}
+.lede{font-size:20px;line-height:1.65;color:var(--ink-2);max-width:60ch;margin:0}
+.hero-mascot{grid-column:2;grid-row:2;justify-self:end;width:112px;height:127px;margin:8px 24px 0 0}
+.hero-mascot svg{width:100%;height:100%}
+.resume{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:24px 0 8px;padding:6px 0 6px 18px;border-left:2.5px solid var(--blue);font:400 21px/1.4 var(--hand)}
+.resume b{font:600 17px var(--body)}
+
+/* ---------- section heads ---------- */
+section.sec{margin-top:150px;scroll-margin-top:24px}
+section.sec:first-of-type{margin-top:56px}
+.sec-head{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+h2{font:700 clamp(44px,3.8vw,62px)/1 var(--hand);margin:0;letter-spacing:.005em}
+h2::after{content:"";display:block;height:9px;width:100%;margin-top:2px;background:var(--blue);
+  --sq:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 40 3, 80 8, 120 5 S 180 4, 198 6' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  -webkit-mask:var(--sq) no-repeat 0 0/100% 100%;mask:var(--sq) no-repeat 0 0/100% 100%}
+.sec-intro{color:var(--ink-2);max-width:62ch;margin:14px 0 48px}
+.grow{flex:1}
+
+/* ---------- scene plates (parts/scenes.js draws them; the box is reserved so nothing jumps) ----------
+   The drawing is 640 units wide and no text in it is under 20 units, so every label stays >= 11px as long as a plate is >= 352px wide.
+   Plates that carry text are therefore as wide as their box allows (560px max; 460px/360px columns on the wide layouts); the section-default
+   "quiet" plates have no text but a few big glyphs (A, B, ok, ?) and stay small. On a phone the plate bleeds into the card padding and
+   under the step number column to get its 352px. */
+.plate{margin:0;width:100%;max-width:560px;aspect-ratio:16/9}
+.plate svg{display:block;width:100%;height:100%}
+.plate.quiet{max-width:320px}
+/* A drawn picture does not write its caption inside the svg, so it sits under the plate as handwriting; the plate's 16:9 box moves to the svg. */
+.plate.cap{aspect-ratio:auto}
+.plate.cap svg{height:auto;aspect-ratio:16/9}
+.plate figcaption{margin:6px 0 0;font:400 20px/1.25 var(--hand);color:var(--ink-2);overflow-wrap:anywhere}
+.stop .plate{margin:6px 0 30px}
+.node-note .plate{max-width:460px;margin:0 0 22px}
+
+/* ---------- map ---------- */
+.map-top{display:flex;align-items:flex-end;gap:12px 28px;flex-wrap:wrap;margin:0 0 22px}
+.map-top h2{margin-right:4px}
+.map-hint{font:400 21px/1.35 var(--hand);color:var(--ink-2);flex:1;min-width:260px;padding-bottom:6px}
+.map-hint b{font:700 16.5px var(--body)}
+.map-card{padding:0}
+.mapwrap{overflow-x:auto;overscroll-behavior-x:contain}
+#map{display:block;width:100%;min-width:900px;height:auto}
+#map text{pointer-events:none}
+#map .zone path{fill:none;stroke:var(--ink-3);stroke-width:1.1;stroke-dasharray:6 7;opacity:.6}
+#map .zone text{font:700 20px var(--hand);fill:var(--ink-3)}
+#map .edge .wire,#map .edge .head{fill:none;stroke:var(--ink);stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+#map .elabel{font:400 20px var(--hand);fill:var(--ink-2);stroke:var(--paper);stroke-width:5px;paint-order:stroke;stroke-linejoin:round}
+#map .node{cursor:pointer}
+#map .node .fill{fill:var(--paper)}
+#map .node .stroke{fill:none;stroke:var(--line);stroke-width:1.05;stroke-linecap:round}
+#map .node .circ{fill:none;stroke:var(--red);stroke-width:2.2;stroke-linecap:round;opacity:0;pointer-events:none;transition:opacity .25s}
+#map .node .lbl{font:700 17px var(--body);fill:var(--ink)}
+#map .node .kind{font:400 19px var(--hand);fill:var(--ink-3)}
+#map .node .nicon{pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
+#map .node:hover .fill,#map .node:focus-visible .fill{fill:var(--paper-2)}
+#map .node:focus{outline:none}
+#map .node:focus-visible .stroke{stroke:var(--blue);stroke-width:2.4}
+#map .node.onroute .stroke{stroke:var(--blue);stroke-width:1.7}
+#map .node.active .stroke{stroke:var(--line);stroke-width:2}
+#map .node.active .circ{opacity:1}
+#map .node.picked .stroke{stroke-width:2.4}
+#map .node.hit .stroke{stroke:var(--red);stroke-width:1.8}
+#map .node.origin .stroke{stroke:var(--red);stroke-width:2.2}
+#map .node.origin .circ{opacity:1}
+#map.impact .node.hit .stroke,#map.impact .node.origin .stroke,#map.impact .node.origin .circ{stroke:var(--orange)}
+#map .node.dim{opacity:.28}
+#map .edge.hit .wire,#map .edge.hit .head{stroke:var(--red);stroke-width:2}
+#map.impact .edge.hit .wire,#map.impact .edge.hit .head{stroke:var(--orange)}
+#map .edge.dimmed,#map .elabel.dimmed{opacity:.25}
+
+/* ---------- architecture: async edges, clickable edges, marks ---------- */
+#map .route,#map .ghost{pointer-events:none}
+#map .edge.async .wire{stroke-dasharray:8 7}
+#map .edge .hitarea{fill:none;stroke:transparent;stroke-width:18;pointer-events:stroke}
+#map .edge.link{cursor:pointer}
+#map .edge:focus{outline:none}
+#map .edge.link:hover:not(.hit) .wire,#map .edge.link:hover:not(.hit) .head,#map .edge:focus-visible:not(.hit) .wire,#map .edge:focus-visible:not(.hit) .head{stroke:var(--blue);stroke-width:2.4}
+#map .edge.sel:not(.hit) .wire,#map .edge.sel:not(.hit) .head{stroke:var(--blue);stroke-width:3}
+#map .node.endpoint .stroke{stroke:var(--blue);stroke-width:2.4}
+#map .node.marked .stroke{stroke:var(--blue);stroke-width:2.4}
+#map .node.marked .circ{opacity:1;stroke:var(--blue)}
+#map .ghost{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-dasharray:1.5 8;opacity:.6}
+#map .route{fill:none;stroke:var(--blue);stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+#map .route.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .7s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.map-foot{display:flex;gap:6px 26px;flex-wrap:wrap;align-items:center;font:400 19px/1.3 var(--hand);color:var(--ink-3);padding:14px 0 0}
+.map-foot i{display:inline-block;width:26px;height:0;border-top:3px solid var(--blue);vertical-align:middle;margin-right:6px}
+.map-foot i.p{border-top-color:var(--red)}
+.map-foot i.o{border-top-color:var(--orange)}
+.map-foot i.d{border-top:2px dashed var(--ink-2)}
+.map-foot i.c{width:16px;height:12px;border:2px solid var(--red);border-radius:50%}
+
+/* the component note that opens under the map */
+.node-note{margin-top:32px;background:var(--paper);border:1.5px solid var(--line);border-radius:var(--wob);padding:30px 36px 26px;position:relative}
+.node-note[hidden]{display:none}
+.node-note .close{position:absolute;right:14px;top:14px}
+.node-note h3{font:700 28px/1.2 var(--body);margin:0 50px 4px 0;letter-spacing:-.01em}
+.node-note .kindline{font:400 22px/1.3 var(--hand);color:var(--ink-3);margin-bottom:6px}
+.node-note .files{font:400 14px var(--mono);color:var(--ink-3);margin-bottom:20px;overflow-wrap:anywhere}
+.node-grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:48px}
+.links{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:17px}
+.links dt{font:700 19px/1.4 var(--hand);color:var(--ink-3)}
+.links dd{margin:0}
+.side-h{font:700 21px/1.3 var(--hand);color:var(--ink-3);margin:20px 0 6px}
+.side-h:first-child{margin-top:0}
+.at a{display:block;font-size:16px;padding:2px 0}
+.archblock{margin:24px 0 0;padding:16px 20px 14px;border:1.5px dashed var(--ink-3);border-radius:var(--wob)}
+.archblock .side-h{margin:0 0 8px}
+.archblock .links dt,.edge-dl dt{white-space:nowrap}
+.edge-dl{font-size:18px;gap:10px 18px}
+.edge-dl dt{font-size:20px}
+details.inside{margin-top:16px;border-top:1.5px dashed var(--rule);padding-top:12px}
+details.inside summary{cursor:pointer;font:700 17px var(--body);list-style:none;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+details.inside summary::before{content:"+";font:700 24px/1 var(--hand);color:var(--blue-ink);width:14px}
+details.inside[open] summary::before{content:"\2013"}
+details.inside summary span{font:400 13.5px var(--mono);color:var(--ink-3)}
+
+/* ---------- the trip ---------- */
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 36px}
+.tabs button{border:1.5px solid var(--line);background:var(--paper);border-radius:var(--wob);padding:7px 18px;cursor:pointer;font:600 15.5px var(--body);color:var(--ink-2)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.tabs button:not([aria-selected="true"]):hover{background:var(--paper-2);color:var(--ink)}
+.trigger{display:flex;gap:16px;align-items:baseline;max-width:820px;margin:0 0 56px;padding:4px 0 4px 18px;border-left:2.5px solid var(--blue);font-size:18px}
+.trigger .lab{font:700 23px/1.2 var(--hand);color:var(--blue-ink);flex:none}
+.trip{position:relative}
+.stop{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:0 30px;padding-bottom:110px;scroll-margin-top:28px}
+.stop::before{content:"";position:absolute;left:31px;top:70px;bottom:10px;border-left:1.5px dashed var(--ink-3);opacity:.5}
+.stop:last-child::before{display:none}
+.stop.past::before{border-left:2px solid var(--blue);opacity:.8}
+.stop .num{width:64px;height:64px;display:grid;place-items:center;font:700 34px/1 var(--hand);color:var(--ink);position:relative}
+.stop .num svg{position:absolute;inset:0;width:100%;height:100%;color:var(--ink)}
+.stop.past .num svg .ring{color:var(--blue)}
+.stop.here .num svg .ring{color:var(--red)}
+.stop.here .num{color:var(--red-ink)}
+.stop-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:8px 0 4px}
+.stop-title{font:700 clamp(24px,2vw,31px)/1.2 var(--body);margin:0;letter-spacing:-.012em;text-wrap:balance}
+.stop-title code{font-size:.8em}
+.stop-meta{font:400 21px/1.3 var(--hand);color:var(--ink-3);margin-bottom:28px;display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}
+.stop-meta a{font-weight:700}
+.stamp{display:inline-block;font:700 18px/1.25 var(--hand);padding:0 9px;border:1.5px solid currentColor;border-radius:8px 12px 9px 13px;transform:rotate(-2deg);white-space:nowrap;cursor:help;vertical-align:middle}
+.stamp.evidenced{color:var(--blue-ink)}
+.stamp.inferred{color:var(--orange-ink)}
+.stamp.uncertain{color:var(--red-ink)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:56px;align-items:start}
+.cols.solo{grid-template-columns:minmax(0,1fr)}
+.narr{max-width:66ch}
+.narr p:last-child{margin-bottom:0}
+.blurred{filter:blur(7px);user-select:none;pointer-events:none;opacity:.55}
+.gate-wait{font:700 21px/1.3 var(--hand);color:var(--red-ink);margin:0 0 10px}
+.aside{display:flex;gap:12px;align-items:flex-start;margin:26px 0 0;max-width:62ch;font:400 22px/1.35 var(--hand);color:var(--ink-2)}
+.aside svg{flex:none;width:24px;height:24px;margin-top:3px;color:var(--orange)}
+.stop-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+
+/* guess-first gate */
+.turn{display:grid;grid-template-columns:64px minmax(0,1fr);gap:4px 22px;margin:0 0 36px;padding:24px 28px;background:var(--paper);border:1.5px solid var(--line);border-radius:var(--wob)}
+.turn .masc{width:64px;height:73px}
+.turn .masc svg{width:100%;height:100%}
+.turn .q{font:700 20px/1.4 var(--body);margin:2px 0 16px}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice{display:flex;gap:14px;align-items:center;text-align:left;background:var(--paper);border:1.5px solid var(--line);border-radius:var(--wob);padding:10px 16px;cursor:pointer;font-size:17.5px;line-height:1.4;transition:transform .15s,background .15s}
+.choice:hover:not(:disabled){background:var(--paper-2);transform:translateX(3px)}
+.choice .k{flex:none;display:grid;place-items:center;width:30px;height:30px;border:1.5px solid var(--line);border-radius:50%;font:700 19px/1 var(--hand)}
+.choice:disabled{cursor:default}
+.choice.right{border-color:var(--blue);border-width:2px}
+.choice.right .k{background:var(--blue);border-color:var(--blue);color:var(--paper)}
+.choice.wrong{border-color:var(--red);border-width:2px}
+.choice.wrong .k{background:var(--red);border-color:var(--red);color:var(--paper)}
+.choice:disabled:not(.right):not(.wrong){opacity:.5}
+.verdict{margin-top:16px;font-size:17.5px}
+.verdict b{font:700 23px var(--hand);margin-right:8px}
+.verdict.ok b{color:var(--blue-ink)}.verdict.no b{color:var(--red-ink)}
+
+/* code card */
+.code{margin:28px 0 0;background:var(--paper);border:1.5px solid var(--line);border-radius:var(--wob);overflow:hidden;max-width:100%}
+.code figcaption{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;padding:8px 18px;border-bottom:1.5px solid var(--line);font:400 19px/1.3 var(--hand);color:var(--ink-3)}
+.code .file{font:600 14.5px var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.code .lines-n{margin-left:auto}
+.code:has(.rows.more) .lines-n::after{content:" · scroll for more \2192"}
+.code .rows{overflow-x:auto;padding:12px 0 14px;font:400 15px/1.75 var(--mono);scrollbar-width:thin;scrollbar-color:var(--ink-3) transparent}
+.ln{display:grid;grid-template-columns:4.2em max-content;padding-right:22px;min-width:100%;position:relative}
+.ln .n{color:var(--ink-3);text-align:right;padding-right:16px;user-select:none;opacity:.7}
+.ln .t{white-space:pre;padding:0 4px;border-radius:3px}
+.ln.hl{background:var(--tint)}
+.ln.hl .n{color:var(--red-ink);opacity:1;font-weight:600}
+.nt{position:sticky;left:0;display:flex;gap:8px;align-items:flex-start;max-width:min(680px,84vw);margin:4px 0 10px 4.2em;padding:0 10px 0 0;font:400 21px/1.3 var(--hand);color:var(--blue-ink);white-space:normal}
+.nt svg{flex:none;width:24px;height:20px;margin-top:2px}
+.nt code{font-size:.7em;color:var(--ink)}
+.tk-c{color:var(--tk-c);font-style:italic}.tk-s{color:var(--tk-s)}.tk-n{color:var(--tk-n)}.tk-k{color:var(--tk-k);font-weight:600}
+
+/* memory note */
+.memo{position:sticky;top:32px}
+.memo-note{position:relative;background:var(--paper);color:var(--ink);padding:18px 20px 16px;border:1.5px dashed var(--ink-3);border-radius:var(--wob)}
+.memo-h{font:700 23px/1.2 var(--hand);margin:0 0 8px}
+.mv{padding:7px 0;border-top:1px dashed var(--rule)}
+.mv dt{font:600 14px var(--mono);color:var(--ink-3);overflow-wrap:anywhere}
+.mv dd{margin:2px 0 0;font:400 15px/1.45 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.mv.new dd span{border-bottom:2px solid var(--red);padding:0 1px}
+.mv .newtag{font:700 18px/1 var(--hand);color:var(--red-ink);margin-left:8px}
+.mv.masked dd{height:14px;margin-top:5px;width:72%;background:var(--ink-3);opacity:.6;
+  --sq:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 16' preserveAspectRatio='none'%3E%3Cpath d='M2 9c6-7 10 6 16-1s10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  -webkit-mask:var(--sq) no-repeat 0 0/100% 100%;mask:var(--sq) no-repeat 0 0/100% 100%}
+.memo-lock{font:400 19px/1.3 var(--hand);color:var(--red-ink);margin:12px 0 0}
+.memo-empty{font:400 20px/1.3 var(--hand);color:var(--ink-3);margin:0}
+
+/* ---------- lists that carry a scene: text on the left, the plate on the right (above it on narrow screens) ---------- */
+.exps,.risks,.invs,.press-list{display:flex;flex-direction:column}
+.exp,.dec,.risk,.inv,.press{display:grid;gap:20px 56px;align-items:start;padding:44px 0;border-top:1.5px dashed var(--rule);max-width:1180px}
+.exp:first-child,.risk:first-child,.inv:first-child,.press:first-child,.sec-intro+.dec{border-top:0;padding-top:8px}
+.exp{grid-template-columns:minmax(0,1fr) 460px}
+.dec{grid-template-columns:minmax(0,1fr) 460px}
+.risk,.press{grid-template-columns:100px minmax(0,1fr) 460px}
+.inv{grid-template-columns:64px minmax(0,1fr) 460px}
+.exp>.plate,.dec>.plate,.risk>.plate,.inv>.plate,.press>.plate{justify-self:end}
+
+/* ---------- failure modes / break it ---------- */
+.exp h3{font:700 23px/1.3 var(--body);margin:0 0 10px;letter-spacing:-.01em}
+.exp .change{max-width:62ch}
+.exp .result{margin-top:22px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;max-width:62ch}
+.exp .result.shown{border-left:2.5px solid var(--red);padding:2px 0 2px 18px}
+.exp .guess{font:400 22px/1.3 var(--hand);color:var(--ink-2)}
+.exp .what{font:700 23px/1.3 var(--hand);color:var(--red-ink)}
+.exp .takeaway{font:400 22px/1.35 var(--hand);color:var(--blue-ink)}
+
+/* ---------- decisions ---------- */
+.dec h3{font:700 26px/1.25 var(--body);margin:0 0 16px;letter-spacing:-.01em}
+.chosen{font-weight:600}
+.chosen-wrap{max-width:66ch;margin:0 0 18px;padding:2px 0 2px 18px;border-left:2.5px solid var(--blue)}
+.chosen-wrap .lab,.dec-ctx .lab,.dec-cons .lab{font:700 21px/1.3 var(--hand);color:var(--ink-3);display:block;margin-bottom:2px}
+.chosen-wrap .lab{color:var(--blue-ink)}
+.alts{width:100%;border-collapse:collapse;margin-top:22px;font-size:17px}
+.alts th{text-align:left;font:700 20px/1.3 var(--hand);color:var(--ink-3);padding:6px 16px 6px 0;border-bottom:1.5px solid var(--line)}
+.alts td{padding:12px 16px 12px 0;border-bottom:1px dashed var(--rule);vertical-align:top}
+.alts td:first-child{font-weight:700;width:30%}
+
+/* ---------- weak spots ---------- */
+.risks-head{display:flex;gap:18px;align-items:flex-end}
+.risks-head svg{width:52px;height:59px;flex:none}
+.sev{justify-self:start;align-self:start;font:700 20px/1.2 var(--hand);padding:1px 12px;border:1.5px solid currentColor;border-radius:8px 12px 9px 13px;transform:rotate(-3deg);margin-top:4px}
+.sev.high{color:var(--red-ink)}
+.sev.medium{color:var(--orange-ink)}
+.sev.low{color:var(--ink-3)}
+.risk h3{font:700 22px/1.3 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.risk .loc{font:400 14px var(--mono);color:var(--ink-3);margin-bottom:10px;overflow-wrap:anywhere}
+.risk p{max-width:66ch}
+.risk .fix{max-width:66ch;color:var(--ink-2)}
+.risk .fix b{font:700 21px var(--hand);color:var(--blue-ink);margin-right:8px}
+
+/* ---------- interfaces, invariants, pressure points, decision forces (architecture) ---------- */
+.iface-card{border:1.5px solid var(--line);border-radius:var(--wob);overflow-x:auto;max-width:1180px}
+.ifaces{width:100%;border-collapse:collapse;font-size:16.5px;line-height:1.5}
+.ifaces th{text-align:left;font:700 20px/1.3 var(--hand);color:var(--ink-3);padding:10px 16px;border-bottom:1.5px solid var(--line)}
+.ifaces td{padding:14px 16px;border-bottom:1px dashed var(--rule);vertical-align:top}
+.ifaces tr:last-child td{border-bottom:0}
+.ifaces tr.on td{background:var(--tint)}
+.ifaces td.none{color:var(--ink-3)}
+.iface-go{display:block;max-width:100%;border:0;background:none;padding:0;cursor:pointer;text-align:left;font:700 17px/1.4 var(--body);color:var(--ink);text-decoration:underline;text-decoration-color:var(--blue);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.iface-go:hover{text-decoration-color:var(--red)}
+.mode{display:inline-block;font:700 19px/1.2 var(--hand);padding:0 9px;border:1.5px solid var(--ink-2);border-radius:8px 12px 9px 13px;color:var(--ink-2)}
+.mode.async{border-style:dashed;color:var(--blue-ink);border-color:var(--blue-ink)}
+.inv .num{width:56px;height:56px;display:grid;place-items:center;font:700 30px/1 var(--hand);color:var(--ink);position:relative}
+.inv .num svg{position:absolute;inset:0;width:100%;height:100%;color:var(--ink)}
+.press h3{font:700 22px/1.3 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.inv h3{font:400 20px/1.5 var(--body);margin:0 0 6px}
+.enf{font:400 21px/1.3 var(--hand);color:var(--ink-3);margin:0 0 12px}
+.enf a{font-weight:700}
+.enf+.enf{margin-top:-8px}
+.enf code{font-size:.82em}
+.breaks{max-width:66ch;margin:0 0 6px}
+.breaks b{font:700 21px var(--hand);color:var(--red-ink);margin-right:8px}
+.press .links{max-width:66ch;margin:0 0 6px}
+.dec-ctx{max-width:66ch;margin:0 0 18px}
+.dec-cons{max-width:66ch;margin:20px 0 0;padding:2px 0 2px 18px;border-left:2.5px solid var(--orange)}
+.dec-cons .lab{color:var(--orange-ink)}
+
+/* ---------- quiz ---------- */
+.quiz{max-width:860px}
+.pips{display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.pip{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink-3);background:var(--paper);cursor:pointer;padding:0}
+.pip.right{background:var(--blue);border-color:var(--blue)}
+.pip.wrong{background:var(--red);border-color:var(--red)}
+.pip.cur{outline:2px solid var(--ink);outline-offset:3px;border-color:var(--ink)}
+.qcard{background:var(--paper);border:1.5px solid var(--line);border-radius:var(--wob);padding:28px 32px}
+.qnum{font:400 21px/1.3 var(--hand);color:var(--ink-3)}
+.qtext{font:700 23px/1.35 var(--body);margin:6px 0 20px;letter-spacing:-.01em}
+.score-row{display:flex;gap:28px;align-items:center}
+.score-row svg{width:84px;height:95px;flex:none}
+.score{font:700 96px/1 var(--hand)}
+.score small{font:400 34px var(--hand);color:var(--ink-3)}
+.qnav{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
+
+/* ---------- glossary ---------- */
+.terms{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:28px 56px;margin:0}
+.terms div{break-inside:avoid}
+.terms dt{font:700 19px var(--body);display:inline;border-bottom:2px solid var(--blue)}
+.terms dd{margin:8px 0 0;color:var(--ink-2);font-size:17.5px}
+.term{text-decoration:underline dotted var(--blue) 2px;text-underline-offset:4px;cursor:help}
+#tip{position:fixed;z-index:30;max-width:340px;padding:12px 16px;background:var(--paper);color:var(--ink);border:1.5px solid var(--line);font:400 15.5px/1.45 var(--body);border-radius:var(--wob);pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
+#tip.on{opacity:1;transform:none}
+#tip b{font:700 19px var(--hand)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,24px);background:var(--ink);color:var(--paper);padding:10px 20px;border-radius:var(--wob);font:600 15.5px var(--body);opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.16,1,.3,1);pointer-events:none;z-index:40}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+footer.end{margin-top:150px;display:flex;gap:18px;align-items:center;font:400 22px/1.35 var(--hand);color:var(--ink-3)}
+footer.end svg{width:48px;height:54px;flex:none}
+
+/* ---------- ask claude (needs scripts/serve.py; opened as a file it copies instead) ---------- */
+.if-copy{display:contents}
+.if-ask,body.can-ask .if-copy{display:none}
+body.can-ask .if-ask{display:contents}
+#askPop{position:fixed;z-index:35;display:none;align-items:center;gap:8px;padding:7px 14px 7px 12px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:var(--wob);font:600 15.5px var(--body);cursor:pointer}
+#askPop.on{display:inline-flex}
+#askPop:hover{background:var(--blue-ink);border-color:var(--blue-ink);color:#fff}
+#askPop svg{width:18px;height:18px}
+#askPop kbd{font:600 12px var(--mono);border:1.2px solid currentColor;border-radius:5px;padding:0 5px;opacity:.7;background:none;color:inherit}
+.ask{position:fixed;top:0;right:0;bottom:0;z-index:36;width:min(500px,100vw);display:flex;flex-direction:column;background:var(--paper);border-left:1.5px solid var(--line);transform:translateX(104%);visibility:hidden;transition:transform .3s cubic-bezier(.16,1,.3,1),visibility 0s .3s}
+.ask.on{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.16,1,.3,1)}
+.ask-head{display:flex;align-items:center;gap:12px;padding:16px 18px 14px 22px;border-bottom:1.5px solid var(--line)}
+.ask-head h2{font-size:38px;flex:1;white-space:nowrap}
+.ask-head h2::after{width:100%;height:7px}
+.ask-head .pill button{padding:3px 11px;font-size:14px}
+.ask-log{flex:1;overflow-y:auto;padding:22px 22px 28px;display:flex;flex-direction:column;gap:18px;overscroll-behavior:contain}
+.ask-empty{color:var(--ink-2);font:400 21px/1.35 var(--hand);display:grid;gap:12px;justify-items:start}
+.ask-empty svg{width:56px;height:64px}
+.ask-empty kbd,.ask-empty b{font-family:var(--body);font-size:15px}
+.ask-quote{border-left:2.5px solid var(--blue);color:var(--ink);padding:4px 0 4px 16px;font-size:16.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow-y:auto}
+.ask-quote .where{display:block;font:400 19px/1.3 var(--hand);color:var(--ink-3);margin-bottom:6px;white-space:normal}
+.ask-about{font:400 21px/1.3 var(--hand);color:var(--ink-2)}
+.ask-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ask-chips button{border:1.5px solid var(--line);border-radius:var(--wob);background:var(--paper);padding:4px 12px;font:600 14.5px var(--body);color:var(--ink);cursor:pointer}
+.ask-chips button:hover{background:var(--paper-2)}
+.ask-me{align-self:flex-end;max-width:88%;border:1.5px solid var(--line);border-radius:var(--wob);padding:6px 14px;font:400 22px/1.3 var(--hand);white-space:pre-wrap;overflow-wrap:anywhere}
+.ask-ai{font-size:17.5px;line-height:1.6;min-width:0}
+.ask-ai .who{font:700 19px var(--hand);color:var(--blue-ink);margin-bottom:4px}
+.ask-ai p,.ask-ai ul,.ask-ai ol{margin:0 0 .75em}
+.ask-ai ul,.ask-ai ol{padding-left:1.3em}
+.ask-ai li{margin:.2em 0}
+.ask-ai pre{margin:0 0 .75em;padding:10px 14px;background:var(--paper);border:1.5px solid var(--line);border-radius:8px;overflow-x:auto;font:400 14px/1.6 var(--mono)}
+.ask-ai pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.ask-status{font:400 19px var(--hand);color:var(--ink-3)}
+.ask-status:empty{display:none}
+.ask-err{color:var(--red-ink);font-weight:600}
+.ask-form{border-top:1.5px solid var(--line);padding:14px 18px 18px;display:grid;gap:10px}
+.ask-form textarea{width:100%;box-sizing:border-box;min-height:76px;max-height:40vh;resize:vertical;font:400 17px/1.45 var(--body);color:var(--ink);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px}
+.ask-form textarea:focus{outline:2.5px solid var(--blue);outline-offset:1px}
+.ask-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ask-row small{color:var(--ink-3);font-size:14px}
+.ask-row span{display:flex;gap:6px}
+@media (min-width:1800px){body.asking .page{max-width:calc(100vw - 540px);margin-left:20px}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1380px){.exp,.dec{grid-template-columns:minmax(0,1fr) 360px}.risk,.press{grid-template-columns:100px minmax(0,1fr) 360px}.inv{grid-template-columns:64px minmax(0,1fr) 360px}}
+@media (max-width:1280px){.cols{grid-template-columns:minmax(0,1fr) 270px;gap:36px}.page{gap:48px;padding:0 36px 110px}}
+@media (max-width:1120px){
+  .page{grid-template-columns:minmax(0,1fr)}
+  .rail{min-width:0;position:sticky;top:0;z-index:20;height:auto;flex-direction:row;align-items:center;gap:10px;padding:8px 0;margin:0 -36px;padding-left:36px;padding-right:36px;background:var(--paper);border-bottom:1.5px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .rail-brand span,.rail-foot,.stops{display:none}
+  .rail-brand svg{width:28px;height:32px}
+  .toc{flex-direction:row;gap:2px}
+  .toc>li>a{white-space:nowrap;font-size:21px;padding:2px 10px}
+  .toc .cnt{display:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .memo{position:static;max-width:520px}
+  .node-grid{grid-template-columns:minmax(0,1fr)}
+  .exp,.dec,.risk,.inv,.press{grid-template-columns:minmax(0,1fr);gap:14px}
+  .exp>.plate,.dec>.plate,.risk>.plate,.inv>.plate,.press>.plate{order:-1;justify-self:start}
+}
+@media (max-width:900px){ /* the five-column table needs about 780px; below that each connection stacks into a card */
+  .ifaces thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .ifaces,.ifaces tbody,.ifaces tr,.ifaces td{display:block}
+  .ifaces tr{padding:12px 0;border-bottom:1px dashed var(--rule)}
+  .ifaces tr:last-child{border-bottom:0}
+  .ifaces td{border:0;padding:3px 16px}
+  .ifaces td.none{display:none}
+  .ifaces td::before{content:attr(data-label);display:block;font:700 18px/1.2 var(--hand);color:var(--ink-3)}
+  .ifaces td:first-child::before{display:none}
+}
+@media (max-width:760px){
+  body{font-size:17.5px}
+  .inv h3{font-size:18px}
+  .page{padding:0 16px 80px}
+  .rail{margin:0 -16px;padding-left:16px;padding-right:16px}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .hero-ctl{grid-column:1;grid-row:1;justify-content:flex-start}
+  .hero-txt{grid-row:2}
+  .hero-mascot{display:none}
+  .lede{font-size:18.5px}
+  section.sec{margin-top:100px}
+  .sec-intro{margin-bottom:32px}
+  .stop{grid-template-columns:44px minmax(0,1fr);gap:0 14px;padding-bottom:80px}
+  .stop .num{width:44px;height:44px;font-size:26px}
+  .stop::before{left:21px;top:52px}
+  .turn{grid-template-columns:minmax(0,1fr);padding:18px}
+  .turn .masc{width:44px;height:50px}
+  .trigger{flex-direction:column;gap:2px}
+  .map-foot::before{content:"Swipe the map sideways to see all of it.";width:100%;color:var(--ink-2)}
+  .exp,.dec,.risk,.inv,.press{padding:32px 0}
+  .terms{grid-template-columns:minmax(0,1fr)}
+  .qcard,.node-note{padding:20px}
+  .alts td:first-child{width:auto}
+  .code .rows{font-size:13.5px}
+  .nt{margin-left:1.5em}
+  .ask-head{padding:12px 12px 12px 16px;gap:8px}
+  .ask-head h2{font-size:30px}
+  .ask-log{padding:18px 16px 24px}
+}
+@media (max-width:460px){ /* a phone: below this the plates would fall under 352px, so they bleed into the card padding and under the step numbers */
+  .node-note .plate{width:calc(100% + 40px);max-width:none;margin:0 -20px 22px}
+  .stop .plate{width:calc(100% + 58px);max-width:none;margin-left:-58px;background:var(--paper);position:relative}
+  .node-note .plate figcaption{padding:0 20px}
+  .stop .plate figcaption{padding:0 0 0 58px}
+}
+.dsec{--d-a:var(--blue-ink);--d-b:var(--red-ink);--d-c:var(--orange);--d-card:var(--paper);--d-rule:var(--rule);--d-head:var(--tint)}
+<!-- lens:include data.css -->
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="rail" id="rail" aria-label="Contents"></nav>
+  <main>
+    <header class="hero">
+      <div class="hero-txt">
+        <h1 id="title"></h1>
+        <svg class="swash" viewBox="0 0 520 20" preserveAspectRatio="none" aria-hidden="true"><path d="M4 12 C 90 4, 180 18, 280 9 S 440 5, 516 11" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg>
+        <p class="lede" id="subtitle"></p>
+      </div>
+      <div class="hero-ctl">
+        <div class="pill" id="depth" role="group" aria-label="Detail level"><button data-d="simple">Plain</button><button data-d="deep">Deep</button></div>
+        <button class="icon-btn" id="themeBtn" aria-label="Switch between light and dark"></button>
+      </div>
+      <div class="hero-mascot" id="heroMascot" aria-hidden="true"></div>
+    </header>
+    <div id="resume"></div>
+    <section class="sec" id="s-map"></section>
+    <section class="sec" id="s-trip"></section>
+    <section class="sec" id="s-interfaces"></section>
+    <section class="sec" id="s-invariants"></section>
+    <section class="sec" id="s-pressure"></section>
+    <section class="sec" id="s-break"></section>
+    <section class="sec" id="s-why"></section>
+    <section class="sec" id="s-weak"></section>
+    <section class="sec" id="s-quiz"></section>
+    <section class="sec" id="s-terms"></section>
+    <footer class="end" id="end"></footer>
+  </main>
+</div>
+<div id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+<button id="askPop" type="button"></button>
+<aside class="ask" id="ask" aria-label="Ask Claude">
+  <div class="ask-head"><h2>Ask Claude</h2>
+    <div class="pill" id="askModel" role="group" aria-label="Model"><button data-model="haiku">Haiku</button><button data-model="sonnet">Sonnet</button></div>
+    <button class="icon-btn" id="askClose" aria-label="Close"></button></div>
+  <div class="ask-log" id="askLog" aria-live="polite"></div>
+  <form class="ask-form" id="askForm"><textarea id="askIn" rows="3" aria-label="Your question" placeholder="Ask anything about this lesson or the code"></textarea>
+    <div class="ask-row"><small>Enter sends, Shift+Enter for a new line. Claude can read the repo, not change it.</small>
+      <span><button type="button" class="btn quiet" id="askNew">New chat</button><button class="btn go" id="askSend">Send</button></span></div></form>
+</aside>
+<script id="lesson" type="application/json">__LESSON_JSON__</script>
+<script>
+<!-- lens:include props.js -->
+<!-- lens:include scenes.js -->
+<!-- lens:include data.js -->
+</script>
+<script>
+(() => {
+const L = JSON.parse(document.getElementById('lesson').textContent);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nodes = L.nodes || [], edges = L.edges || [], traces = L.traces || [], EXPS = L.whatifs || [], QS = L.quiz || [];
+const DECS = L.decisions || [], RISKS = L.risks || [], GLOSS = L.glossary || [];
+const DATA = (Array.isArray(L.data) ? L.data : []).filter(d => d && typeof d === 'object');
+const ARCH = L.mode === 'architecture', INVS = L.invariants || [], PRESS = L.pressure || [];
+const hasMeta = e => ARCH && !!(e.protocol || e.payload || e.guarantee || typeof e.sync === 'boolean');
+const IFACES = edges.map((e, i) => i).filter(i => hasMeta(edges[i])); // edges that carry a contract; only these are clickable and listed
+const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const KEY = 'lens:' + (L.id || L.title);
+const QKEY = 'quiz:' + hash(JSON.stringify(QS));
+const PKEY = 'answered:' + hash(JSON.stringify(traces.map(t => t.steps.map(s => s.predict || null))));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(KEY + ':' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(KEY + ':' + k, JSON.stringify(v)); } catch {} }
+};
+const S = {
+  depth: store.get('depth', 'simple'), trace: store.get('trace', 0), step: 0, last: store.get('last', null),
+  mode: 'route', node: null, origin: null, exp: null, edge: null, mark: null, ran: {},
+  answered: store.get(PKEY, {}), quiz: store.get(QKEY, {}), qi: 0, qorder: null, seen: {}
+};
+if (!traces[S.trace]) S.trace = 0;
+{ const th = store.get('theme', null); if (th) document.documentElement.dataset.theme = th; }
+const motionOK = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- authored drawings ----------
+// Blot (parts/scenes.js) stands in wherever zine shows its mascot; zine's moods map onto Blot's.
+const mascot = (mood = 'happy') => LensScenes.blot({ mood: { think: 'blank', happy: 'happy', oops: 'worried', worry: 'worried' }[mood] || 'blank' });
+const ICON = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.3l1.7 1.6M17.1 17.1l1.7 1.7M5.2 18.7l1.7-1.6M17.1 6.9l1.7-1.6"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.4 8.4 0 0 1 9.4 4a8.6 8.6 0 1 0 10.6 10.6z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8.5h9.5a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5H9a1.5 1.5 0 0 1-1.5-1.5V10A1.5 1.5 0 0 1 9 8.5z"/><path d="M15.8 8.4V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9.4A1.5 1.5 0 0 0 5 16h2.4"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.2s-6.6-6-6.6-11.1a6.6 6.6 0 0 1 13.2 0c0 5.1-6.6 11.1-6.6 11.1z"/><circle cx="12" cy="10" r="2.4"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6.3l11.6 11.4M17.8 6.1L6.2 17.9"/></svg>',
+  star: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M16 3.5v25M4.5 9.5l23 13M27.5 9.5l-23 13"/></svg>',
+  arrow: '<svg viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 18C17 19 9 15 5 6"/><path d="M2.5 11.5 4.6 4.8l6.6 2.3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M7 4.6v14.8l12-7.5z"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.6c2.6-1.6 12.4-1.9 15.4-.2 1.6 1 1.5 7.6.3 9-1.6 1.7-6.2 1.6-8.4 1.7L6.8 20l.6-3.9c-2.2-.3-3.4-.8-3.8-2.3-.6-2.3-.6-7.2.6-8.2z"/><path d="M8.6 10.6h.1M12 10.4h.1M15.4 10.6h.1"/></svg>'
+};
+// One button, two jobs: asks in the side panel when served by serve.py, copies a question when opened as a file.
+const askBtn = attr => `<button class="btn quiet" ${attr}><span class="if-ask">${ICON.chat} Ask Claude about this</span><span class="if-copy">${ICON.copy} Copy question for Claude</span></button>`;
+const ring = n => `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27" fill="var(--paper)"/><path class="ring" d="M32 4.5c15.6-.4 27.9 11.6 27.6 27.3C59.3 47.7 47 59.8 31.5 59.6 16 59.4 4.3 47 4.6 31.4 4.9 16.6 16.8 5.4 30 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span style="position:relative">${n}</span>`;
+
+// ---------- text helpers ----------
+const gloss = GLOSS.filter(g => g && typeof g.term === 'string' && g.term.trim()).sort((a, b) => b.term.length - a.term.length);
+const glossRe = gloss.length ? new RegExp('\\b(' + gloss.map(g => g.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi') : null;
+const glossDef = Object.fromEntries(gloss.map(g => [g.term.toLowerCase(), g.def]));
+function rich(t) { // glossary terms are matched on the raw text and each piece is escaped afterwards, so they can never match inside an entity
+  if (!t) return '';
+  return String(t).split(/(`[^`]+`)/).map(part => {
+    if (/^`[^`]+`$/.test(part)) return '<code>' + esc(part.slice(1, -1)) + '</code>';
+    if (!glossRe) return esc(part);
+    let out = '', last = 0, m; glossRe.lastIndex = 0;
+    while ((m = glossRe.exec(part))) { out += esc(part.slice(last, m.index)) + `<span class="term" tabindex="0" data-def="${esc(glossDef[m[0].toLowerCase()] || '')}">${esc(m[0])}</span>`; last = m.index + m[0].length; }
+    return out + esc(part.slice(last));
+  }).join('');
+}
+const paras = t => (t || '').split(/\n\n+/).map(p => `<p>${rich(p)}</p>`).join('');
+const pick = o => o ? (S.depth === 'deep' ? (o.deep || o.simple) : (o.simple || o.deep)) : '';
+const CONF = { evidenced: ['seen in code', 'Read directly in the code, docs or tests'], inferred: ['likely', 'A reasonable reading of the code, not stated anywhere'], uncertain: ['a guess', 'One of several possible explanations'] };
+const conf = c => CONF[c] ? `<span class="stamp ${c}" title="${CONF[c][1]}">${CONF[c][0]}</span>` : '';
+const nodeName = id => esc(nodeById[id]?.label || id);
+const nLabel = id => nodeById[id]?.label || id;
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+// A scene plate: the item's own scene, else the section default (none for steps and nodes). Default plates are drawn smaller
+// ("quiet") because they repeat. A plate behind an unanswered guess is blurred like the narrative so its caption cannot spoil it.
+// An authored `draw` list (the bespoke picture) wins over the named scene; if the library lacks draw(), draw throws or returns
+// nothing, the named scene (or, with none, no plate) is drawn instead.
+function drawn(sc) {
+  if (!sc || !Array.isArray(sc.draw) || !sc.draw.length || typeof LensScenes.draw !== 'function') return '';
+  try { const svg = LensScenes.draw({ caption: typeof sc.caption === 'string' ? sc.caption : '', draw: sc.draw }); return typeof svg === 'string' && svg.startsWith('<svg') ? svg : ''; }
+  catch (e) { return ''; }
+}
+function plate(o, def, hide) {
+  const sc = o && o.scene, name = (sc && sc.name) || def, svg = drawn(sc);
+  if (svg) { const cap = sc && typeof sc.caption === 'string' ? sc.caption.trim() : '';   // the caption is also the svg's aria-label, so the visible copy is hidden from assistive tech
+    return `<figure class="plate cap${hide ? ' blurred' : ''}"${hide ? ' aria-hidden="true"' : ''}>${svg}${cap ? `<figcaption aria-hidden="true">${esc(cap)}</figcaption>` : ''}</figure>`; }
+  if (!name || !LensScenes.names.includes(name)) return '';
+  const opts = { caption: (sc && sc.caption) || '' };
+  if (sc && Array.isArray(sc.items)) opts.items = sc.items.filter(x => typeof x === 'string' && x.trim()).slice(0, 4);
+  if (sc && Array.isArray(sc.props)) opts.props = sc.props.filter(x => x && typeof x.prop === 'string').slice(0, 3).map(x => ({ prop: x.prop, label: typeof x.label === 'string' ? x.label : '' }));
+  return `<figure class="plate${sc ? '' : ' quiet'}${hide ? ' blurred' : ''}"${hide ? ' aria-hidden="true"' : ''}>${LensScenes.render(name, opts)}</figure>`;
+}
+// The context plate (architecture mode, a node with no authored scene): the component in the middle, what feeds it on the left,
+// what it feeds on the right, each arrow named after the edge's payload, else its protocol, else its label. Edges to unknown nodes
+// and self-loops are skipped. Skipped silently when the scene library has no context().
+const clip18 = s => { s = String(s ?? '').trim().replace(/\s+/g, ' '); return s.length > 18 ? s.slice(0, 17) + '…' : s; };
+function ctxPlate(n) {
+  if (!ARCH || typeof LensScenes.context !== 'function') return '';
+  const side = (list, other) => list.filter(e => e.from !== e.to && nodeById[other(e)]).map(e => {
+    const m = nodeById[other(e)], r = { label: String(m.label || m.id) }; if (typeof m.prop === 'string' && m.prop) r.prop = m.prop;
+    const pay = clip18(e.payload || e.protocol || e.label); if (pay) r.payload = pay; return r; });
+  const arg = { title: String(n.label || n.id), inputs: side(edges.filter(e => e.to === n.id), e => e.from), outputs: side(edges.filter(e => e.from === n.id), e => e.to) };
+  if (typeof n.prop === 'string' && n.prop) arg.prop = n.prop;
+  if (typeof n.owns === 'string' && n.owns) arg.owns = n.owns;
+  return `<figure class="plate ctx">${LensScenes.context(arg)}</figure>`;
+}
+
+// ---------- code ----------
+const KW = new Set('if else elif for while return function def class const let var import from export async await try catch except finally raise throw new fn pub struct impl match case switch break continue in of do then fi done esac local echo type interface extends implements self this None null true false True False nil package func go defer yield with as not and or use mod static public private protected'.split(' '));
+function tint(line, lang) {
+  const hashc = /^(py|python|sh|bash|zsh|shell|rb|ruby|yaml|yml|toml|r|perl|make|makefile|dockerfile|conf)$/i.test(lang || '');
+  const re = hashc ? /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g
+                   : /(\/\/.*$|--\s.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    if (m[1]) out += `<span class="tk-c">${esc(m[1])}</span>`;
+    else if (m[2]) out += `<span class="tk-s">${esc(m[2])}</span>`;
+    else if (m[3]) out += `<span class="tk-n">${esc(m[3])}</span>`;
+    else out += KW.has(m[4]) ? `<span class="tk-k">${esc(m[4])}</span>` : esc(m[4]);
+    last = re.lastIndex;
+  }
+  return out + esc(line.slice(last));
+}
+function codeBlock(c) {
+  if (!c || !c.src) return '';
+  const start = parseInt(c.start, 10) || 1, hl = new Set((c.highlight || []).map(Number)), notes = c.notes || {};
+  const lines = c.src.replace(/\n$/, '').split('\n'), end = start + lines.length - 1;
+  const rows = lines.map((ln, i) => {
+    const no = start + i, note = notes[no] ?? notes[String(no)];
+    return `<div class="ln${hl.has(no) ? ' hl' : ''}"><span class="n">${no}</span><span class="t">${tint(ln, c.lang) || ' '}</span></div>` +
+      (note ? `<div class="nt">${ICON.arrow}<span>${rich(note)}</span></div>` : '');
+  }).join('');
+  return `<figure class="code"><figcaption><span class="file">${esc(c.file || '')}</span><span class="lines-n">${end > start ? `lines ${start}–${end}` : `line ${start}`}</span></figcaption><div class="rows">${rows}</div></figure>`;
+}
+
+// ---------- the sketched map ----------
+const zones = (L.layers && L.layers.length) ? L.layers : [{ id: '_', name: '' }];
+const grid = (() => {
+  const cols = zones.map(z => nodes.filter(n => (n.layer || '_') === z.id));
+  nodes.filter(n => !zones.some(z => z.id === (n.layer || '_'))).forEach(n => cols[cols.length - 1].push(n));
+  const g = {}; cols.forEach((col, ci) => col.forEach((n, ri) => { g[n.id] = { c: n.col ?? ci, r: n.row ?? ri }; }));
+  return g;
+})();
+const nCols = Math.max(1, ...Object.values(grid).map(p => p.c + 1)), nRows = Math.max(1, ...Object.values(grid).map(p => p.r + 1));
+let M = null; // current geometry
+const meas = document.createElement('canvas').getContext('2d');
+const HANDF = '"Caveat", "Patrick Hand", "Segoe Print", "Bradley Hand", cursive'; // the --hand stack, so labels are measured in the face that draws them
+const tw = (t, font) => { meas.font = font; return meas.measureText(t).width; };
+function geometry(width) {
+  const lastCol = nCols - 1, sideW = Math.max(0, ...edges.filter(e => e.label && grid[e.from] && grid[e.to] && grid[e.from].c === grid[e.to].c && grid[e.from].c === lastCol).map(e => tw(e.label, '400 20px ' + HANDF)));
+  const fan = Math.max(0, ...edges.map((e, i) => grid[e.from] && grid[e.to] && grid[e.from].c === lastCol && grid[e.to].c === lastCol ? slotOf[i].k * BEND_STEP * .75 : 0));
+  // the gap between columns is where the edge labels live: widen it (up to 150) so the longest label fits between the boxes
+  const lblW = Math.max(0, ...edges.filter(e => e.label && grid[e.from] && grid[e.to]).map(e => tw(e.label, '400 20px ' + HANDF)));
+  const PAD = 18, PR = (sideW ? Math.round(sideW + 72) : 58) + Math.round(fan), TOP = zones.some(z => z.name) ? 46 : 18, CG = Math.max(66, Math.min(92, width * .07), lblW ? Math.min(150, Math.round(lblW + 56)) : 0);
+  const NW = Math.max(150, (width - PAD - PR - (nCols - 1) * CG) / nCols), NH = 112, RG = 44;
+  const pos = {}; for (const id in grid) pos[id] = { x: PAD + grid[id].c * (NW + CG), y: TOP + grid[id].r * (NH + RG), col: grid[id].c };
+  const W = PAD + PR + nCols * NW + (nCols - 1) * CG, H = TOP + nRows * NH + (nRows - 1) * RG + PAD + 4;
+  return { PAD, TOP, CG, NW, NH, W, H, pos };
+}
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const seedOf = s => parseInt(hash(String(s)), 36);
+const f1 = v => Math.round(v * 10) / 10;
+function wl(r, x1, y1, x2, y2, amp = 1.5) {
+  const j = () => (r() - .5) * 2 * amp, mx = (x1 + x2) / 2 + j() * 1.4, my = (y1 + y2) / 2 + j() * 1.4;
+  return `M${f1(x1 + j())},${f1(y1 + j())} Q${f1(mx)},${f1(my)} ${f1(x2 + j())},${f1(y2 + j())}`;
+}
+function roughRect(x, y, w, h, seed, passes = 2) {
+  const r = rng(seed); let d = '';
+  for (let p = 0; p < passes; p++) {
+    const o = 2 + r() * 2;
+    d += wl(r, x - o, y, x + w + o, y) + wl(r, x + w, y - o, x + w, y + h + o) + wl(r, x + w + o, y + h, x - o, y + h) + wl(r, x, y + h + o, x, y - o);
+  }
+  return d;
+}
+function softRect(x, y, w, h, seed) {
+  const r = rng(seed + 7), j = () => (r() - .5) * 3;
+  return `M${f1(x + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + h + j())} L${f1(x + j())},${f1(y + h + j())}Z`;
+}
+// edges between the same two nodes (either direction, or repeated) fan out so each has its own curve and its own hit area
+const slotOf = (() => { const groups = {}, out = edges.map(() => ({ k: 0, n: 1 }));
+  edges.forEach((e, i) => { (groups[[String(e.from), String(e.to)].sort().join('\n')] ||= []).push(i); });
+  Object.values(groups).forEach(g => g.forEach((i, k) => { out[i] = { k, n: g.length }; })); return out; })();
+const slotShift = ({ k, n }) => n < 2 ? 0 : (k - (n - 1) / 2) * Math.min(30, 80 / (n - 1));
+const BEND_STEP = 40;
+function curve(a, b, slot = { k: 0, n: 1 }) {
+  const A = M.pos[a], B = M.pos[b]; if (!A || !B) return null;
+  const { NW, NH } = M, sh = slotShift(slot);
+  if (A.col === B.col) {
+    const x = A.x + NW, y1 = A.y + NH / 2 + sh, y2 = B.y + NH / 2 + sh, bend = 34 + Math.abs(y2 - y1) * .16 + slot.k * BEND_STEP;
+    return { p: [x, y1, x + bend, y1, x + bend, y2, x, y2], mx: x + bend * .75 + 6, my: (y1 + y2) / 2 + 5, anchor: 'start' };
+  }
+  const fwd = B.x > A.x, x1 = fwd ? A.x + NW : A.x, x2 = fwd ? B.x : B.x + NW, y1 = A.y + NH / 2 + sh, y2 = B.y + NH / 2 + sh, dx = (x2 - x1) / 2;
+  // A fanned-out edge also moves up or down its node side (sh). On a steep curve that barely separates it, so its middle is bowed
+  // along the curve's normal (the same normal for both directions) until the middle sits sh away from where the single edge would.
+  const cy = B.y - A.y, len = Math.hypot(x2 - x1, cy) || 1; let nx = -cy / len, ny = (x2 - x1) / len; if (ny < 0 || (ny === 0 && nx < 0)) { nx = -nx; ny = -ny; }
+  const bow = sh * (1 - ny) / .75, ex = bow * nx, ey = bow * ny, p = [x1, y1, x1 + dx + ex, y1 + ey, x2 - dx + ex, y2 + ey, x2, y2];
+  const t = .5, u = 1 - t, bx = u*u*u*p[0] + 3*u*u*t*p[2] + 3*u*t*t*p[4] + t*t*t*p[6], by = u*u*u*p[1] + 3*u*u*t*p[3] + 3*u*t*t*p[5] + t*t*t*p[7];
+  return { p, mx: bx, my: by - 8, anchor: 'middle' };
+}
+function roughOval(cx, cy, rx, ry, seed) { // one overshooting hand loop, seeded so it is the same every load
+  const r = rng(seed), a0 = -2.2 + r() * .6, n = 26, q = [];
+  for (let i = 0; i <= n; i++) { const a = a0 + i / n * Math.PI * 2.12, k = 1 + (r() - .5) * .06; q.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]); }
+  let d = `M${f1(q[0][0])},${f1(q[0][1])}`;
+  for (let i = 1; i < q.length - 1; i++) d += ` Q${f1(q[i][0])},${f1(q[i][1])} ${f1((q[i][0] + q[i + 1][0]) / 2)},${f1((q[i][1] + q[i + 1][1]) / 2)}`;
+  return d;
+}
+const wobbleD = (p, seed) => { const r = rng(seed), j = a => (r() - .5) * 2 * a; return cubicD([p[0], p[1], p[2] + j(5), p[3] + j(5), p[4] + j(5), p[5] + j(5), p[6], p[7]]); };
+const cubicD = p => `M${f1(p[0])},${f1(p[1])} C${f1(p[2])},${f1(p[3])} ${f1(p[4])},${f1(p[5])} ${f1(p[6])},${f1(p[7])}`;
+function roughCurve(p, seed) {
+  const r = rng(seed); let d = '';
+  for (let k = 0; k < 2; k++) { const j = a => (r() - .5) * 2 * a; d += cubicD([p[0] + j(.8), p[1] + j(.8), p[2] + j(3), p[3] + j(3), p[4] + j(3), p[5] + j(3), p[6] + j(.6), p[7] + j(.6)]) + ' '; }
+  return d;
+}
+function head(p, rev) {
+  const [ex, ey, cx, cy] = rev ? [p[0], p[1], p[2], p[3]] : [p[6], p[7], p[4], p[5]];
+  const a = Math.atan2(ey - cy, ex - cx), L1 = 13;
+  const pt = s => `${f1(ex - L1 * Math.cos(a + s))},${f1(ey - L1 * Math.sin(a + s))}`;
+  return `M${pt(.45)} L${f1(ex)},${f1(ey)} L${pt(-.45)}`;
+}
+const edgeTip = e => `${nLabel(e.from)} to ${nLabel(e.to)}${e.protocol ? ', ' + e.protocol : ''}${typeof e.sync === 'boolean' ? (e.sync ? ', sync' : ', async') : ''}`;
+const edgeBetween = (a, b) => { const f = edges.findIndex(e => e.from === a && e.to === b); return f >= 0 ? f : edges.findIndex(e => e.from === b && e.to === a); }; // index; the edge that runs the way the route goes wins
+const LBL = '700 17px "Atkinson Hyperlegible Next", system-ui, sans-serif', KND = '400 19px ' + HANDF, ZN = '700 20px ' + HANDF;
+function fit(t, max, font) { if (tw(t, font) <= max) return t; while (t.length > 1 && tw(t + '…', font) > max) t = t.slice(0, -1); return t.trimEnd() + '…'; }
+function wrapLabel(text, max, font = LBL, most = 2) {
+  const words = String(text).split(/\s+/), out = []; let cur = '';
+  words.forEach(w => { const next = (cur + ' ' + w).trim(); if (tw(next, font) > max && cur) { out.push(cur); cur = w; } else cur = next; });
+  if (cur) out.push(cur);
+  if (out.length > most) { out[most - 1] = out.slice(most - 1).join(' '); out.length = most; }
+  return out.map(l => fit(l, max, font));
+}
+// The node's own icon (node.prop) at the left of its box, drawn by the prop library through a seeded pen: ink plus one accent.
+// Nothing when the node has no prop (or the libraries are absent), so such boxes are laid out exactly as before.
+function nodeIcon(n) {
+  if (typeof n.prop !== 'string' || !n.prop.trim() || typeof LensScenes._pen !== 'function' || typeof LensProps === 'undefined') return null;
+  const size = M.NW < 190 ? 36 : 44, pn = LensScenes._pen(seedOf('icon' + n.id));
+  LensProps.draw(pn, n.prop, 14 + size / 2, M.NH / 2, size);
+  return { size, svg: `<g class="nicon" aria-hidden="true">${pn.out.join('')}</g>` };
+}
+let restoring = false;
+function drawMap() {
+  const svg = $('#map'); if (!svg) return;
+  const wrap = svg.parentElement, width = Math.max(900, wrap.clientWidth);
+  M = geometry(width);
+  const { NW, NH, W, H, pos, PAD, CG } = M;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H);
+  let s = '';
+  zones.forEach((z, i) => { if (!z.name) return;
+    const x = PAD + i * (NW + CG) - 12;
+    s += `<g class="zone"><path d="${roughRect(x, 6, NW + 24, H - 12, seedOf('z' + z.id), 1)}"/><text x="${x + 12}" y="32">${esc(fit(z.name, NW, ZN))}</text></g>`; });
+  let labels = '';
+  edges.forEach((e, ei) => { const c = curve(e.from, e.to, slotOf[ei]); if (!c) return; const sd = seedOf(e.from + '>' + e.to), link = hasMeta(e);
+    s += `<g class="edge${ARCH && e.sync === false ? ' async' : ''}${link ? ' link' : ''}" data-ei="${ei}" data-from="${esc(e.from)}" data-to="${esc(e.to)}"${link ? ` tabindex="0" role="button" aria-label="${esc('Connection: ' + edgeTip(e))}"` : ''}><path class="wire" d="${roughCurve(c.p, sd)}"/><path class="head" d="${head(c.p)}"/>` +
+      (link ? `<path class="hitarea" d="${cubicD(c.p)}"/><title>${esc(edgeTip(e))}</title>` : '') + `</g>`;
+    if (e.label) labels += `<text class="elabel" data-ei="${ei}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" x="${f1(c.mx)}" y="${f1(c.my)}" text-anchor="${c.anchor}">${esc(e.label)}</text>`; });
+  s += `<g id="routeLayer"></g>`;
+  nodes.forEach(n => { const p = pos[n.id]; if (!p) return; const sd = seedOf(n.id), ic = nodeIcon(n), tx = ic ? 14 + ic.size + 10 : 14, room = NW - tx - 12, lines = wrapLabel(n.label, room, LBL, 3);
+    const kinds = n.kind ? wrapLabel(n.kind, room, KND, lines.length > 2 ? 1 : 2) : [];
+    const ly = Math.round((NH - (lines.length * 22 + kinds.length * 21)) / 2) + 16;
+    s += `<g class="node" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}" transform="translate(${f1(p.x)},${f1(p.y)})">` +
+      `<path class="fill" d="${softRect(0, 0, NW, NH, sd)}"/><path class="stroke" d="${roughRect(0, 0, NW, NH, sd)}"/><path class="circ" d="${roughOval(NW / 2, NH / 2, NW / 2 + 11, NH / 2 + 10, sd + 3)}"/>` +
+      (ic ? ic.svg : '') +
+      lines.map((t, i) => `<text class="lbl" x="${tx}" y="${ly + i * 22}">${esc(t)}</text>`).join('') +
+      kinds.map((t, i) => `<text class="kind" x="${tx}" y="${ly + lines.length * 22 + 4 + i * 21}">${esc(t)}</text>`).join('') + `<title>${esc(n.label)}${n.kind ? ' (' + esc(n.kind) + ')' : ''}</title></g>`; });
+  const had = svg.contains(document.activeElement) ? document.activeElement : null, keep = had && (had.dataset.ei != null ? `.edge[data-ei="${had.dataset.ei}"]` : had.dataset.id != null ? `.node[data-id="${CSS.escape(had.dataset.id)}"]` : null);
+  svg.innerHTML = s + `<g class="labels">${labels}</g>`;
+  if (keep) { restoring = true; $(keep, svg)?.focus({ preventScroll: true }); restoring = false; } // the redraw replaces every element, so give keyboard focus back to the same one (restoring: that focusin must not close a tooltip)
+  placeLabels(svg);
+  $$('.node', svg).forEach(g => {
+    const go = () => openNode(g.dataset.id);
+    g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  $$('.edge.link', svg).forEach(g => {
+    const go = () => selectEdge(+g.dataset.ei);
+    g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  routeDrawn = -1; paintMap(false);
+}
+// Edge labels: each one sits at the middle of ITS OWN curve, on the outer side (above a flat curve, to the right of a steep one), with its
+// paper halo from the CSS. When that spot is taken by a node, the map's zone titles, another label, or sits on other wires, it slides along
+// the curve (and tries the other side) to the least bad spot.
+function placeLabels(svg) {
+  const pad = 4, box = (cx, cy, w, h) => ({ l: cx - w / 2 - 3, t: cy - h / 2 - 3, r: cx + w / 2 + 3, b: cy + h / 2 + 3 });
+  const hits = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  const at = (p, t) => { const u = 1 - t, pt = k => u*u*u*p[k] + 3*u*u*t*p[k+2] + 3*u*t*t*p[k+4] + t*t*t*p[k+6];
+    return [pt(0), pt(1), 3*u*u*(p[2]-p[0]) + 6*u*t*(p[4]-p[2]) + 3*t*t*(p[6]-p[4]), 3*u*u*(p[3]-p[1]) + 6*u*t*(p[5]-p[3]) + 3*t*t*(p[7]-p[5])]; };
+  const wires = edges.map((e, i) => { const c = curve(e.from, e.to, slotOf[i]); return c ? Array.from({ length: 25 }, (_, k) => at(c.p, k / 24)) : []; });
+  const fixed = Object.values(M.pos).map(q => ({ l: q.x - pad, t: q.y - pad, r: q.x + M.NW + pad, b: q.y + M.NH + pad }))
+    .concat($$('.zone text', svg).map(z => { const b = z.getBBox(); return { l: b.x - 3, t: b.y - 3, r: b.x + b.width + 3, b: b.y + b.height + 3 }; }));
+  const placed = [];
+  $$('.elabel', svg).forEach(t => {
+    const ei = +t.dataset.ei, c = curve(edges[ei].from, edges[ei].to, slotOf[ei]); if (!c) return;
+    t.setAttribute('x', 0); t.setAttribute('y', 0); t.setAttribute('text-anchor', 'middle');
+    const bb = t.getBBox(), w = bb.width, h = bb.height, mid = bb.y + h / 2; let best = null;
+    [.5, .46, .54, .42, .58, .38, .62, .34, .66, .3, .7, .26, .74, .22, .78, .18, .82, .14, .86].forEach((tt, k) => { const [x, y, dx, dy] = at(c.p, tt), L = Math.hypot(dx, dy) || 1; let nx = -dy / L, ny = dx / L;
+      if (Math.abs(ny) < .5 ? nx < 0 : ny > 0) { nx = -nx; ny = -ny; }   // outer side: up for a flat curve, right for a steep one
+      [1, -1].forEach((side, si) => { const d = Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2 + 7, cx = x + nx * side * d, cy = y + ny * side * d, r = box(cx, cy, w, h);
+        let cost = k * 2 + si;
+        if (r.l < 2 || r.t < 2 || r.r > M.W - 2 || r.b > M.H - 2) cost += 1000;
+        if (fixed.some(f => hits(r, f)) || placed.some(f => hits(r, f))) cost += 1000;
+        wires.forEach(ws => ws.forEach(q => { if (q[0] > r.l - 2 && q[0] < r.r + 2 && q[1] > r.t - 2 && q[1] < r.b + 2) cost += 25; }));
+        if (!best || cost < best.cost) best = { cost, cx, cy, r }; }); });
+    t.setAttribute('x', f1(best.cx)); t.setAttribute('y', f1(best.cy - mid)); placed.push(best.r);
+  });
+}
+function dependents(id) {
+  const seen = new Set([id]), q = [id];
+  while (q.length) { const cur = q.shift(); edges.forEach(e => { if (e.to === cur && !seen.has(e.from)) { seen.add(e.from); q.push(e.from); } }); }
+  return seen;
+}
+let routeDrawn = -1;
+function paintMap(animate = true) {
+  if (!M) return;
+  const svg = $('#map'), steps = traces[S.trace]?.steps || [];
+  let hit = null, origin = null;
+  if (S.exp != null) { const w = EXPS[S.exp]; hit = new Set([...(w.affects || []), w.node].filter(Boolean)); origin = w.node; }
+  else if (S.mode === 'impact' && S.origin) { hit = dependents(S.origin); origin = S.origin; }
+  const upto = steps.slice(0, S.step + 1), visited = new Set(upto.map(s => s.node)), current = steps[S.step]?.node;
+  svg.classList.toggle('impact', !!hit && S.exp == null); // impact is orange, damage from an experiment is red
+  const layer = $('#routeLayer');
+  if (hit) { layer.innerHTML = ''; routeDrawn = -1; }
+  else if (S.step !== routeDrawn) {
+    let r = '';
+    for (let i = 1; i < steps.length; i++) { // the whole trip, faint, so the route is visible before you start
+      const a = steps[i - 1].node, b = steps[i].node; if (a === b) continue;
+      const ei = edgeBetween(a, b), e = edges[ei], c = e && curve(e.from, e.to, slotOf[ei]); if (c) r += `<path class="ghost" d="${cubicD(c.p)}"/>`;
+    }
+    for (let i = 1; i < upto.length; i++) {
+      const a = upto[i - 1].node, b = upto[i].node; if (a === b) continue;
+      const ei = edgeBetween(a, b), e = edges[ei], c = e && curve(e.from, e.to, slotOf[ei]); if (!c) continue;
+      const fresh = animate && motionOK && i > routeDrawn;
+      r += `<path class="route${fresh ? ' draw' : ''}" pathLength="1" d="${wobbleD(e.from === a ? c.p : [c.p[6], c.p[7], c.p[4], c.p[5], c.p[2], c.p[3], c.p[0], c.p[1]], seedOf('r' + a + b))}"${fresh ? ` style="animation-delay:${Math.max(0, i - Math.max(1, routeDrawn + 1)) * .18}s"` : ''}/>`;
+    }
+    layer.innerHTML = r; routeDrawn = S.step;
+  }
+  $$('.node', svg).forEach(g => {
+    const id = g.dataset.id;
+    g.classList.toggle('active', !hit && id === current);
+    g.classList.toggle('onroute', !hit && visited.has(id));
+    g.classList.toggle('picked', !hit && id === S.node);
+    g.classList.toggle('hit', !!hit && hit.has(id) && id !== origin);
+    g.classList.toggle('origin', !!hit && id === origin);
+    g.classList.toggle('dim', !!hit && !hit.has(id) && id !== origin);
+    g.classList.toggle('marked', !hit && S.mark?.node === id);
+    g.classList.toggle('endpoint', !hit && S.edge != null && (edges[S.edge]?.from === id || edges[S.edge]?.to === id));
+  });
+  $$('.edge', svg).forEach(g => {
+    const on = !!hit && hit.has(g.dataset.from) && (hit.has(g.dataset.to) || g.dataset.to === origin);
+    g.classList.toggle('hit', on); g.classList.toggle('dimmed', !!hit && !on); g.classList.toggle('sel', !hit && S.edge === +g.dataset.ei);
+  });
+  $$('#s-interfaces tbody tr').forEach(tr => tr.classList.toggle('on', !hit && S.edge === +tr.dataset.ei));
+  $$('.elabel', svg).forEach(t => t.classList.toggle('dimmed', !!hit && !(hit.has(t.dataset.from) && (hit.has(t.dataset.to) || t.dataset.to === origin))));
+  const t = traces[S.trace];
+  $('#mapHint').innerHTML = S.exp != null ? `Red shows what <b>${rich(EXPS[S.exp].title)}</b> would damage. <a href="#" id="clearExp">Clear it</a>`
+    : hit ? `Orange shows everything that depends on <b>${nodeName(origin)}</b>. Change it and these could break.`
+    : S.mark ? `The blue circle marks <b>${nodeName(S.mark.node)}</b>, which ${S.mark.what}. <a href="#" id="clearMark">Clear it</a>`
+    : S.edge != null && edges[S.edge] ? `The thick blue arrow is the connection from <b>${nodeName(edges[S.edge].from)}</b> to <b>${nodeName(edges[S.edge].to)}</b>. Click a box to read about it.`
+    : S.mode === 'impact' ? 'Click any box to see what depends on it.'
+    : t ? `The blue line is <b>${esc(t.title)}</b> up to stop ${S.step + 1}, and the red circle is where you are. Click any box to read about it.${IFACES.length ? ' Click an arrow to see what crosses it.' : ''}` : `Click any box to read about it.${IFACES.length ? ' Click an arrow to see what crosses it.' : ''}`;
+  $('#clearExp')?.addEventListener('click', e => { e.preventDefault(); S.exp = null; paintMap(); });
+  $('#clearMark')?.addEventListener('click', e => { e.preventDefault(); S.mark = null; paintMap(); });
+}
+
+// ---------- component note ----------
+function renderEdge(box, e) {
+  const link = id => `<a href="#" data-node="${esc(id)}">${nodeName(id)}</a>`;
+  const rows = [['protocol', e.protocol], ['calls', typeof e.sync === 'boolean' ? (e.sync ? 'sync: the caller waits for the reply' : 'async: fire and forget, the caller moves on') : ''], ['payload', e.payload], ['guarantee', e.guarantee]].filter(r => r[1]);
+  box.innerHTML = `<button class="icon-btn close" id="closeNode" aria-label="Close">${ICON.x}</button><h3>${nodeName(e.from)} → ${nodeName(e.to)}</h3>` +
+    `<div class="kindline">connection${e.label ? ' · ' + esc(e.label) : ''}</div>` +
+    `<div class="node-grid"><div><dl class="links edge-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl></div>` +
+    `<div><div class="side-h">Between</div><div style="font-size:17px">${link(e.from)} and ${link(e.to)}</div><div class="stop-actions">${askBtn('id="askNode"')}</div></div></div>`;
+  box.hidden = false;
+  $('#closeNode').onclick = () => { S.edge = null; renderNode(); paintMap(); };
+  $('#askNode').onclick = () => askAbout(`the connection from ${nLabel(e.from)} to ${nLabel(e.to)}`);
+}
+function renderNode() {
+  const box = $('#nodeNote'), n = nodeById[S.node];
+  if (!n && S.edge != null && edges[S.edge]) { renderEdge(box, edges[S.edge]); return; }
+  if (!n) { box.hidden = true; box.innerHTML = ''; return; }
+  const out = edges.filter(e => e.from === n.id), inc = edges.filter(e => e.to === n.id);
+  const link = (id, label) => `<a href="#" data-node="${esc(id)}">${nodeName(id)}</a>${label ? ` <span style="color:var(--ink-3)">(${esc(label)})</span>` : ''}`;
+  const at = []; traces.forEach((t, ti) => t.steps.forEach((s, si) => { if (s.node === n.id) at.push([ti, si, s.title]); }));
+  const dep = dependents(n.id).size - 1;
+  let main = `${n.scene ? plate(n) : ctxPlate(n)}<div class="narr">${paras(pick(n))}</div>`;
+  if (n.analogy) main += `<div class="aside">${ICON.star}<span>${rich(n.analogy)}</span></div>`;
+  const arch = [['Owns', n.owns], ['Exposes', n.exposes], ['Runs', n.runs], ['Scale', n.scale]].filter(r => r[1]);
+  if (arch.length) main += `<div class="archblock"><div class="side-h">Architecture</div><dl class="links">${arch.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl></div>`;
+  (n.functions || []).forEach((f, i) => { main += `<details class="inside"${i === 0 ? ' open' : ''}><summary>${esc(f.name)}<span>${esc(f.loc || '')}</span></summary><div class="narr" style="margin-top:8px">${paras(pick(f) || f.what)}</div>${codeBlock(f.code)}</details>`; });
+  let side = '';
+  if (inc.length || out.length) side += `<div class="side-h">Wired to</div><dl class="links">${inc.length ? `<dt>gets from</dt><dd>${inc.map(e => link(e.from, e.label)).join(', ')}</dd>` : ''}${out.length ? `<dt>sends to</dt><dd>${out.map(e => link(e.to, e.label)).join(', ')}</dd>` : ''}</dl>`;
+  side += `<div class="side-h">If you change it</div><div style="font-size:17px">${dep ? `${plural(dep, 'other part')} depend${dep === 1 ? 's' : ''} on this. <a href="#" id="showImpact">Show them on the map</a>` : 'Nothing else depends on this.'}</div>`;
+  if (at.length) side += `<div class="side-h">The route stops here</div><div class="at">${at.map(([ti, si, title]) => `<a href="#" data-jump="${ti}:${si}">${traces.length > 1 ? esc(traces[ti].title.split(':')[0]) + ', ' : ''}stop ${si + 1}: ${rich(title)}</a>`).join('')}</div>`;
+  box.innerHTML = `<button class="icon-btn close" id="closeNode" aria-label="Close">${ICON.x}</button><h3>${esc(n.label)} ${conf(n.confidence)}</h3>` +
+    `<div class="kindline">${esc(n.kind || '')}</div>${n.files?.length ? `<div class="files">${n.files.map(esc).join(' · ')}</div>` : ''}` +
+    `<div class="node-grid"><div>${main}</div><div>${side}<div class="stop-actions">${askBtn('id="askNode"')}</div></div></div>`;
+  box.hidden = false; markOverflow(box);
+  $('#closeNode').onclick = () => { S.node = null; renderNode(); paintMap(); };
+  $('#showImpact')?.addEventListener('click', e => { e.preventDefault(); setMode('impact'); S.origin = n.id; paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+  $('#askNode').onclick = () => askAbout(`the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`);
+  $$('[data-jump]', box).forEach(a => a.onclick = e => { e.preventDefault(); const [t, s] = a.dataset.jump.split(':').map(Number); jumpTo(t, s); });
+}
+function selectEdge(i, scrollMap) {
+  S.edge = i; S.node = null; S.exp = null; S.mark = null; renderNode(); paintMap(); // impact mode (S.origin) stays: the edge note is read beside it
+  if (scrollMap) $('#s-map').scrollIntoView({ block: 'start' }); else $('#nodeNote').scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'nearest' });
+}
+function openNode(id) {
+  S.exp = null; S.edge = null; S.mark = null;
+  if (S.mode === 'impact') { S.origin = S.origin === id ? null : id; }
+  S.node = id; renderNode(); paintMap();
+  if (S.mode !== 'impact') $('#nodeNote').scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'nearest' });
+}
+document.addEventListener('click', e => { const a = e.target.closest('a[data-node]'); if (!a) return; e.preventDefault(); openNode(a.dataset.node); });
+
+function renderMapSection() {
+  if (!nodes.length) { // nothing to draw: a code lesson drops the section, an architecture lesson says so
+    const sec = $('#s-map'); sec.hidden = !ARCH;
+    sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>The map</h2></div><p class="sec-intro empty-map">No parts have been added to this map yet.</p>` : '') + `<div class="node-note" id="nodeNote" hidden></div>`; return;
+  }
+  $('#s-map').innerHTML = `<div class="map-top"><h2>The map</h2><div class="map-hint" id="mapHint"></div>
+      <div class="pill" id="mapMode" role="group" aria-label="Map mode"><button data-m="route">Follow the route</button><button data-m="impact">What depends on it?</button></div></div>
+    <div class="map-card"><div class="mapwrap"><svg id="map" role="img" aria-label="System map"></svg></div>
+      <div class="map-foot"><span>${L.legend ? rich(L.legend) : 'Arrows point from the caller to what it calls or hands data to.'}</span><span><i></i>route so far, dotted ahead</span><span><i class="c"></i>the current stop</span><span><i class="o"></i>what depends on it</span><span><i class="p"></i>damage</span>${ARCH && edges.some(e => e.sync === false) ? '<span><i class="d"></i>dashed arrow: async, the caller does not wait</span>' : ''}</div></div>
+    <div class="node-note" id="nodeNote" hidden></div>`;
+  $$('#mapMode button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+}
+
+// ---------- the trip ----------
+function stopHTML(tr, i) {
+  const st = tr.steps[i], key = S.trace + ':' + i, a = S.answered[key], gated = st.predict && a == null;
+  let h = `<article class="stop" id="stop-${i}" data-i="${i}"><div class="num">${ring(i + 1)}</div><div class="stop-body">`;
+  h += `<div class="stop-head"><h3 class="stop-title">${rich(st.title)}</h3>${conf(st.confidence)}</div>`;
+  h += `<div class="stop-meta"><span>in <a href="#" data-node="${esc(st.node)}">${nodeName(st.node)}</a></span><a href="#" data-showmap="${i}">see it on the map</a></div>`;
+  let gate = '';
+  if (st.predict) {
+    const ok = a === st.predict.answer;
+    gate += `<div class="turn${a != null ? ' done' : ''}"><div class="masc">${mascot(a == null ? 'think' : ok ? 'happy' : 'oops')}</div><div>
+      <div class="q">${rich(st.predict.q)}</div>
+      <div class="choices">${st.predict.options.map((o, j) => `<button class="choice ${a == null ? '' : j === st.predict.answer ? 'right' : j === a ? 'wrong' : ''}" data-p="${j}" data-stop="${i}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>
+      ${a != null ? `<div class="verdict ${ok ? 'ok' : 'no'}"><b>${ok ? 'Right.' : 'Not quite.'}</b>${rich(st.predict.why)}</div>` : ''}</div></div>`;
+  }
+  const memo = st.state?.length
+    ? `<dl>${st.state.map(v => { const masked = gated && v.changed;
+        return `<div class="mv${masked ? ' masked' : v.changed ? ' new' : ''}"><dt>${esc(v.name)}${v.changed && !masked ? '<span class="newtag">new</span>' : ''}</dt><dd>${masked ? '' : `<span>${esc(v.value)}</span>`}</dd></div>`; }).join('')}</dl>${gated && st.state.some(v => v.changed) ? '<p class="memo-lock">New values appear after your guess.</p>' : ''}`
+    : `<p class="memo-empty">Nothing new is stored at this stop.</p>`;
+  const showMemo = !ARCH || st.state?.length; // a flow step with nothing in memory gets no memory note
+  h += `<div class="cols${showMemo ? '' : ' solo'}"><div class="col-main">${gate}`;
+  h += gated ? `<p class="gate-wait">Read the code, make your guess, and the explanation appears.</p>${plate(st, null, true)}<div class="narr blurred" aria-hidden="true">${paras(pick(st))}</div>` : `${plate(st)}<div class="narr">${paras(pick(st))}</div>`;
+  h += codeBlock(st.code);
+  if (st.aside && !gated) h += `<div class="aside">${ICON.star}<span>${rich(st.aside)}</span></div>`;
+  h += `<div class="stop-actions">${askBtn(`data-ask="${i}"`)}</div>`;
+  h += `</div>${showMemo ? `<aside class="memo"><div class="memo-note"><div class="memo-h">In memory now</div>${memo}</div></aside>` : ''}</div></div></article>`;
+  return h;
+}
+function renderTrip() {
+  const sec = $('#s-trip'), tr = traces[S.trace];
+  if (!tr) { sec.hidden = true; return; }
+  let h = ARCH ? `<div class="sec-head"><h2>Flows</h2></div><p class="sec-intro">Follow one request through the system, one hop at a time. Where a step changes state, the memory note shows what.</p>`
+    : `<div class="sec-head"><h2>The trip</h2></div><p class="sec-intro">Follow one real input through the code, one stop at a time. The memory note beside each stop shows what is in memory there.</p>`;
+  if (traces.length > 1) h += `<div class="tabs" role="tablist">${traces.map((t, i) => `<button role="tab" data-tr="${i}" aria-selected="${i === S.trace}">${esc(t.title)}</button>`).join('')}</div>`;
+  if (tr.trigger) h += `<div class="trigger"><span class="lab">It starts when</span><span>${rich(tr.trigger.replace(/^You /, 'you '))}</span></div>`;
+  h += `<div class="trip">${tr.steps.map((_, i) => stopHTML(tr, i)).join('')}</div>`;
+  sec.innerHTML = h;
+  $$('[data-tr]', sec).forEach(b => b.onclick = () => { S.trace = +b.dataset.tr; S.step = 0; store.set('trace', S.trace); S.seen = {}; renderTrip(); renderRail(); paintMap(); sec.scrollIntoView({ block: 'start' }); });
+  bindTrip(); observeStops(); markStops(); markOverflow(sec);
+}
+function bindTrip() {
+  const sec = $('#s-trip');
+  $$('[data-p]', sec).forEach(b => b.onclick = () => answer(+b.dataset.stop, +b.dataset.p));
+  $$('[data-ask]', sec).forEach(b => b.onclick = () => askAbout(stopWhere(+b.dataset.ask)));
+  $$('[data-showmap]', sec).forEach(a => a.onclick = e => { e.preventDefault(); setStep(+a.dataset.showmap); setMode('route'); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+function stopWhere(i, inCode) {
+  const tr = traces[S.trace], st = tr.steps[i];
+  return `${tr.title}, stop ${i + 1} ("${st.title}")${st.code?.file ? `${inCode ? ', in the code from' : ', code in'} ${st.code.file}:${parseInt(st.code.start, 10) || 1}` : ''}`;
+}
+function markOverflow(root = document) {
+  $$('.code .rows', root).forEach(r => { const upd = () => r.classList.toggle('more', r.scrollLeft + r.clientWidth < r.scrollWidth - 4); upd(); r.onscroll = upd; });
+}
+function rerenderStop(i) {
+  const tr = traces[S.trace], old = $('#stop-' + i); if (!old) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = stopHTML(tr, i); const fresh = tmp.firstElementChild;
+  old.replaceWith(fresh); bindTrip(); observeStops(); markStops(); markOverflow(fresh);
+}
+function answer(i, j) {
+  const st = traces[S.trace]?.steps[i]; if (!st?.predict || S.answered[S.trace + ':' + i] != null || j >= st.predict.options.length) return;
+  S.answered[S.trace + ':' + i] = j; store.set(PKEY, S.answered); rerenderStop(i); renderRail();
+}
+let io, navT;
+const holdNav = () => { S.nav = true; S.resync = false; clearTimeout(navT); navT = setTimeout(() => { S.nav = false; }, 250); }; // while the page scrolls to a stop we chose, scrolling must not choose another
+let syncT;
+const syncStep = () => { const hi = innerHeight * .42, on = $$('.stop').filter(el => el.getBoundingClientRect().top <= hi).pop(); if (on) setStep(+on.dataset.i, true); }; // the stop under the observer's reading band (-38% .. -58%)
+// the hold covers only scrolling WE caused: the user's own wheel, touch, scrollbar or scroll key ends it, and once they stop scrolling the step is re-read from the page
+const userScroll = () => { if (!S.nav) return; S.nav = false; clearTimeout(navT); S.resync = true; };
+['wheel', 'touchmove', 'pointerdown'].forEach(ev => addEventListener(ev, userScroll, { passive: true, capture: true }));
+addEventListener('keydown', e => { if (/^(ArrowUp|ArrowDown|PageUp|PageDown|Home|End| )$/.test(e.key)) userScroll(); }, true);
+addEventListener('scroll', () => { if (S.nav) holdNav(); else if (S.resync) { clearTimeout(syncT); syncT = setTimeout(() => { S.resync = false; syncStep(); }, 150); } }, { passive: true });
+function observeStops() {
+  io?.disconnect();
+  io = new IntersectionObserver(ents => {
+    ents.forEach(e => { if (e.isIntersecting) { const i = +e.target.dataset.i; e.target.classList.add('seen'); if (!S.nav) setStep(i, true); } });
+  }, { rootMargin: '-38% 0px -58% 0px' });
+  $$('.stop').forEach(el => { io.observe(el); if (S.seen[el.dataset.i]) el.classList.add('seen'); });
+}
+function setStep(i, fromScroll) {
+  const tr = traces[S.trace]; if (!tr) return;
+  i = Math.max(0, Math.min(i, tr.steps.length - 1)); S.seen[i] = true;
+  if (i === S.step && fromScroll) return;
+  S.step = i; store.set('last', { trace: S.trace, step: i }); store.set('trace', S.trace);
+  markStops(); renderRail(); paintMap();
+}
+function markStops() { $$('.stop').forEach(el => { const i = +el.dataset.i; el.classList.toggle('here', i === S.step); el.classList.toggle('past', i < S.step); }); }
+function stepBy(d) { const n = traces[S.trace]?.steps.length || 0, i = Math.max(0, Math.min(S.step + d, n - 1)); if (i !== S.step) jumpTo(S.trace, i); } // J/K at either end move nothing, so they must not wipe painted state either
+function clearTransient() { S.exp = null; S.mark = null; if (S.edge != null) { S.edge = null; renderNode(); } } // damage, a mark or a selected connection give way to the route
+function jumpTo(t, i) {
+  holdNav(); clearTransient();
+  if (t !== S.trace) { S.trace = t; store.set('trace', t); S.seen = {}; renderTrip(); }
+  setStep(i); const el = $('#stop-' + i); el?.scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'start' });
+}
+
+// ---------- break it ----------
+function renderExps() {
+  const sec = $('#s-break'); if (!EXPS.length) { sec.hidden = true; return; }
+  sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>Failure modes</h2></div><p class="sec-intro">Each failure mode is one realistic thing going wrong. Guess how far it spreads, then reveal the blast radius.</p>`
+    : `<div class="sec-head"><h2>Break it</h2></div><p class="sec-intro">Each experiment is one realistic change. Guess what breaks, then run it.</p>`) + `<div class="exps">${EXPS.map((w, i) => {
+    const ran = S.ran[i];
+    return `<div class="exp"><div class="exp-main"><div class="change"><h3>${rich(w.title)}</h3><div>${rich(w.change)}</div></div>
+      <div class="result${ran ? ' shown' : ''}">${ran
+        ? `<div class="what">${ARCH ? 'Blast radius' : 'What happens'} ${conf(w.confidence)}</div><div>${rich(w.outcome)}</div>${w.lesson ? `<div class="takeaway">${rich(w.lesson)}</div>` : ''}${(w.affects?.length || w.node) ? `<button class="btn" data-show="${i}">${ICON.pin} Show the damage on the map</button>` : ''}`
+        : `<div class="guess">${ARCH ? 'How far do you think it spreads?' : 'What do you think breaks?'}</div><button class="btn go" data-run="${i}">${ICON.play} ${ARCH ? 'Reveal the blast radius' : 'Run the experiment'}</button>`}</div></div>${plate(w, 'fire')}</div>`; }).join('')}</div>`;
+  $$('[data-run]', sec).forEach(b => b.onclick = () => { S.ran[b.dataset.run] = true; renderExps(); $(`[data-show="${b.dataset.run}"]`)?.focus(); });
+  $$('[data-show]', sec).forEach(b => b.onclick = () => { S.mode = 'route'; S.origin = null; syncMode(); S.exp = +b.dataset.show; S.mark = null; S.edge = null; renderNode(); paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+
+// ---------- why ----------
+function renderDecs() {
+  const sec = $('#s-why'); if (!DECS.length) { sec.hidden = true; return; }
+  sec.innerHTML = (ARCH ? `<div class="sec-head"><h2>Decisions</h2></div><p class="sec-intro">The forces behind each choice, what we now live with, and what the alternatives would have cost.</p>`
+    : `<div class="sec-head"><h2>Why it's built this way</h2></div><p class="sec-intro">The choices behind the code, and what the alternatives would have cost.</p>`) +
+    DECS.map(d => `<div class="dec"><div class="dec-main"><h3>${rich(d.title)} ${conf(d.confidence)}</h3>
+      ${d.context ? `<div class="dec-ctx"><span class="lab">The forces</span>${rich(d.context)}</div>` : ''}
+      <div class="chosen-wrap"><span class="lab">${ARCH ? 'What we chose' : 'What the code does'}</span><span class="chosen">${rich(d.chosen)}</span></div>
+      <div class="narr">${paras(pick(d) || d.why)}</div>
+      ${d.consequences ? `<div class="dec-cons"><span class="lab">What we live with</span>${rich(d.consequences)}</div>` : ''}
+      ${(d.alternatives || []).length ? `<table class="alts"><thead><tr><th>Could have used</th><th>Trade-off</th></tr></thead><tbody>${d.alternatives.map(a => `<tr><td>${esc(a.name)}</td><td>${rich(a.tradeoff)}</td></tr>`).join('')}</tbody></table>` : ''}</div>${plate(d, 'fork')}</div>`).join('');
+}
+
+// ---------- weak spots ----------
+function renderRisks() {
+  const sec = $('#s-weak'); if (!RISKS.length) { sec.hidden = true; return; }
+  const order = { high: 0, medium: 1, low: 2 };
+  sec.innerHTML = `<div class="sec-head risks-head">${mascot('worry')}<h2>Weak spots</h2></div><p class="sec-intro">${ARCH ? 'Places the design is likely to hurt, worst first, each with the smallest fix.' : 'Real problems found while reading the code, worst first, each with the smallest fix.'}</p><div class="risks">` +
+    RISKS.slice().sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3)).map(r => `<div class="risk">
+      <div class="sev ${esc(r.severity)}">${esc(r.severity || '')}</div>
+      <div><h3>${rich(r.title)} ${conf(r.confidence)}</h3>${r.where ? `<div class="loc">${esc(r.where)}</div>` : ''}<p>${rich(r.what)}</p>${r.fix ? `<div class="fix"><b>Smallest fix:</b>${rich(r.fix)}</div>` : ''}</div>${plate(r, 'watch')}</div>`).join('') + `</div>`;
+}
+
+// ---------- interfaces, invariants, pressure points (architecture) ----------
+function renderIfaces() {
+  const sec = $('#s-interfaces'); if (!IFACES.length) { sec.hidden = true; return; }
+  const cell = (label, v) => v ? `<td data-label="${label}">${rich(v)}</td>` : `<td data-label="${label}" class="none">—</td>`;
+  sec.innerHTML = `<div class="sec-head"><h2>Interfaces</h2></div><p class="sec-intro">Every connection on the map: how it is made, whether the caller waits, what crosses it and what is promised. Click one to see it on the map.</p>
+    <div class="iface-card"><table class="ifaces"><thead><tr><th>Connection</th><th>Protocol</th><th>Calls</th><th>Payload</th><th>Guarantee</th></tr></thead><tbody>${IFACES.map(i => { const e = edges[i];
+      return `<tr data-ei="${i}"><td data-label="Connection"><button class="iface-go" data-edge="${i}">${nodeName(e.from)} → ${nodeName(e.to)}</button></td>${cell('Protocol', e.protocol)}` +
+        (typeof e.sync === 'boolean' ? `<td data-label="Calls"><span class="mode ${e.sync ? 'sync' : 'async'}">${e.sync ? 'sync' : 'async'}</span></td>` : `<td data-label="Calls" class="none">—</td>`) +
+        `${cell('Payload', e.payload)}${cell('Guarantee', e.guarantee)}</tr>`; }).join('')}</tbody></table></div>`;
+  $$('[data-edge]', sec).forEach(b => b.onclick = () => selectEdge(+b.dataset.edge, true));
+}
+function markOnMap(node, what) { S.mark = { node, what }; S.exp = null; S.edge = null; S.mode = 'route'; S.origin = null; syncMode(); renderNode(); paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); }
+function renderInvs() {
+  const sec = $('#s-invariants'); if (!INVS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Invariants</h2></div><p class="sec-intro">Rules that must always hold for the system to be correct, who enforces each one, and what goes wrong when it is broken.</p><div class="invs">` +
+    INVS.map((v, i) => `<div class="inv"><div class="num">${ring(i + 1)}</div><div><h3>${rich(v.rule)} ${conf(v.confidence)}</h3>
+      <div class="enf">Enforced at <a href="#" data-node="${esc(v.node)}">${nodeName(v.node)}</a></div>${v.evidence ? `<div class="enf ev">Enforced by: ${rich(v.evidence)}</div>` : ''}
+      <p class="breaks"><b>If it breaks:</b> ${rich(v.breaks)}</p>
+      <button class="btn quiet" data-mark="${i}">${ICON.pin} Show it on the map</button></div>${plate(v, 'gate')}</div>`).join('') + `</div>`;
+  $$('[data-mark]', sec).forEach(b => b.onclick = () => markOnMap(INVS[+b.dataset.mark].node, 'enforces this rule'));
+}
+function renderPress() {
+  const sec = $('#s-pressure'); if (!PRESS.length) { sec.hidden = true; return; }
+  const order = { high: 0, medium: 1, low: 2 }, list = PRESS.slice().sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3));
+  sec.innerHTML = `<div class="sec-head"><h2>Pressure points</h2></div><p class="sec-intro">Where the design will strain first as load or data grows: the limit, how you would notice, and what to do about it. Worst first.</p><div class="press-list">` +
+    list.map(p => { const rows = [['limit', p.limit], ['you would notice', p.signal], ['mitigation', p.mitigation]].filter(r => r[1]);
+      return `<div class="press"><div class="sev ${esc(p.severity)}">${esc(p.severity || '')}</div><div><h3>${rich(p.title)} ${conf(p.confidence)}</h3>
+      <div class="enf">At <a href="#" data-node="${esc(p.node)}">${nodeName(p.node)}</a></div>
+      <dl class="links">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${rich(v)}</dd>`).join('')}</dl>
+      <button class="btn quiet" data-mark="${PRESS.indexOf(p)}">${ICON.pin} Show it on the map</button></div>${plate(p, 'queue')}</div>`; }).join('') + `</div>`;
+  $$('[data-mark]', sec).forEach(b => b.onclick = () => markOnMap(PRESS[+b.dataset.mark].node, 'is under this pressure'));
+}
+
+// ---------- data sections (parts/data.js builds the blocks) ----------
+DATA.forEach((d, i) => { const sec = document.createElement('section'); sec.className = 'sec dsec'; sec.id = 's-data-' + i; $(d.at === 'start' ? '#s-map' : '#s-quiz').before(sec); });
+function renderData() {
+  DATA.forEach((d, i) => { $('#s-data-' + i).innerHTML = `<div class="sec-head"><h2>${rich(d.title)}</h2></div>${d.intro ? `<p class="sec-intro">${rich(d.intro)}</p>` : ''}${dataBlocksHTML(d.blocks, { rich, esc, paras })}`; });
+}
+
+// ---------- quiz ----------
+function quizOrder() { const rank = i => S.quiz[i] == null ? 1 : S.quiz[i] === QS[i].answer ? 2 : 0; return QS.map((_, i) => i).sort((a, b) => rank(a) - rank(b) || a - b); }
+function renderQuiz() {
+  const sec = $('#s-quiz'); if (!QS.length) { sec.hidden = true; return; }
+  if (!S.qorder) { S.qorder = quizOrder(); S.qi = S.qorder.findIndex(i => S.quiz[i] == null); }
+  const right = QS.filter((q, i) => S.quiz[i] === q.answer).length, missed = QS.filter((q, i) => S.quiz[i] != null && S.quiz[i] !== q.answer).length;
+  let h = `<div class="sec-head"><h2>Check yourself</h2></div><p class="sec-intro">${QS.length} questions that need understanding, not memory. Questions you miss come back first next time.</p><div class="quiz">`;
+  h += `<div class="pips">${S.qorder.map((qi, k) => `<button class="pip ${S.quiz[qi] == null ? '' : S.quiz[qi] === QS[qi].answer ? 'right' : 'wrong'}${k === S.qi ? ' cur' : ''}" data-k="${k}" aria-label="Question ${k + 1}"></button>`).join('')}</div>`;
+  if (S.qi < 0) {
+    h += `<div class="qcard"><div class="score-row">${mascot(right === QS.length ? 'happy' : 'oops')}<div><div class="score">${right}<small> of ${QS.length}</small></div>
+      <p style="margin-top:10px">${right === QS.length ? 'All correct. Come back in a few days and try again without looking at the map.' : `You missed ${missed}. Walk those stops again, then retry them.`}</p></div></div>
+      <div class="qnav">${missed ? `<button class="btn go" id="retryMissed">Retry the ${missed} I missed</button>` : ''}<button class="btn" id="restart">Start over</button></div></div>`;
+  } else {
+    const qi = S.qorder[S.qi], q = QS[qi], a = S.quiz[qi], more = S.qorder.some(i => S.quiz[i] == null);
+    h += `<div class="qcard"><div class="qnum">Question ${S.qi + 1} of ${QS.length}</div><div class="qtext">${rich(q.q)}</div><div class="choices">${q.options.map((o, j) =>
+      `<button class="choice ${a == null ? '' : j === q.answer ? 'right' : j === a ? 'wrong' : ''}" data-a="${j}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>` +
+      (a != null ? `<div class="verdict ${a === q.answer ? 'ok' : 'no'}"><b>${a === q.answer ? 'Right.' : 'Not quite.'}</b>${rich(q.why)}</div><div class="qnav"><button class="btn go" id="qnext">${more ? 'Next question' : 'See my score'}</button></div>` : '') + `</div>`;
+  }
+  sec.innerHTML = h + `</div>`;
+  $$('.pip', sec).forEach(b => b.onclick = () => { S.qi = +b.dataset.k; renderQuiz(); });
+  $$('[data-a]', sec).forEach(b => b.onclick = () => qanswer(+b.dataset.a));
+  $('#qnext')?.addEventListener('click', qnext);
+  $('#retryMissed')?.addEventListener('click', () => { QS.forEach((q, i) => { if (S.quiz[i] != null && S.quiz[i] !== q.answer) delete S.quiz[i]; }); store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+  $('#restart')?.addEventListener('click', () => { S.quiz = {}; store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+}
+function qanswer(j) {
+  if (S.qi < 0) return; const qi = S.qorder[S.qi]; if (S.quiz[qi] != null || j >= QS[qi].options.length) return;
+  S.quiz[qi] = j; store.set(QKEY, S.quiz); renderQuiz(); renderRail(); $('#qnext')?.focus({ preventScroll: true });
+}
+function qnext() { const later = S.qorder.findIndex((qi, k) => k > S.qi && S.quiz[qi] == null); S.qi = later >= 0 ? later : S.qorder.findIndex(qi => S.quiz[qi] == null); renderQuiz(); }
+
+// ---------- glossary ----------
+function renderTerms() {
+  const sec = $('#s-terms'); if (!GLOSS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Words to know</h2></div><p class="sec-intro">Dotted words anywhere on the page show these definitions when you hover them.</p><dl class="terms">${GLOSS.map(g => `<div><dt>${esc(g.term)}</dt><dd>${esc(g.def)}</dd></div>`).join('')}</dl>`;
+}
+const tip = $('#tip');
+function showTip(el) { const r = el.getBoundingClientRect(); tip.innerHTML = `<b>${esc(el.textContent)}</b>: ${esc(el.dataset.def)}`; tip.classList.add('on');
+  const tw = tip.offsetWidth, th = tip.offsetHeight; let x = Math.min(Math.max(12, r.left + r.width / 2 - tw / 2), innerWidth - tw - 12), y = r.top - th - 10; if (y < 8) y = r.bottom + 10;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+const hideTip = () => tip.classList.remove('on');
+document.addEventListener('mouseover', e => { const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+document.addEventListener('focusin', e => { if (restoring) return; const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
+
+// ---------- rail ----------
+const dataSecs = start => DATA.map((d, i) => ['s-data-' + i, String(d.title || 'Data').replace(/`/g, ''), () => true, d.at === 'start']).filter(x => x[3] === start).map(x => x.slice(0, 3));
+const SECS = [...dataSecs(true), ['s-map', 'The map', () => nodes.length || ARCH], ['s-trip', ARCH ? 'Flows' : 'The trip', () => traces.length], ['s-interfaces', 'Interfaces', () => IFACES.length], ['s-invariants', 'Invariants', () => INVS.length],
+  ['s-pressure', 'Pressure points', () => PRESS.length], ['s-break', ARCH ? 'Failure modes' : 'Break it', () => EXPS.length], ['s-why', ARCH ? 'Decisions' : 'Why this way', () => DECS.length],
+  ['s-weak', 'Weak spots', () => RISKS.length], ...dataSecs(false), ['s-quiz', 'Check yourself', () => QS.length], ['s-terms', 'Words to know', () => GLOSS.length]];
+let curSec = 's-map';
+function renderRail() {
+  const tr = traces[S.trace];
+  let h = `<div class="rail-brand">${mascot('happy')}<span>lens</span></div><ul class="toc">`;
+  SECS.filter(s => s[2]()).forEach(([id, name]) => {
+    const cnt = id === 's-quiz' ? `<span class="cnt">${Object.keys(S.quiz).length}/${QS.length}</span>` : id === 's-trip' && tr ? `<span class="cnt">${S.step + 1}/${tr.steps.length}</span>` : '';
+    h += `<li><a href="#${id}" class="${curSec === id ? 'on' : ''}">${esc(name)}${cnt}</a>`;
+    if (id === 's-trip' && tr) {
+      h += `<ol class="stops"><span class="fill"></span>${tr.steps.map((s, i) => { const gate = s.predict && S.answered[S.trace + ':' + i] == null;
+        return `<li class="${i < S.step ? 'done' : i === S.step ? 'here' : ''}${gate ? ' gate' : ''}"><span class="dot"></span><a href="#stop-${i}" data-go="${i}" data-lens-stop="${i}">${esc(s.title.replace(/`/g, ''))}</a></li>`; }).join('')}</ol>`;
+    }
+    h += `</li>`;
+  });
+  h += `</ul><div class="rail-foot"><div class="pill" role="group" aria-label="Detail level">${['simple', 'deep'].map(d => `<button data-d="${d}" aria-pressed="${S.depth === d}">${d === 'simple' ? 'Plain' : 'Deep'}</button>`).join('')}</div>
+    <div class="keys"><span><kbd>J</kbd><kbd>K</kbd> next / previous stop</span><span><kbd>P</kbd><kbd>D</kbd> plain / deep</span><span><kbd>1</kbd>–<kbd>3</kbd> answer a guess</span><span><kbd>A</kbd> ask about the selection</span></div></div>`;
+  const rail = $('#rail'); rail.innerHTML = h;
+  const here = $('.stops li.here', rail), fill = $('.stops .fill', rail);
+  if (here && fill) fill.style.setProperty('--h', Math.max(0, here.offsetTop + 8) + 'px');
+  $$('[data-go]', rail).forEach(a => a.onclick = e => { e.preventDefault(); jumpTo(S.trace, +a.dataset.go); });
+  $$('.rail-foot [data-d]', rail).forEach(b => b.onclick = () => setDepth(b.dataset.d));
+}
+const secIO = new IntersectionObserver(ents => { ents.forEach(e => { if (e.isIntersecting) { curSec = e.target.id; $$('.toc>li>a', $('#rail')).forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + curSec)); } }); }, { rootMargin: '-30% 0px -65% 0px' });
+
+// ---------- chrome ----------
+function syncMode() { $$('#mapMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode)); }
+function setMode(m) { S.mode = m; S.exp = null; S.mark = null; if (m === 'route') S.origin = null; syncMode(); paintMap(); }
+function setDepth(d) {
+  S.depth = d; store.set('depth', d);
+  $$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
+  const y = scrollY; renderTrip(); renderNode(); renderDecs(); renderRail(); scrollTo(0, y);
+}
+let tt; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2000); }
+function copy(text) {
+  const done = () => toast('Question copied. Paste it into Claude and finish it.');
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { prompt('Copy this:', text); } ta.remove(); };
+  navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(done, fallback) : fallback();
+}
+function themeIcon() { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; $('#themeBtn').innerHTML = dark ? ICON.sun : ICON.moon; return dark; }
+$('#themeBtn').onclick = () => { const dark = themeIcon(); document.documentElement.dataset.theme = dark ? 'light' : 'dark'; store.set('theme', document.documentElement.dataset.theme); themeIcon(); };
+$$('#depth button').forEach(b => b.onclick = () => setDepth(b.dataset.d));
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const num = /^[1-9]$/.test(e.key) ? +e.key - 1 : null, k = e.key.toLowerCase();
+  if (curSec === 's-quiz') { if (num != null) { qanswer(num); return; } if (e.key === 'Enter' && $('#qnext') && !e.target.closest('button,a')) { e.preventDefault(); qnext(); return; } }
+  if (k === 'arrowright' || k === 'j') { e.preventDefault(); stepBy(1); }
+  else if (k === 'arrowleft' || k === 'k') { e.preventDefault(); stepBy(-1); }
+  else if (k === 'p') setDepth('simple'); else if (k === 'd') setDepth('deep');
+  else if (k === 'a') { e.preventDefault(); if (!askSelection()) curSec === 's-trip' && traces[S.trace] ? askAbout(stopWhere(S.step)) : ASK.on ? openAsk() : toast('Select some text first, then press A.'); }
+  else if (num != null && curSec === 's-trip') answer(S.step, num);
+});
+
+// ---------- ask claude ----------
+// serve.py answers POST /__lens/ask with NDJSON events; without it (file://) every ask copies a question instead.
+const ASK = { on: false, models: ['haiku', 'sonnet'], model: store.get('model', 'haiku'), session: null, pending: null, busy: null, key: '' };
+{ // serve.py's link carries its key in the #fragment; keep it for this origin and tidy the address bar
+  const m = location.hash.match(/(?:^#|&)k=([\w-]+)/);
+  try { if (m) localStorage.setItem('lens:key', m[1]); ASK.key = localStorage.getItem('lens:key') || ''; } catch { ASK.key = m?.[1] || ''; }
+  if (m) history.replaceState(null, '', location.pathname + location.search);
+}
+const askBox = $('#ask'), askLog = $('#askLog'), askIn = $('#askIn'), askPop = $('#askPop');
+const modelName = m => m[0].toUpperCase() + m.slice(1);
+const inl = s => esc(s).split(/(`[^`]+`)/).map(p => /^`[^`]+`$/.test(p) ? `<code>${p.slice(1, -1)}</code>`
+  : p.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s.,;:!?)]|$)/g, '$1<i>$2</i>')).join('');
+const LI = /^\s*([-*]|\d+\.)\s+/;
+function md(t) {
+  // Small, escape-first markdown: fenced code, paragraphs, bullet and numbered lists, `code`, **bold**.
+  return String(t).split('```').map((b, i) => i % 2 ? `<pre><code>${esc(b.replace(/^[\w+-]*\n/, '').replace(/\n$/, ''))}</code></pre>`
+    : b.split(/\n{2,}/).filter(p => p.trim()).map(p => {
+      let out = '', run = [], kind = null;
+      const flush = () => { if (!run.length) return; const ol = /^\s*\d/.test(run[0]);
+        out += kind === 'p' ? `<p>${run.map(inl).join('<br>')}</p>` : `<${ol ? 'ol' : 'ul'}>${run.map(l => `<li>${inl(l.replace(LI, ''))}</li>`).join('')}</${ol ? 'ol' : 'ul'}>`; run = []; };
+      p.split('\n').forEach(l => { const k = LI.test(l) ? 'li' : 'p'; if (k !== kind) { flush(); kind = k; } run.push(k === 'p' ? l.replace(/^#+\s*/, '') : l); });
+      flush(); return out; }).join('')).join('');
+}
+function whereOf(el) {
+  const stop = el.closest('.stop');
+  if (stop && traces[S.trace]) return stopWhere(+stop.dataset.i, !!el.closest('figure.code'));
+  if (el.closest('#nodeNote') && S.edge != null && edges[S.edge]) return `the connection from ${nLabel(edges[S.edge].from)} to ${nLabel(edges[S.edge].to)}`;
+  const n = el.closest('#nodeNote') && nodeById[S.node];
+  if (n) return `the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`;
+  const sec = el.closest('section.sec'), name = SECS.find(s => s[0] === sec?.id)?.[1];
+  return name ? `the "${name}" section` : 'the lesson introduction';
+}
+function selInfo() {
+  const s = getSelection(); if (!s || s.isCollapsed || !s.rangeCount) return null;
+  const text = s.toString().trim(), r = s.getRangeAt(0), a = r.commonAncestorContainer, el = a.nodeType === 1 ? a : a.parentElement;
+  if (text.length < 2 || !el?.closest('main') || el.closest('[aria-hidden="true"]')) return null;
+  return { quote: text.slice(0, 1500), where: whereOf(el), rect: r.getBoundingClientRect() };
+}
+let selNow = null, selT;
+function placePop() {
+  selNow = selInfo(); askPop.classList.toggle('on', !!selNow); if (!selNow) return;
+  askPop.innerHTML = ASK.on ? `${ICON.chat} Ask Claude <kbd>A</kbd>` : `${ICON.copy} Copy question <kbd>A</kbd>`;
+  const r = selNow.rect, w = askPop.offsetWidth, h = askPop.offsetHeight;
+  let y = r.top - h - 12; if (y < 8) y = r.bottom + 12;
+  askPop.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+  askPop.style.top = Math.min(Math.max(8, y), innerHeight - h - 8) + 'px';
+}
+document.addEventListener('selectionchange', () => { clearTimeout(selT); selT = setTimeout(placePop, 160); });
+addEventListener('scroll', () => { if (selNow) placePop(); }, { passive: true });
+askPop.addEventListener('mousedown', e => e.preventDefault()); // keep the selection while clicking
+askPop.onclick = () => askSelection();
+function askSelection() { const s = selNow || selInfo(); if (!s) return false; askPop.classList.remove('on'); askAbout(s.where, s.quote); getSelection().removeAllRanges(); return true; }
+
+function askAbout(where, quote) {
+  if (!ASK.on) return copy(`About the "${L.title}" lesson, ${where}${quote ? `, this part:\n"${quote}"\n\n` : ': '}`);
+  ASK.pending = { where, quote }; $('.ask-pending', askLog)?.remove(); $('.ask-empty', askLog)?.remove();
+  const d = document.createElement('div'); d.className = 'ask-pending';
+  d.innerHTML = (quote ? `<div class="ask-quote"><span class="where">${esc(where)}</span>${esc(quote)}</div>` : `<div class="ask-about">About ${esc(where)}</div>`) +
+    `<div class="ask-chips" style="margin-top:12px">${[['Explain it simply', 'Explain this in plain words.'], ['Why this way?', 'Why is it done this way, and what would go wrong otherwise?'], ['Show me the code', 'Show me where this happens in the code.']]
+      .map(([l, q]) => `<button type="button" data-q="${esc(q)}">${l}</button>`).join('')}</div>`;
+  askLog.appendChild(d); $$('[data-q]', d).forEach(b => b.onclick = () => send(b.dataset.q));
+  openAsk(); d.scrollIntoView({ block: 'nearest' });
+}
+function openAsk() {
+  askBox.classList.add('on'); document.body.classList.add('asking'); askBox.removeAttribute('inert');
+  if (!askLog.children.length) askLog.innerHTML = `<div class="ask-empty">${mascot('think')}<span>Select any text in the lesson and press <b>Ask Claude</b> (or <kbd>A</kbd>), or just type a question. ${modelName(ASK.model)} answers from this repo's real code.</span></div>`;
+  askIn.focus({ preventScroll: true });
+}
+function closeAsk() { askBox.classList.remove('on'); document.body.classList.remove('asking'); askBox.setAttribute('inert', ''); } // an answer in progress keeps streaming
+function syncAsk() {
+  $$('#askModel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.model === ASK.model));
+  $('#askSend').textContent = ASK.busy ? 'Stop' : 'Send'; $('#askSend').classList.toggle('go', !ASK.busy);
+}
+const toolLabel = v => { const [tool, ...rest] = v.split(' '), arg = rest.join(' '), short = arg.split('/').slice(-2).join('/');
+  return tool === 'Read' ? `Reading ${short}…` : tool === 'Grep' ? `Searching the code for “${arg}”…` : tool === 'Glob' ? `Looking for files like ${arg}…` : `${tool}…`; };
+async function send(q) {
+  if (ASK.busy) return toast('Wait for this answer, or press Stop.');
+  q = q.trim() || (ASK.pending ? 'Explain this in plain words.' : ''); if (!q) return;
+  const ctx = ASK.pending || {}; ASK.pending = null; askIn.value = '';
+  const pend = $('.ask-pending', askLog); if (pend) { $('.ask-chips', pend)?.remove(); pend.className = 'ask-sent'; }
+  $('.ask-empty', askLog)?.remove();
+  askLog.insertAdjacentHTML('beforeend', `<div class="ask-me">${esc(q)}</div><div class="ask-ai"><div class="who">${modelName(ASK.model)}</div><div class="body"></div><div class="ask-status">${modelName(ASK.model)} is thinking…</div></div>`);
+  const ai = askLog.lastElementChild, body = $('.body', ai), status = $('.ask-status', ai);
+  const near = () => askLog.scrollHeight - askLog.scrollTop - askLog.clientHeight < 80, stick = () => { askLog.scrollTop = askLog.scrollHeight; };
+  stick();
+  const ctrl = new AbortController(); ASK.busy = ctrl; syncAsk();
+  let text = '', failed = false, finished = false;
+  const fail = m => { failed = true; status.textContent = ''; body.insertAdjacentHTML('beforeend', `<p class="ask-err">${esc(m)}</p>`); };
+  try {
+    const r = await fetch('/__lens/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lens-Key': ASK.key }, signal: ctrl.signal,
+      body: JSON.stringify({ q, model: ASK.model, session: ASK.session, lesson: L.title, quote: ctx.quote, where: ctx.where }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `The helper answered ${r.status}.`);
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (!line.trim()) continue;
+        const ev = JSON.parse(line), stuck = near();
+        if (ev.t === 'session') ASK.session = ev.v;
+        else if (ev.t === 'text') { text += ev.v; body.innerHTML = md(text); status.textContent = ''; }
+        else if (ev.t === 'tool') status.textContent = toolLabel(ev.v);
+        else if (ev.t === 'error') fail(ev.v);
+        else if (ev.t === 'done') finished = true;
+        if (stuck) stick();
+      }
+    }
+    if (!finished && !failed) fail('The answer was cut off. Ask again, or press New chat.');
+    else if (!text && !failed) fail('No answer came back. Try again, or switch model.');
+  } catch (e) {
+    if (e.name === 'AbortError') status.textContent = 'Stopped.';
+    else fail(/fetch/i.test(e.message) ? 'Lost the connection to serve.py. Is it still running?' : e.message);
+  } finally { ASK.busy = null; syncAsk(); }
+}
+$('#askForm').onsubmit = e => { e.preventDefault(); ASK.busy ? ASK.busy.abort() : send(askIn.value); };
+askIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!ASK.busy) send(askIn.value); } });
+$('#askClose').innerHTML = ICON.x; $('#askClose').onclick = closeAsk;
+$('#askNew').onclick = () => { ASK.busy?.abort(); ASK.session = null; ASK.pending = null; askLog.innerHTML = ''; openAsk(); };
+$$('#askModel button').forEach(b => b.onclick = () => { ASK.model = b.dataset.model; store.set('model', ASK.model); syncAsk(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && askBox.classList.contains('on')) closeAsk(); });
+askBox.setAttribute('inert', ''); syncAsk();
+if (location.protocol.startsWith('http')) fetch('/__lens/health').then(r => r.ok ? r.json() : null).then(h => {
+  if (!h?.lens) return;
+  ASK.on = true; ASK.models = h.models; if (!h.models.includes(ASK.model)) ASK.model = h.model;
+  $$('#askModel button').forEach(b => { b.hidden = !h.models.includes(b.dataset.model); }); document.body.classList.add('can-ask'); syncAsk();
+}).catch(() => {});
+
+// ---------- boot ----------
+{ const i = L.title.indexOf(': '); $('#title').innerHTML = i > 0 ? `${rich(L.title.slice(0, i + 1))} <span class="swipe">${rich(L.title.slice(i + 2))}</span>` : rich(L.title); } $('#subtitle').innerHTML = rich(L.subtitle || '');
+$('#heroMascot').innerHTML = mascot('happy'); themeIcon();
+$$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === S.depth));
+$('#end').innerHTML = `${mascot('happy')}<span>That's the whole ${ARCH ? 'system' : 'trip'}. Come back in a few days and take the quiz again before reading anything.</span>`;
+renderMapSection(); syncMode(); renderTrip(); renderIfaces(); renderInvs(); renderPress(); renderExps(); renderDecs(); renderRisks(); renderData(); renderQuiz(); renderTerms(); renderRail();
+drawMap(); renderNode();
+$$('section.sec').forEach(s => secIO.observe(s));
+if (S.last && traces[S.last.trace] && S.last.step > 0) {
+  const t = traces[S.last.trace], st = t.steps[S.last.step];
+  if (st) { $('#resume').innerHTML = `<div class="resume"><span>Welcome back. You stopped at <b>stop ${S.last.step + 1}${traces.length > 1 ? ' of ' + esc(t.title) : ''}: ${rich(st.title)}</b></span><button class="btn go" id="resumeBtn">Jump back in</button></div>`;
+    $('#resumeBtn').onclick = () => { $('#resume').innerHTML = ''; jumpTo(S.last.trace, S.last.step); }; }
+}
+document.fonts?.ready.then(() => drawMap());
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { drawMap(); markOverflow(); }, 120); }).observe($('#s-map'));
+})();
+</script>
+</body>
+</html>

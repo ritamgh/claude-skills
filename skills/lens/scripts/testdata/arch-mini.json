@@ -1,0 +1,165 @@
+{
+  "id": "arch-mini",
+  "mode": "architecture",
+  "title": "How the upload service moves a photo",
+  "subtitle": "Five parts, six connections, and what happens when one of them has a bad day",
+  "layers": [
+    {"id": "front", "name": "Front door"},
+    {"id": "buffer", "name": "Buffer"},
+    {"id": "work", "name": "Workers"},
+    {"id": "data", "name": "Storage and delivery"}
+  ],
+  "nodes": [
+    {
+      "id": "api", "label": "Upload API", "kind": "stateless web service", "layer": "front", "row": 1,
+      "simple": "The front door. It checks the upload, stores its record and hands the heavy work to the queue.",
+      "deep": "A stateless HTTP service. It validates size and type, writes one metadata row, publishes one job and answers 202 without waiting for any thumbnail.",
+      "confidence": "evidenced",
+      "owns": "Upload ids and the first metadata row of every upload.",
+      "exposes": "POST /uploads and GET /uploads/{id} over HTTPS.",
+      "runs": "Container pool behind the public load balancer.",
+      "scale": "Horizontally, add containers. Tops out at the store connection limit.",
+      "scene": {"name": "gate", "caption": "check, then wave through"}
+    },
+    {
+      "id": "queue", "label": "Job queue", "kind": "durable message queue", "layer": "buffer", "row": 0,
+      "simple": "A waiting line for thumbnail jobs, so a burst of uploads never overwhelms the workers.",
+      "deep": "A durable queue with acknowledgements. A job stays in the queue until a worker acknowledges it, so a crashed worker means a redelivery, never a lost job.",
+      "confidence": "evidenced",
+      "owns": "Pending thumbnail jobs and their delivery order.",
+      "exposes": "Publish and consume over AMQP.",
+      "runs": "Three-node cluster in the private subnet.",
+      "scale": "Add partitions. A single partition tops out near one consumer group.",
+      "scene": {"name": "queue", "caption": "jobs wait their turn"}
+    },
+    {
+      "id": "worker", "label": "Thumbnail worker", "kind": "background worker", "layer": "work", "row": 0,
+      "simple": "Takes one job at a time, makes the small versions of the photo and records the result.",
+      "deep": "Pulls a job, reads the original, renders three sizes, writes them and the rows that point at them, then acknowledges the job and asks the CDN to forget old copies.",
+      "confidence": "inferred",
+      "owns": "The thumbnail files and the rows that list them.",
+      "runs": "Autoscaled batch pool, no public address.",
+      "scale": "Add workers until the queue drains. CPU bound, so about one per core."
+    },
+    {
+      "id": "store", "label": "Photo store", "kind": "SQL database", "layer": "data", "row": 1,
+      "simple": "The one place that remembers every upload and where its files live.",
+      "deep": "A relational database with one primary and a replica. It is the source of truth for upload status, and the CDN pulls originals from it.",
+      "confidence": "evidenced",
+      "owns": "Upload status and the list of files for each photo.",
+      "exposes": "SQL over TLS, plus an object read endpoint for the CDN.",
+      "scale": "Vertically for writes, read replicas for reads. Tops out near 2,000 writes a second."
+    },
+    {
+      "id": "cdn", "label": "CDN", "kind": "edge cache", "layer": "data", "row": 0,
+      "simple": "Keeps copies of popular images close to viewers so most reads never reach the store.",
+      "confidence": "inferred"
+    }
+  ],
+  "edges": [
+    {"from": "api", "to": "queue", "label": "enqueue job", "protocol": "AMQP publish", "sync": false, "payload": "Upload id and object key.", "guarantee": "at-least-once"},
+    {"from": "queue", "to": "worker", "label": "deliver", "protocol": "AMQP consume", "sync": false, "payload": "One job at a time.", "guarantee": "at-least-once, ordered per upload"},
+    {"from": "worker", "to": "store", "label": "save sizes", "protocol": "SQL over TLS", "sync": true, "payload": "Thumbnail rows and object keys.", "guarantee": "transactional"},
+    {"from": "api", "to": "store", "label": "record", "protocol": "SQL over TLS", "sync": true, "payload": "One metadata row per upload.", "guarantee": "read-your-writes"},
+    {"from": "worker", "to": "cdn", "label": "purge", "protocol": "HTTPS purge call", "sync": false, "payload": "Object keys to evict.", "guarantee": "best-effort"},
+    {"from": "cdn", "to": "store", "protocol": "S3 GET"}
+  ],
+  "traces": [
+    {
+      "title": "Upload a photo",
+      "trigger": "A user taps Upload in the app.",
+      "steps": [
+        {
+          "node": "api", "title": "Accept the upload",
+          "simple": "The API checks the file and answers right away with an id, before any thumbnail exists.",
+          "deep": "Size and type are validated, one row is written with status received, one job is published, and the client gets 202 with the upload id.",
+          "confidence": "evidenced",
+          "state": [
+            {"name": "upload_id", "value": "\"u_91\"", "changed": true},
+            {"name": "status", "value": "\"received\"", "changed": true}
+          ],
+          "code": {"lang": "python", "start": 1, "src": "def accept(upload):\n    row = db.insert(upload.meta, status=\"received\")\n    queue.publish(job(row.id))\n    return 202, row.id", "highlight": [3]},
+          "scene": {"name": "carry", "caption": "id out, job queued"}
+        },
+        {
+          "node": "queue", "title": "Park a job",
+          "simple": "The queue holds the job until a worker is free.",
+          "confidence": "evidenced"
+        },
+        {
+          "node": "worker", "title": "Make the thumbnails",
+          "simple": "A worker renders three sizes of the photo.",
+          "deep": "The worker reads the original, renders 128, 512 and 1024 pixel versions and keeps them in memory until the write.",
+          "confidence": "inferred"
+        },
+        {
+          "node": "store", "title": "Record the result",
+          "simple": "The store marks the upload ready and lists its three files.",
+          "confidence": "evidenced"
+        }
+      ]
+    },
+    {
+      "title": "Read a cold image",
+      "trigger": "A browser asks the CDN for an image it has not cached yet.",
+      "steps": [
+        {"node": "cdn", "title": "The CDN misses its cache", "simple": "The CDN has no copy, so it asks the store for the original.", "confidence": "inferred"},
+        {"node": "store", "title": "The store serves the original", "simple": "The store answers the read and the CDN gets the bytes.", "confidence": "evidenced"},
+        {"node": "cdn", "title": "The CDN keeps a copy", "simple": "The next viewer is served straight from the cache.", "confidence": "inferred"}
+      ]
+    }
+  ],
+  "invariants": [
+    {"rule": "Only the worker writes thumbnails.", "node": "worker", "breaks": "Two writers race and a reader sees a half-overwritten thumbnail.", "confidence": "evidenced", "scene": {"name": "wall", "caption": "one writer only"}},
+    {"rule": "An upload id is accepted at most once.", "node": "api", "breaks": "A retried request creates a duplicate row and a duplicate job.", "confidence": "inferred"},
+    {"rule": "The store is the source of truth for status.", "node": "store", "breaks": "The app shows ready while the files are still missing.", "confidence": "uncertain"}
+  ],
+  "pressure": [
+    {"title": "Queue backlog during a burst", "node": "queue", "limit": "About 5,000 jobs a minute per worker pool.", "signal": "Queue depth keeps growing for more than five minutes.", "mitigation": "Add workers and cap new uploads per user.", "severity": "high", "confidence": "inferred", "scene": {"name": "queue", "caption": "line out the door"}},
+    {"title": "Store write connections", "node": "store", "limit": "200 open connections on the primary.", "signal": "Connection wait time above 50 ms.", "mitigation": "Pool connections in front of the primary.", "severity": "medium", "confidence": "evidenced"}
+  ],
+  "whatifs": [
+    {"title": "The worker crashes mid-job", "change": "A worker process dies after rendering but before it acknowledges the job.", "outcome": "The queue redelivers the job, so the thumbnails are made twice and the store sees a second write.", "lesson": "At-least-once delivery means every consumer must be safe to run twice.", "node": "worker", "affects": ["queue", "store"], "confidence": "inferred", "scene": {"name": "fire", "caption": "crash, then redeliver"}},
+    {"title": "The queue loses its disk", "change": "The queue cluster restarts with an empty disk.", "outcome": "Every pending job is gone. Uploads stay at received forever and nobody is told.", "node": "queue", "affects": ["api", "worker"], "confidence": "uncertain"}
+  ],
+  "decisions": [
+    {
+      "title": "Thumbnails in the background",
+      "chosen": "Answer the upload at once and make thumbnails later through a queue.",
+      "context": "Uploads arrive in bursts and thumbnailing takes seconds of CPU per photo.",
+      "consequences": "Users briefly see an upload without thumbnails, and the status field must tell the truth.",
+      "simple": "The user should not wait for image work.",
+      "deep": "Rendering inside the request would tie the API pool to CPU load and turn every burst into timeouts.",
+      "alternatives": [
+        {"name": "Render in the request", "tradeoff": "Simplest, but slow responses and no way to absorb a burst."},
+        {"name": "Render on first read", "tradeoff": "No queue, but the first viewer pays and the CDN sees slow origins."}
+      ],
+      "confidence": "inferred",
+      "scene": {"name": "fork", "caption": "now or later"}
+    },
+    {
+      "title": "One database for status",
+      "chosen": "Keep upload status in the same SQL database as the metadata.",
+      "context": "Status and metadata change together and must never disagree.",
+      "consequences": "The database is a shared ceiling on write throughput.",
+      "simple": "One place to look for the truth.",
+      "alternatives": [
+        {"name": "Status in the queue", "tradeoff": "Fewer writes, but status disappears when a job is acknowledged."}
+      ],
+      "confidence": "evidenced"
+    }
+  ],
+  "risks": [
+    {"title": "Uploads can stay received forever", "where": "services/worker/jobs.py", "what": "If a job is lost nothing ever marks the upload failed, so the app shows a spinner for good.", "fix": "Add a sweeper that fails uploads older than ten minutes.", "severity": "high", "confidence": "inferred", "scene": {"name": "watch", "caption": "who checks the dial?"}}
+  ],
+  "quiz": [
+    {"q": "Why does the API answer before any thumbnail exists?", "options": ["Rendering would tie request time to CPU load", "Thumbnails are optional for users", "The CDN makes thumbnails itself"], "answer": 0, "why": "Rendering in the request would turn every burst into timeouts, so the work moves behind the queue."},
+    {"q": "A worker dies before acknowledging a job. What happens next?", "options": ["The job is lost", "The queue delivers the job again", "The API retries the upload"], "answer": 1, "why": "Acknowledgement is what removes a job, so an unacknowledged job is redelivered."},
+    {"q": "Which connection is drawn dashed on the map?", "options": ["Worker to store", "API to store", "API to queue"], "answer": 2, "why": "Publishing a job is fire and forget, so the caller does not wait for the reply."},
+    {"q": "What does the CDN do on a cache miss?", "options": ["Asks the store for the original", "Asks the worker to render it", "Returns an error"], "answer": 0, "why": "On a miss the CDN pulls the original from the store and keeps a copy for the next viewer."}
+  ],
+  "glossary": [
+    {"term": "at-least-once", "def": "A delivery promise: every message arrives one or more times, never zero, so duplicates are possible."},
+    {"term": "backlog", "def": "Work that has arrived but is not yet done, such as jobs waiting in a queue."}
+  ]
+}

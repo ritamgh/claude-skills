@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# crew-worktree ID [--base REF] [--branch NAME] — git worktree + branch + dev-server PORT for a ship task
+# (the logic behind `crew worktree`; skill: crew §2).
+#   worktree  <repo>/.claude/worktrees/crew-<ID>   branch  crew/<ID> (default)   base  the repo's current branch
+#   meta      worktree= branch= base= port=   (recorded through `crew meta`; an existing branch or worktree keeps its
+#             recorded base= and --base is ignored with a warning, since the branch did not come from it)
+#   port      20000-32000, a hash of ID as the start then a linear probe; skips ports of other open tasks
+#             (state not done/landed/failed/dropped) and ports something listens on right now.
+#   hook      <repo>/.crew/setup, if executable: run in the worktree with argv [hook], env CREW_TASK CREW_WORKTREE
+#             CREW_REPO CREW_PORT, under `timeout -k 5 ${CREW_SETUP_TIMEOUT:-120}`.
+# Idempotent: a rerun reuses the worktree, branch and port and prints the path again; it reruns the hook only if
+# the last run of it failed. Stdout: the absolute worktree path as the last line; everything else goes to stderr.
+# Exit: 0 ok | 2 usage, no such task, no repo, path or branch belongs to something else, no free port |
+#       4 worktree ready but the setup hook failed or timed out | 5 git could not create the worktree.
+set -euo pipefail
+
+CREW_BIN=$(dirname "$(readlink -f "$0")")
+CREW="$CREW_BIN/crew"
+CREW_ROOT="${CREW_ROOT:-$HOME/.claude/crew}"
+export CREW_ROOT
+PORT_MIN=20000 PORT_MAX=32000
+
+die() { echo "crew worktree: $*" >&2; exit 2; }
+meta_get() { grep -E "^$2=" "$1/meta" 2>/dev/null | tail -n 1 | cut -d= -f2- || true; }
+
+id="" base="" branch=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --base) [ $# -ge 2 ] || die "--base needs a ref"; base=$2; shift 2 ;;
+    --branch) [ $# -ge 2 ] || die "--branch needs a name"; branch=$2; shift 2 ;;
+    -*) die "unknown flag $1 (usage: crew worktree ID [--base REF] [--branch NAME])" ;;
+    *) [ -z "$id" ] || die "one task id only"; id=$1; shift ;;
+  esac
+done
+[ -n "$id" ] || die "usage: crew worktree ID [--base REF] [--branch NAME]"
+
+d=$("$CREW" dir "$id") || exit 2
+repo=$(meta_get "$d" repo)
+[ -n "$repo" ] || die "task $id has no repo= in its meta"
+git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || die "$repo is not a git repository"
+repo=$(cd "$repo" && pwd -P)   # git lists worktrees by realpath: a symlink or trailing slash in repo= must not break the rerun check
+
+# a rerun keeps what the first run recorded unless a flag says otherwise
+[ -n "$branch" ] || branch=$(meta_get "$d" branch)
+[ -n "$branch" ] || branch="crew/$id"
+git check-ref-format --branch "$branch" >/dev/null 2>&1 || die "bad branch name '$branch'"
+wt="$repo/.claude/worktrees/crew-$id"
+
+# --- is the worktree there already? ---
+registered() { # is $wt a worktree of $repo on refs/heads/$branch?
+  git -C "$repo" worktree list --porcelain | P="$wt" B="refs/heads/$branch" awk '
+    $1 == "worktree" { cur = substr($0, 10); ok = (cur == ENVIRON["P"]) }
+    $1 == "branch" && ok && $2 == ENVIRON["B"] { found = 1 }
+    END { exit !found }'
+}
+reused=0
+if [ -e "$wt" ] || [ -L "$wt" ]; then
+  registered || die "$wt exists but is not a worktree of $repo on branch $branch"
+  reused=1
+fi
+
+# --- base: what the branch actually came from; an existing branch or worktree keeps its recorded base (maybe none) ---
+branch_exists=0
+git -C "$repo" show-ref --verify -q "refs/heads/$branch" && branch_exists=1
+if [ $reused = 0 ] && [ $branch_exists = 0 ]; then
+  if [ -z "$base" ]; then
+    base=$(git -C "$repo" symbolic-ref --short -q HEAD || git -C "$repo" rev-parse HEAD)
+  fi
+  git -C "$repo" rev-parse --verify -q "$base^{commit}" >/dev/null || die "base '$base' is not a commit in $repo"
+else
+  [ -z "$base" ] || echo "crew worktree: --base $base ignored: branch $branch already exists" >&2
+  base=$(meta_get "$d" base)
+fi
+
+# --- port: one task at a time picks and records it ---
+listening() { ss -ltnH 2>/dev/null | awk '{ n = split($4, a, ":"); print a[n] }' | sort -u; }
+taken_by_others() {
+  local o st
+  for o in "$CREW_ROOT"/*/; do
+    o=${o%/}
+    [ "$o" != "$d" ] && [ -f "$o/meta" ] || continue
+    st=$(tail -n 1 "$o/status" 2>/dev/null | cut -f2 || true)
+    case "$st" in done | landed | failed | dropped) continue ;; esac
+    meta_get "$o" port
+  done
+}
+pick_port() {
+  local busy start i p span=$((PORT_MAX - PORT_MIN + 1))
+  busy=$(printf '%s\n%s\n' "$(taken_by_others)" "$(listening)")
+  start=$(( $(printf '%s' "$id" | cksum | cut -d' ' -f1) % span ))
+  for ((i = 0; i < span; i++)); do
+    p=$((PORT_MIN + (start + i) % span))
+    grep -qxF "$p" <<<"$busy" || { echo "$p"; return 0; }
+  done
+  return 1
+}
+
+port=$(meta_get "$d" port)
+mkdir -p "$CREW_ROOT/.locks"
+exec 8>"$CREW_ROOT/.locks/.worktree-port"; flock 8   # not a task id: crew meta locks .locks/<id>
+if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt $PORT_MIN ] || [ "$port" -gt $PORT_MAX ]; then
+  port=$(pick_port) || die "no free port in $PORT_MIN-$PORT_MAX"
+fi
+
+# --- create ---
+if [ $reused = 0 ]; then
+  mkdir -p "$(dirname "$wt")"
+  if [ $branch_exists = 1 ]; then
+    add=(git -C "$repo" worktree add "$wt" "$branch")   # the branch exists (an earlier worktree was removed): reattach it
+  else
+    add=(git -C "$repo" worktree add "$wt" -b "$branch" "$base")
+  fi
+  "${add[@]}" >&2 || { echo "crew worktree: git worktree add failed" >&2; exit 5; }
+fi
+
+# --- record (only what changed, so a rerun adds no lines) ---
+pairs=()
+for kv in "worktree=$wt" "branch=$branch" "base=$base" "port=$port"; do
+  [ -n "${kv#*=}" ] && [ "$(meta_get "$d" "${kv%%=*}")" != "${kv#*=}" ] && pairs+=("$kv")
+done
+[ ${#pairs[@]} -eq 0 ] || "$CREW" meta "$id" "${pairs[@]}"
+exec 8>&-
+
+# --- setup hook ---
+hook="$repo/.crew/setup"
+failed_marker="$d/setup.failed"
+rc=0
+if [ -e "$hook" ] && { [ $reused = 0 ] || [ -e "$failed_marker" ]; }; then
+  if [ ! -x "$hook" ] || [ -d "$hook" ]; then
+    echo "crew worktree: $hook is not executable: skipped (chmod +x it)" >&2
+  else
+    t=${CREW_SETUP_TIMEOUT:-120}
+    hook_start=$SECONDS
+    (cd "$wt" && CREW_TASK="$id" CREW_WORKTREE="$wt" CREW_REPO="$repo" CREW_PORT="$port" \
+      timeout -k 5 "$t" "$hook" </dev/null >&2) || rc=$?
+    secs=$((SECONDS - hook_start))
+    # 124: timeout stopped it; 137: it ignored TERM and was killed after the grace period
+    [ $rc = 137 ] && [ "$secs" -ge "$t" ] && rc=124
+    case $rc in
+      0) rm -f "$failed_marker" ;;
+      124) echo "crew worktree: setup hook timed out after ${t}s (worktree kept: $wt)" >&2 ;;
+      *) echo "crew worktree: setup hook failed with exit $rc (worktree kept: $wt)" >&2 ;;
+    esac
+    [ $rc = 0 ] || : >"$failed_marker"
+  fi
+fi
+
+printf '%s\n' "$wt"
+[ $rc = 0 ] || exit 4

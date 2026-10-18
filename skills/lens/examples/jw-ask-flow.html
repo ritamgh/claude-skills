@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What happens when you run `jw ask`</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&family=Permanent+Marker&family=Shantell+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBF6EA;--paper-2:#F3EBD8;--card:#FFFDF8;--ink:#1B1A17;--ink-2:#46413A;--ink-3:#6B6458;--line:#1B1A17;--dot:rgba(27,26,23,.11);
+  --teal:#1FA898;--teal-ink:#0A6B60;--teal-soft:#D3F1EC;
+  --pink:#FF7EB6;--pink-ink:#B21F5C;--pink-soft:#FFE0EE;
+  --yellow:#FFD84D;--yellow-ink:#7A5A00;
+  --hl-y:#FFE680;--hl-p:#FFC3DD;--hl-t:#BDEDE5;
+  --tk-c:#857D70;--tk-s:#0A6B60;--tk-n:#A3470F;--tk-k:#B21F5C;
+  --shadow:2px 4px 14px rgba(60,48,20,.12);
+  --display:"Permanent Marker","Comic Sans MS",cursive;
+  --hand:"Shantell Sans","Comic Sans MS",cursive;
+  --body:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --wob:14px 18px 12px 20px / 18px 12px 20px 14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#1A1915;--paper-2:#24221D;--card:#25231E;--ink:#F3EDE0;--ink-2:#D3CBBA;--ink-3:#A79F8F;--line:#E9E1D1;--dot:rgba(243,237,224,.08);
+  --teal:#34C7B5;--teal-ink:#6FDCCD;--teal-soft:#173F3A;
+  --pink:#FF86BC;--pink-ink:#FF9CC8;--pink-soft:#46202F;
+  --yellow:#F2CB4E;--yellow-ink:#F5D46B;
+  --hl-y:rgba(255,216,77,.30);--hl-p:rgba(255,126,182,.30);--hl-t:rgba(52,199,181,.28);
+  --tk-c:#9C9483;--tk-s:#7FDCCB;--tk-n:#F3A46F;--tk-k:#FF9CC8;
+  --shadow:2px 6px 18px rgba(0,0,0,.45);color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#1A1915;--paper-2:#24221D;--card:#25231E;--ink:#F3EDE0;--ink-2:#D3CBBA;--ink-3:#A79F8F;--line:#E9E1D1;--dot:rgba(243,237,224,.08);
+  --teal:#34C7B5;--teal-ink:#6FDCCD;--teal-soft:#173F3A;
+  --pink:#FF86BC;--pink-ink:#FF9CC8;--pink-soft:#46202F;
+  --yellow:#F2CB4E;--yellow-ink:#F5D46B;
+  --hl-y:rgba(255,216,77,.30);--hl-p:rgba(255,126,182,.30);--hl-t:rgba(52,199,181,.28);
+  --tk-c:#9C9483;--tk-s:#7FDCCB;--tk-n:#F3A46F;--tk-k:#FF9CC8;
+  --shadow:2px 6px 18px rgba(0,0,0,.45);color-scheme:dark;}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+body{margin:0;background-color:var(--paper);background-image:radial-gradient(var(--dot) 1.2px,transparent 1.3px);background-size:22px 22px;
+  color:var(--ink);font:400 19px/1.65 var(--body);font-variant-numeric:lining-nums}
+::selection{background:var(--hl-y);color:var(--ink)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px;border-radius:6px}
+a{color:var(--teal-ink);text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:var(--teal)}
+a:hover{text-decoration-color:var(--pink)}
+code{font-family:var(--mono);font-size:.84em;overflow-wrap:anywhere;background:var(--paper-2);padding:.08em .32em;border-radius:5px}
+p{margin:0 0 .85em}
+button{font:inherit;color:inherit}
+html{scrollbar-color:var(--ink-3) transparent}
+::-webkit-scrollbar{width:12px;height:12px}::-webkit-scrollbar-thumb{background:var(--ink-3);border-radius:8px;border:3px solid var(--paper)}
+
+/* ---------- page frame ---------- */
+.page{display:grid;grid-template-columns:220px minmax(0,1fr);gap:48px;max-width:1660px;margin:0 auto;padding:0 48px 120px}
+.rail{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:36px 0 24px;display:flex;flex-direction:column;gap:18px;scrollbar-width:thin}
+main{min-width:0;padding-top:28px;overflow-wrap:break-word}
+
+/* ---------- rail: the sketched contents ---------- */
+.rail-brand{display:flex;align-items:center;gap:10px;font:700 18px var(--hand);color:var(--ink)}
+.rail-brand svg{width:46px;height:46px}
+.toc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.toc>li>a{display:flex;align-items:baseline;gap:8px;padding:5px 10px;border-radius:10px;font:600 17px var(--hand);color:var(--ink-2);text-decoration:none}
+.toc>li>a:hover{background:var(--paper-2);color:var(--ink)}
+.toc>li>a.on{color:var(--ink);background:linear-gradient(100deg,transparent 2%,var(--hl-y) 4%,var(--hl-y) 94%,transparent 97%)}
+.toc .cnt{margin-left:auto;font:400 15px var(--hand);color:var(--ink-3)}
+.stops{list-style:none;margin:6px 0 10px 14px;padding:0 0 0 20px;position:relative}
+.stops::before{content:"";position:absolute;left:8px;top:12px;bottom:12px;border-left:3px dashed var(--ink-3);opacity:.5}
+.stops .fill{position:absolute;left:7px;top:12px;width:5px;border-radius:3px;background:var(--teal);height:var(--h,0px);transition:height .5s cubic-bezier(.16,1,.3,1)}
+.stops li{position:relative}
+.stops a{display:block;padding:4px 6px 4px 18px;font-size:16px;line-height:1.35;color:var(--ink-3);text-decoration:none;border-radius:8px}
+.stops a:hover{color:var(--ink);background:var(--paper-2)}
+.stops .dot{position:absolute;left:-19px;top:6px;width:18px;height:18px;border-radius:50%;border:2.5px solid var(--ink-3);background:var(--paper);display:grid;place-items:center;font:700 10px var(--body);color:var(--paper)}
+.stops li.done a{color:var(--ink-2)}
+.stops li.done .dot{background:var(--teal);border-color:var(--teal)}
+.stops li.done .dot::after{content:"";width:7px;height:4px;border:solid var(--paper);border-width:0 0 2.5px 2.5px;transform:translateY(-1px) rotate(-45deg)}
+.stops li.here a{color:var(--ink);font-weight:700}
+.stops li.here .dot{border-color:var(--teal);background:var(--paper);box-shadow:0 0 0 4px var(--teal-soft)}
+.stops li.gate:not(.done) .dot::after{content:"?";color:var(--pink-ink);font:700 11px var(--hand)}
+.rail-foot .keys{display:flex;flex-direction:column;gap:6px}.rail-foot .keys span{display:flex;gap:4px;align-items:center}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:12px;font:400 15px var(--hand);color:var(--ink-3)}
+kbd{font:600 13.5px var(--mono);border:1.5px solid var(--ink-3);border-bottom-width:3px;border-radius:6px;padding:0 5px;color:var(--ink-2);background:var(--card)}
+
+/* ---------- controls ---------- */
+.pill{display:inline-flex;border:2px solid var(--line);border-radius:999px;padding:3px;background:var(--card)}
+.pill button{border:0;background:none;padding:5px 16px;border-radius:999px;cursor:pointer;font:600 16px var(--hand);color:var(--ink-2)}
+.pill button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.pill button:not([aria-pressed="true"]):hover{background:var(--paper-2)}
+.icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border:2px solid var(--line);border-radius:50%;background:var(--card);cursor:pointer;color:var(--ink)}
+.icon-btn svg{width:22px;height:22px}
+.icon-btn:hover{background:var(--paper-2)}
+.btn{display:inline-flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:var(--wob);background:var(--card);padding:8px 18px;cursor:pointer;font:600 17px var(--hand);color:var(--ink);transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px) rotate(-.4deg);background:var(--paper-2)}
+.btn.go{background:var(--yellow);color:#1B1A17;border-color:#1B1A17}
+.btn.go:hover{background:#FFE47A}
+.btn.quiet{border-color:transparent;background:none;color:var(--ink-2);padding:6px 10px}
+.btn.quiet:hover{color:var(--ink);background:var(--paper-2)}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
+.btn svg{width:20px;height:20px}
+
+/* ---------- hero ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 40px;align-items:start;margin-bottom:8px}
+.hero-ctl{display:flex;gap:12px;align-items:center;justify-content:flex-end;grid-column:2;grid-row:1}
+.hero-txt{grid-column:1;grid-row:1 / span 2}
+h1{font:400 clamp(40px,4.6vw,76px)/1.08 var(--display);letter-spacing:.005em;margin:0;max-width:20ch;text-wrap:balance}
+h1 code{font-size:.7em;background:var(--hl-y)}
+h1 .swipe{background:linear-gradient(100deg,transparent 0,var(--hl-p) 1.5%,var(--hl-p) 97%,transparent 100%) no-repeat 0 62%/100% 62%;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 .06em}
+.swash{display:block;width:min(520px,70%);height:20px;margin:6px 0 18px;color:var(--teal)}
+.lede{font-size:21px;line-height:1.6;color:var(--ink-2);max-width:62ch;margin:0}
+.hero-mascot{grid-column:2;grid-row:2;justify-self:end;width:150px;height:150px;transform:rotate(4deg)}
+.resume{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:6px 0 26px;padding:14px 20px;background:var(--hl-t);border-radius:var(--wob);font:600 17px var(--hand)}
+.resume b{font-family:var(--body)}
+
+/* ---------- section heads ---------- */
+section.sec{margin-top:96px;scroll-margin-top:24px}
+section.sec:first-of-type{margin-top:36px}
+.sec-head{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:10px}
+h2{font:400 clamp(34px,3.2vw,48px)/1.1 var(--display);margin:0;letter-spacing:.01em}
+h2::after{content:"";display:block;height:10px;width:calc(100% + 16px);margin-top:4px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 40 2, 80 9, 120 5 S 180 3, 198 6' fill='none' stroke='%231FA898' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat;background-size:100% 100%}
+.sec-intro{color:var(--ink-2);max-width:66ch;margin:6px 0 28px}
+.grow{flex:1}
+
+/* ---------- map ---------- */
+.map-top{display:flex;align-items:flex-end;gap:12px 28px;flex-wrap:wrap;margin:0 0 18px}
+.map-top h2{margin-right:4px}
+.map-hint{font:400 17px var(--hand);color:var(--ink-2);flex:1;min-width:260px;padding-bottom:10px}
+.map-hint b{font-family:var(--body)}
+.map-card{background:var(--card);border:2.5px solid var(--line);border-radius:22px 28px 20px 30px / 28px 20px 30px 22px;padding:10px 10px 6px;box-shadow:var(--shadow)}
+.mapwrap{overflow-x:auto;overscroll-behavior-x:contain}
+#map{display:block;width:100%;min-width:900px;height:auto}
+#map text{pointer-events:none}
+#map .zone path{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-dasharray:7 7;opacity:.75}
+#map .zone text{font:700 16px var(--hand);fill:var(--ink-3)}
+#map .edge .wire,#map .edge .head{fill:none;stroke:var(--ink-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#map .elabel{font:400 15px var(--hand);fill:var(--ink-2);stroke:var(--card);stroke-width:5px;paint-order:stroke;stroke-linejoin:round}
+#map .node{cursor:pointer}
+#map .node .fill{fill:var(--card)}
+#map .node .hatch{fill:url(#hatch);opacity:0;transition:opacity .3s}
+#map .node .stroke{fill:none;stroke:var(--line);stroke-width:2;stroke-linecap:round}
+#map .node .lbl{font:700 18px var(--body);fill:var(--ink)}
+#map .node .kind{font:400 15px var(--hand);fill:var(--ink-3)}
+#map .node:hover .fill,#map .node:focus-visible .fill{fill:var(--paper-2)}
+#map .node:focus{outline:none}
+#map .node:focus-visible .stroke{stroke:var(--teal);stroke-width:3.5}
+#map .node.onroute .stroke{stroke:var(--teal-ink);stroke-width:2.6}
+#map .node.active .hatch{opacity:1}
+#map .node.active .stroke{stroke:var(--teal-ink);stroke-width:3.4}
+#map .node.picked .fill{fill:var(--hl-y)}
+#map .node.hit .hatch{opacity:1;fill:url(#hatchP)}
+#map .node.hit .stroke,#map .node.origin .stroke{stroke:var(--pink-ink);stroke-width:3}
+#map .node.origin .fill{fill:var(--hl-p)}
+#map .node.dim{opacity:.32}
+#map .edge.hit .wire,#map .edge.hit .head{stroke:var(--pink-ink);stroke-width:2.6}
+#map .edge.dimmed,#map .elabel.dimmed{opacity:.3}
+#map .ghost{fill:none;stroke:var(--teal);stroke-width:4;stroke-linecap:round;stroke-dasharray:2 9;opacity:.5}
+#map .route{fill:none;stroke:var(--teal);stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+#map .route.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw .7s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.map-foot{display:flex;gap:22px;flex-wrap:wrap;align-items:center;font:400 16px var(--hand);color:var(--ink-3);padding:6px 8px 4px}
+.map-foot i{display:inline-block;width:28px;height:7px;border-radius:4px;background:var(--teal);vertical-align:middle;margin-right:6px;opacity:.85}
+.map-foot i.p{background:var(--pink)}
+
+/* the component note that opens under the map */
+.node-note{margin-top:22px;background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);padding:26px 30px 22px;box-shadow:var(--shadow);position:relative}
+.node-note[hidden]{display:none}
+.node-note .close{position:absolute;right:14px;top:14px}
+.node-note h3{font:700 30px/1.2 var(--body);margin:0 50px 4px 0;letter-spacing:-.01em}
+.node-note .kindline{font:400 17px var(--hand);color:var(--ink-3);margin-bottom:6px}
+.node-note .files{font:400 14.5px var(--mono);color:var(--ink-3);margin-bottom:16px;overflow-wrap:anywhere}
+.node-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px}
+.links{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:17px}
+.links dt{font:700 15px var(--hand);color:var(--ink-3);padding-top:2px}
+.links dd{margin:0}
+.side-h{font:700 17px var(--hand);color:var(--ink-3);margin:18px 0 6px}
+.side-h:first-child{margin-top:0}
+.at a{display:block;font-size:16.5px;padding:2px 0}
+details.inside{margin-top:14px;border-top:2px dashed var(--ink-3);padding-top:12px}
+details.inside summary{cursor:pointer;font:700 18px var(--body);list-style:none;display:flex;gap:12px;align-items:baseline}
+details.inside summary::before{content:"+";font:700 20px var(--hand);color:var(--teal-ink);width:14px}
+details.inside[open] summary::before{content:"\2013"}
+details.inside summary span{font:400 14px var(--mono);color:var(--ink-3)}
+
+/* ---------- the trip ---------- */
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 30px}
+.tabs button{border:2px solid var(--line);background:var(--card);border-radius:var(--wob);padding:9px 20px;cursor:pointer;font:600 18px var(--hand);color:var(--ink-2)}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);transform:rotate(-1deg)}
+.tabs button:not([aria-selected="true"]):hover{background:var(--paper-2);color:var(--ink)}
+.trigger{display:flex;gap:14px;align-items:flex-start;max-width:900px;margin:0 0 40px;padding:16px 22px;background:var(--card);border:2px dashed var(--ink-3);border-radius:var(--wob);font-size:18px}
+.trigger .lab{font:700 17px var(--hand);color:var(--teal-ink);white-space:nowrap;padding-top:1px}
+.trip{position:relative}
+.stop{position:relative;display:grid;grid-template-columns:64px minmax(0,1fr);gap:0 26px;padding-bottom:84px;scroll-margin-top:28px}
+.stop::before{content:"";position:absolute;left:30px;top:66px;bottom:6px;border-left:4px dotted var(--ink-3);opacity:.45}
+.stop:last-child::before{display:none}
+.stop.past::before{border-left:4px solid var(--teal);opacity:.75}
+.stop .num{width:64px;height:64px;display:grid;place-items:center;font:400 30px var(--display);color:var(--ink);position:relative}
+.stop .num svg{position:absolute;inset:0;width:100%;height:100%;color:var(--ink)}
+.stop.here .num svg .ring,.stop.past .num svg .ring{color:var(--teal-ink)}
+.stop.here .num{color:var(--teal-ink)}
+.stop.here .num svg .bg{fill:var(--teal-soft)}
+.stop-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:6px 0 4px}
+.stop-title{font:700 clamp(26px,2.2vw,34px)/1.2 var(--body);margin:0;letter-spacing:-.012em;text-wrap:balance}
+.stop-title code{font-size:.8em}
+.stop-meta{font:400 17px var(--hand);color:var(--ink-3);margin-bottom:22px;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.stop-meta a{font-weight:600}
+.stamp{display:inline-block;font:700 15px var(--hand);padding:1px 10px;border:2px solid currentColor;border-radius:8px 12px 9px 13px;transform:rotate(-2deg);white-space:nowrap;cursor:help;vertical-align:middle}
+.stamp.evidenced{color:var(--teal-ink)}
+.stamp.inferred{color:var(--yellow-ink)}
+.stamp.uncertain{color:var(--pink-ink)}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:32px;align-items:start}
+.narr{max-width:68ch}
+.narr p:last-child{margin-bottom:0}
+.blurred{filter:blur(7px);user-select:none;pointer-events:none;opacity:.6}
+.gate-wait{font:600 18px var(--hand);color:var(--pink-ink);margin:0 0 6px}
+.aside{display:flex;gap:12px;align-items:flex-start;margin:22px 0 0;max-width:64ch;font:400 18px/1.55 var(--hand);color:var(--ink-2)}
+.aside svg{flex:none;width:30px;height:30px;color:var(--pink)}
+.stop-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+
+/* guess-first gate */
+.turn{display:grid;grid-template-columns:80px minmax(0,1fr);gap:4px 18px;margin:0 0 28px;padding:20px 24px;background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow)}
+.turn .masc{width:80px;height:80px}
+.turn .q{font:700 21px/1.4 var(--body);margin:2px 0 14px}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice{display:flex;gap:14px;align-items:center;text-align:left;background:var(--paper);border:2px solid var(--line);border-radius:var(--wob);padding:11px 16px;cursor:pointer;font-size:18px;line-height:1.4;transition:transform .15s,background .15s}
+.choice:hover:not(:disabled){background:var(--hl-y);transform:translateX(3px)}
+.choice .k{flex:none;display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;font:700 15px var(--hand)}
+.choice:disabled{cursor:default}
+.choice.right{background:var(--hl-t);border-color:var(--teal-ink)}
+.choice.right .k{background:var(--teal-ink);border-color:var(--teal-ink);color:var(--paper)}
+.choice.wrong{background:var(--hl-p);border-color:var(--pink-ink)}
+.choice.wrong .k{background:var(--pink-ink);border-color:var(--pink-ink);color:var(--paper)}
+.choice:disabled:not(.right):not(.wrong){opacity:.6}
+.verdict{margin-top:14px;font-size:18px}
+.verdict b{font:700 19px var(--hand);margin-right:6px}
+.verdict.ok b{color:var(--teal-ink)}.verdict.no b{color:var(--pink-ink)}
+
+/* code card */
+.code{margin:24px 0 0;background:var(--card);border:2.5px solid var(--line);border-radius:16px 22px 14px 24px / 22px 14px 24px 16px;box-shadow:var(--shadow);overflow:hidden;max-width:100%}
+.code figcaption{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:2px solid var(--line);background:var(--paper-2);font:400 16px var(--hand);color:var(--ink-3)}
+.code .file{font:600 16px var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.code .lines-n{margin-left:auto;white-space:nowrap}
+.code .rows{overflow-x:auto;padding:10px 0 12px;font:400 15.5px/1.7 var(--mono);scrollbar-width:thin;scrollbar-color:var(--ink-3) transparent}
+.code .rows.more{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent)}
+.ln{display:grid;grid-template-columns:4.2em max-content;padding-right:22px;min-width:100%;position:relative}
+.ln .n{color:var(--ink-3);text-align:right;padding-right:16px;user-select:none;opacity:.75}
+.ln .t{white-space:pre;padding:0 4px;border-radius:4px}
+.ln.hl .t{background:linear-gradient(100deg,transparent 0,var(--hl-y) 1%,var(--hl-y) 98.5%,transparent 100%) no-repeat 0 55%/100% 86%}
+.ln.hl .n{color:var(--ink);opacity:1;font-weight:600}
+.motion .stop:not(.seen) .ln.hl .t{background-size:0% 86%}
+.motion .stop.seen .ln.hl .t{transition:background-size .8s cubic-bezier(.16,1,.3,1) .15s}
+.nt{position:sticky;left:0;display:flex;gap:8px;align-items:flex-start;max-width:min(720px,88vw);margin:2px 0 8px 4.2em;padding:2px 10px 2px 0;font:600 16.5px/1.45 var(--hand);color:var(--pink-ink);white-space:normal}
+.nt svg{flex:none;width:26px;height:22px;margin-top:1px}
+.nt code{font-size:.82em;color:var(--ink)}
+.tk-c{color:var(--tk-c);font-style:italic}.tk-s{color:var(--tk-s)}.tk-n{color:var(--tk-n)}.tk-k{color:var(--tk-k);font-weight:600}
+
+/* memory sticky note */
+.memo{position:sticky;top:28px}
+.memo-note{position:relative;background:#FFF3B0;color:#1B1A17;padding:26px 20px 18px;border-radius:3px 3px 18px 3px;box-shadow:2px 6px 16px rgba(60,48,20,.18);transform:rotate(.8deg)}
+:root[data-theme="dark"] .memo-note{background:#3B3520;color:#F3EDE0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .memo-note{background:#3B3520;color:#F3EDE0}}
+.memo-note::before{content:"";position:absolute;top:-12px;left:50%;width:96px;height:26px;transform:translateX(-50%) rotate(-3deg);background:rgba(189,237,229,.85);border-radius:2px}
+.memo-h{font:700 19px var(--hand);margin:0 0 10px}
+.mv{padding:7px 0;border-top:1.5px dashed rgba(27,26,23,.25)}
+:root[data-theme="dark"] .mv{border-top-color:rgba(243,237,224,.2)}
+.mv dt{font:600 15px var(--mono);opacity:.75;overflow-wrap:anywhere}
+.mv dd{margin:2px 0 0;font:400 15.5px/1.45 var(--mono);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.mv.new dd span{background:linear-gradient(100deg,transparent 0,var(--hl-p) 2%,var(--hl-p) 97%,transparent 100%);padding:0 2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv .newtag{font:700 14px var(--hand);color:var(--pink-ink);margin-left:6px}
+:root[data-theme="dark"] .mv .newtag{color:#FF9CC8}
+.mv.masked dd{height:16px;margin-top:4px;width:72%;opacity:.45;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 16' preserveAspectRatio='none'%3E%3Cpath d='M2 9c6-7 10 6 16-1s10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1 10 6 16-1' fill='none' stroke='%231B1A17' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat;background-size:100% 100%}
+:root[data-theme="dark"] .mv.masked dd{filter:invert(1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mv.masked dd{filter:invert(1)}}
+.memo-lock{font:600 15px var(--hand);color:var(--pink-ink);margin:12px 0 0}
+.memo-empty{font:400 16px var(--hand);opacity:.75;margin:0}
+
+/* ---------- break it ---------- */
+.exps{display:flex;flex-direction:column;gap:26px}
+.exp{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);box-shadow:var(--shadow);overflow:hidden}
+.exp .change{padding:24px 28px}
+.exp h3{font:700 24px/1.3 var(--body);margin:0 0 10px;letter-spacing:-.01em}
+.exp .result{padding:24px 28px;background:var(--paper-2);border-left:2.5px dashed var(--ink-3);display:flex;flex-direction:column;gap:12px;align-items:flex-start;justify-content:center}
+.exp .result.shown{background:var(--pink-soft);justify-content:flex-start}
+.exp .guess{font:400 18px var(--hand);color:var(--ink-2)}
+.exp .what{font:700 18px var(--hand);color:var(--pink-ink)}
+.exp .takeaway{font:600 18px/1.5 var(--hand);color:var(--teal-ink)}
+
+/* ---------- why ---------- */
+.dec{margin-bottom:56px;max-width:1080px}
+.dec h3{font:700 28px/1.25 var(--body);margin:0 0 12px;letter-spacing:-.01em}
+.chosen{display:inline;font-size:19px;background:linear-gradient(100deg,transparent 0,var(--hl-y) 1%,var(--hl-y) 98%,transparent 100%);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 4px}
+.chosen-wrap{max-width:70ch;margin:0 0 16px}
+.chosen-wrap .lab{font:700 17px var(--hand);color:var(--ink-3);display:block;margin-bottom:2px}
+.alts{width:100%;border-collapse:collapse;margin-top:18px;font-size:17.5px}
+.alts th{text-align:left;font:700 16px var(--hand);color:var(--ink-3);padding:6px 16px 6px 0;border-bottom:2.5px solid var(--line)}
+.alts td{padding:12px 16px 12px 0;border-bottom:1.5px dashed var(--ink-3);vertical-align:top}
+.alts td:first-child{font-weight:700;width:30%}
+
+/* ---------- weak spots ---------- */
+.risks-head{display:flex;gap:18px;align-items:center}
+.risks-head svg{width:76px;height:76px;flex:none}
+.risks{display:flex;flex-direction:column}
+.risk{display:grid;grid-template-columns:110px minmax(0,1fr);gap:20px;padding:24px 0;border-bottom:2px dashed var(--ink-3);max-width:1080px}
+.risk:last-child{border-bottom:0}
+.sev{justify-self:start;align-self:start;font:700 16px var(--hand);padding:4px 14px;border:2.5px solid var(--line);border-radius:12px 16px 10px 18px;transform:rotate(-3deg);margin-top:4px}
+.sev.high{background:var(--pink);color:#1B1A17;border-color:#1B1A17}
+.sev.medium{background:var(--yellow);color:#1B1A17;border-color:#1B1A17}
+.sev.low{background:transparent;color:var(--ink-2)}
+.risk h3{font:700 23px/1.3 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.risk .loc{font:400 14.5px var(--mono);color:var(--ink-3);margin-bottom:10px;overflow-wrap:anywhere}
+.risk p{max-width:70ch}
+.risk .fix{max-width:70ch;color:var(--ink-2)}
+.risk .fix b{font:700 17px var(--hand);color:var(--teal-ink);margin-right:6px}
+
+/* ---------- quiz ---------- */
+.quiz{max-width:900px}
+.pips{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.pip{width:26px;height:26px;border-radius:50%;border:2.5px solid var(--ink-3);background:var(--card);cursor:pointer;padding:0}
+.pip.right{background:var(--teal);border-color:var(--teal-ink)}
+.pip.wrong{background:var(--pink);border-color:var(--pink-ink)}
+.pip.cur{box-shadow:0 0 0 4px var(--hl-y);border-color:var(--ink)}
+.qcard{background:var(--card);border:2.5px solid var(--line);border-radius:var(--wob);padding:28px 32px;box-shadow:var(--shadow)}
+.qnum{font:600 17px var(--hand);color:var(--ink-3)}
+.qtext{font:700 25px/1.35 var(--body);margin:6px 0 18px;letter-spacing:-.01em}
+.score-row{display:flex;gap:24px;align-items:center}
+.score-row svg{width:110px;height:110px;flex:none}
+.score{font:400 88px/1 var(--display)}
+.score small{font:400 30px var(--hand);color:var(--ink-3)}
+.qnav{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+
+/* ---------- glossary ---------- */
+.terms{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:22px 48px;margin:0}
+.terms div{break-inside:avoid}
+.terms dt{font:700 20px var(--body);display:inline;background:linear-gradient(100deg,transparent 0,var(--hl-t) 2%,var(--hl-t) 97%,transparent 100%);padding:0 4px}
+.terms dd{margin:6px 0 0;color:var(--ink-2);font-size:18px}
+.term{text-decoration:underline dotted var(--pink-ink) 2px;text-underline-offset:4px;cursor:help}
+#tip{position:fixed;z-index:30;max-width:340px;padding:12px 16px;background:#FFF3B0;color:#1B1A17;font:400 16px/1.45 var(--body);border-radius:3px 3px 14px 3px;box-shadow:2px 6px 16px rgba(0,0,0,.2);pointer-events:none;opacity:0;transform:translateY(4px) rotate(-.6deg);transition:opacity .15s,transform .15s}
+#tip.on{opacity:1;transform:translateY(0) rotate(-.6deg)}
+#tip b{font-family:var(--hand)}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,24px) rotate(-1deg);background:var(--ink);color:var(--paper);padding:12px 22px;border-radius:var(--wob);font:600 17px var(--hand);opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.16,1,.3,1);pointer-events:none;z-index:40}
+.toast.on{opacity:1;transform:translate(-50%,0) rotate(-1deg)}
+footer.end{margin-top:110px;display:flex;gap:16px;align-items:center;font:400 18px var(--hand);color:var(--ink-3)}
+footer.end svg{width:64px;height:64px}
+
+/* ---------- ask claude (needs scripts/serve.py; opened as a file it copies instead) ---------- */
+.if-copy{display:contents}
+.if-ask,body.can-ask .if-copy{display:none}
+body.can-ask .if-ask{display:contents}
+#askPop{position:fixed;z-index:35;display:none;align-items:center;gap:8px;padding:8px 16px 8px 12px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:var(--wob);font:600 17px var(--hand);cursor:pointer;box-shadow:var(--shadow);transform:rotate(-1.2deg)}
+#askPop.on{display:inline-flex}
+#askPop:hover{background:var(--teal-ink);border-color:var(--teal-ink)}
+#askPop svg{width:20px;height:20px}
+#askPop kbd{font:600 13px var(--mono);border:1.5px solid currentColor;border-radius:5px;padding:0 5px;opacity:.7}
+.ask{position:fixed;top:0;right:0;bottom:0;z-index:36;width:min(500px,100vw);display:flex;flex-direction:column;background:var(--paper);border-left:2.5px solid var(--line);box-shadow:-10px 0 34px rgba(0,0,0,.16);transform:translateX(104%);visibility:hidden;transition:transform .3s cubic-bezier(.16,1,.3,1),visibility 0s .3s}
+.ask.on{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.16,1,.3,1)}
+.ask-head{display:flex;align-items:center;gap:12px;padding:16px 18px 14px 22px;border-bottom:2px solid var(--line);background:var(--paper-2)}
+.ask-head h2{font-size:32px;flex:1;white-space:nowrap}
+.ask-head h2::after{width:100%;height:8px}
+.ask-head .pill button{padding:4px 12px;font-size:15px}
+.ask-log{flex:1;overflow-y:auto;padding:22px 22px 28px;display:flex;flex-direction:column;gap:18px;overscroll-behavior:contain}
+.ask-empty{color:var(--ink-2);font:400 18px/1.5 var(--hand);display:grid;gap:12px;justify-items:start}
+.ask-empty svg{width:72px;height:72px}
+.ask-quote{background:var(--hl-y);color:var(--ink);padding:12px 16px;border-radius:3px 3px 16px 3px;font-size:17px;line-height:1.5;transform:rotate(-.5deg);box-shadow:2px 3px 0 rgba(27,26,23,.12);white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow-y:auto}
+.ask-quote .where{display:block;font:600 15px var(--hand);color:var(--ink-2);margin-bottom:6px;white-space:normal}
+.ask-about{font:600 16px var(--hand);color:var(--ink-2)}
+.ask-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ask-chips button{border:2px solid var(--line);border-radius:var(--wob);background:var(--card);padding:5px 12px;font:600 15px var(--hand);color:var(--ink);cursor:pointer}
+.ask-chips button:hover{background:var(--teal-soft)}
+.ask-me{align-self:flex-end;max-width:88%;background:var(--card);border:2px solid var(--line);border-radius:var(--wob);padding:8px 14px;font:500 18px/1.45 var(--hand);white-space:pre-wrap;overflow-wrap:anywhere}
+.ask-ai{font-size:18px;line-height:1.6;min-width:0}
+.ask-ai .who{font:600 15px var(--hand);color:var(--teal-ink);margin-bottom:4px}
+.ask-ai p,.ask-ai ul,.ask-ai ol{margin:0 0 .75em}
+.ask-ai ul,.ask-ai ol{padding-left:1.3em}
+.ask-ai li{margin:.2em 0}
+.ask-ai pre{margin:0 0 .75em;padding:10px 14px;background:var(--card);border:2px solid var(--line);border-radius:12px;overflow-x:auto;font:400 14.5px/1.6 var(--mono)}
+.ask-ai pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+.ask-status{font:400 16px var(--hand);color:var(--ink-3)}
+.ask-status:empty{display:none}
+.ask-err{color:var(--pink-ink);font-weight:600}
+.ask-form{border-top:2px solid var(--line);padding:14px 18px 18px;display:grid;gap:10px;background:var(--paper-2)}
+.ask-form textarea{width:100%;box-sizing:border-box;min-height:76px;max-height:40vh;resize:vertical;font:400 18px/1.45 var(--body);color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.ask-form textarea:focus{outline:3px solid var(--teal);outline-offset:1px}
+.ask-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ask-row small{color:var(--ink-3);font-size:15px}
+.ask-row span{display:flex;gap:6px}
+@media (min-width:1800px){body.asking .page{max-width:calc(100vw - 540px);margin-left:20px}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1280px){.cols{grid-template-columns:minmax(0,1fr) 280px;gap:26px}.page{gap:40px;padding:0 32px 100px}}
+@media (max-width:1120px){
+  .page{grid-template-columns:minmax(0,1fr)}
+  .rail{min-width:0;position:sticky;top:0;z-index:20;height:auto;flex-direction:row;align-items:center;gap:10px;padding:8px 0;margin:0 -32px;padding-left:32px;padding-right:32px;background:var(--paper);border-bottom:2px solid var(--line);overflow-x:auto;scrollbar-width:none}
+  .rail-brand span,.rail-foot,.stops{display:none}
+  .rail-brand svg{width:34px;height:34px}
+  .toc{flex-direction:row;gap:4px}
+  .toc>li>a{white-space:nowrap;font-size:16px;padding:4px 10px}
+  .toc .cnt{display:none}
+  .cols{grid-template-columns:minmax(0,1fr)}
+  .memo{position:static;max-width:520px}
+  .node-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:760px){
+  body{font-size:18px}
+  .page{padding:0 16px 80px}
+  .rail{margin:0 -16px;padding-left:16px;padding-right:16px}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .hero-ctl{grid-column:1;grid-row:1;justify-content:flex-start}
+  .hero-txt{grid-row:2}
+  .hero-mascot{display:none}
+  .lede{font-size:19px}
+  section.sec{margin-top:72px}
+  .stop{grid-template-columns:44px minmax(0,1fr);gap:0 14px;padding-bottom:64px}
+  .stop .num{width:44px;height:44px;font-size:22px}
+  .stop::before{left:20px;top:48px}
+  .turn{grid-template-columns:minmax(0,1fr);padding:18px}
+  .turn .masc{width:56px;height:56px}
+  .exp{grid-template-columns:minmax(0,1fr)}
+  .trigger{flex-direction:column;gap:4px}
+  .map-foot::before{content:"Swipe the map sideways to see all of it.";width:100%;color:var(--ink-2)}
+  .exp .result{border-left:0;border-top:2.5px dashed var(--ink-3)}
+  .risk{grid-template-columns:minmax(0,1fr);gap:8px}
+  .terms{grid-template-columns:minmax(0,1fr)}
+  .qcard,.node-note{padding:20px}
+  .alts td:first-child{width:auto}
+  .code .rows{font-size:14px}
+  .nt{margin-left:1.5em}
+  .ask-head{padding:12px 12px 12px 16px;gap:8px}
+  .ask-head h2{font-size:25px}
+  .ask-log{padding:18px 16px 24px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="rail" id="rail" aria-label="Contents"></nav>
+  <main>
+    <header class="hero">
+      <div class="hero-txt">
+        <h1 id="title"></h1>
+        <svg class="swash" viewBox="0 0 520 20" preserveAspectRatio="none" aria-hidden="true"><path d="M4 12 C 90 4, 180 18, 280 9 S 440 5, 516 11" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg>
+        <p class="lede" id="subtitle"></p>
+      </div>
+      <div class="hero-ctl">
+        <div class="pill" id="depth" role="group" aria-label="Detail level"><button data-d="simple">Plain</button><button data-d="deep">Deep</button></div>
+        <button class="icon-btn" id="themeBtn" aria-label="Switch between light and dark"></button>
+      </div>
+      <div class="hero-mascot" id="heroMascot" aria-hidden="true"></div>
+    </header>
+    <div id="resume"></div>
+    <section class="sec" id="s-map"></section>
+    <section class="sec" id="s-trip"></section>
+    <section class="sec" id="s-break"></section>
+    <section class="sec" id="s-why"></section>
+    <section class="sec" id="s-weak"></section>
+    <section class="sec" id="s-quiz"></section>
+    <section class="sec" id="s-terms"></section>
+    <footer class="end" id="end"></footer>
+  </main>
+</div>
+<div id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status"></div>
+<button id="askPop" type="button"></button>
+<aside class="ask" id="ask" aria-label="Ask Claude">
+  <div class="ask-head"><h2>Ask Claude</h2>
+    <div class="pill" id="askModel" role="group" aria-label="Model"><button data-model="haiku">Haiku</button><button data-model="sonnet">Sonnet</button></div>
+    <button class="icon-btn" id="askClose" aria-label="Close"></button></div>
+  <div class="ask-log" id="askLog" aria-live="polite"></div>
+  <form class="ask-form" id="askForm"><textarea id="askIn" rows="3" aria-label="Your question" placeholder="Ask anything about this lesson or the code"></textarea>
+    <div class="ask-row"><small>Enter sends, Shift+Enter for a new line. Claude can read the repo, not change it.</small>
+      <span><button type="button" class="btn quiet" id="askNew">New chat</button><button class="btn go" id="askSend">Send</button></span></div></form>
+</aside>
+<script id="lesson" type="application/json">{"id": "jw-ask-flow", "title": "What happens when you run `jw ask`", "subtitle": "Following one question from your shell, through the `jw` wrapper, to a GPT worker and back", "layers": [{"id": "you", "name": "You"}, {"id": "jw", "name": "jw script"}, {"id": "out", "name": "Outside & disk"}], "nodes": [{"id": "shell", "label": "Your shell", "kind": "zsh", "layer": "you", "simple": "Where you type the command. It splits your words into arguments and starts the script.", "deep": "The shell does word-splitting and quote removal before `jw` ever runs, so `\"where is auth handled?\"` arrives as ONE argument (`$2`). Quoting here is what keeps the question in one piece.", "analogy": "The customer at the counter handing over a written order.", "confidence": "evidenced"}, {"id": "router", "label": "Command router", "kind": "case statement", "layer": "jw", "files": ["jw:250-261"], "simple": "Looks at the first word (`ask`, `run`, `review`...) and hands the rest to the matching function.", "deep": "A bash `case` on `${1:-}`. The `:-` default avoids an 'unbound variable' crash under `set -u` when you run `jw` with no args. `shift` drops the subcommand so each `cmd_*` sees only its own flags.", "analogy": "A switchboard operator routing each call to the right desk.", "confidence": "evidenced", "functions": [{"name": "case \"${1:-}\"", "loc": "jw:250", "simple": "The whole router is 12 lines.", "code": {"file": "~/.claude/bin/jw", "start": 250, "lang": "bash", "src": "case \"${1:-}\" in\n  init) shift; cmd_init \"$@\";;\n  run) shift; cmd_run \"$@\";;\n  resume) shift; cmd_resume \"$@\";;\n  post) shift; cmd_post \"$@\";;\n  board) shift; cmd_board \"$@\";;\n  review) shift; cmd_review \"$@\";;\n  ask) shift; cmd_ask \"$@\";;\n  usage) cmd_usage;;\n  -h|--help|\"\") usage;;\n  *) die \"unknown command $1\";;\nesac", "highlight": [257], "notes": {}}}]}, {"id": "ask", "label": "cmd_ask", "kind": "function", "layer": "jw", "files": ["jw:224-241"], "simple": "Reads the flags, wraps your question with safety rules, and asks `invoke` to run it.", "deep": "Parses `--cwd/--model/--timeout/--write` with a `while (($#))` + `case` loop. Unless `--write` is given, it appends a read-only constraint to the prompt. It always appends an anti-redraft line, then calls `invoke` with task name `ask-<timestamp>` and `JW_PRINT=full` so the full reply is printed.", "confidence": "evidenced"}, {"id": "invoke", "label": "invoke", "kind": "function", "layer": "jw", "files": ["jw:53-93"], "simple": "The engine room: runs jcode with a time limit, saves everything to disk, decides if it worked, and prints a short summary.", "deep": "Runs `jcode run ... --json` inside a subshell with `timeout`, stdout to `<task>.json`, stderr to `<task>.err`. Captures the exit code without tripping `set -e` (`|| rc=$?`). Extracts `session_id` and `text` with `jq`, classifies status (timeout / error / empty / ok), writes a ledger row, then prints either the full reply or just the EVIDENCE block.", "analogy": "A courier who delivers the letter, waits for the reply, files a copy, and reads you only the important part.", "confidence": "evidenced", "functions": [{"name": "status classification", "loc": "jw:59-65", "simple": "Turns an exit code + reply into one word.", "code": {"file": "~/.claude/bin/jw", "start": 59, "lang": "bash", "src": "  local sid text status\n  sid=$(jq -r '.session_id // empty' \"$out\" 2>/dev/null || true)\n  text=$(jq -r '.text // empty' \"$out\" 2>/dev/null || true)\n  if (( rc == 124 )); then status=\"timeout\"\n  elif (( rc != 0 )); then status=\"error($rc)\"\n  elif [[ -z \"$text\" ]]; then status=\"empty\"\n  else status=\"ok\"; fi", "highlight": [62], "notes": {}}}]}, {"id": "jcode", "label": "jcode → OpenAI", "kind": "external CLI", "layer": "out", "simple": "The actual AI agent. It reads your repo, thinks, and returns JSON with a reply and a session id.", "deep": "Invoked as `jcode run -p openai -m gpt-6-sol -C <cwd> --json <prompt>`. The jw script never talks to OpenAI itself; it only depends on two JSON fields: `.session_id` and `.text`.", "confidence": "inferred"}, {"id": "files", "label": "Run files", "kind": "json + err", "layer": "out", "files": ["~/.claude/orchestration/adhoc/runs/"], "simple": "Every reply is saved in full on disk, so the terminal only needs to show a summary.", "deep": "`ask-<ts>.json` holds jcode's raw JSON; `ask-<ts>.err` holds stderr. `${out%.json}.err` is bash suffix-stripping: it removes `.json` from the end of the path.", "confidence": "evidenced"}, {"id": "ledger", "label": "Ledger", "kind": "markdown table", "layer": "out", "files": ["jw:43-50"], "simple": "A running log: one table row per run with time, task, model, session and status.", "deep": "`ledger_row` creates `ledger.md` with a header on first use, then appends with `>>`. For ad-hoc asks the slug is `adhoc`, so all asks share one ever-growing ledger.", "confidence": "evidenced", "functions": [{"name": "ledger_row()", "loc": "jw:43", "simple": "Create-if-missing, then append.", "code": {"file": "~/.claude/bin/jw", "start": 43, "lang": "bash", "src": "ledger_row() { # slug task model session status\n  local dir=\"$ORCH_ROOT/$1\"\n  mkdir -p \"$dir\"\n  if [[ ! -f \"$dir/ledger.md\" ]]; then\n    printf '# Ledger: %s\\n\\n## jcode runs\\n| time | task | model | session | status |\\n|---|---|---|---|---|\\n' \"$1\" > \"$dir/ledger.md\"\n  fi\n  printf '| %s | %s | %s | %s | %s |\\n' \"$(date '+%F %T')\" \"$2\" \"$3\" \"$4\" \"$5\" >> \"$dir/ledger.md\"\n}", "highlight": [46, 49], "notes": {}}}]}], "edges": [{"from": "shell", "to": "router", "label": "argv"}, {"from": "router", "to": "ask", "label": "shift; call"}, {"from": "ask", "to": "invoke", "label": "prompt"}, {"from": "invoke", "to": "jcode", "label": "runs"}, {"from": "invoke", "to": "files", "label": "writes"}, {"from": "invoke", "to": "ledger", "label": "appends"}, {"from": "invoke", "to": "shell", "label": "summary"}], "traces": [{"title": "jw ask --cwd ~/app \"where is auth handled?\"", "trigger": "You type `jw ask --cwd ~/app \"where is auth handled?\"` and press Enter.", "steps": [{"node": "shell", "title": "The shell builds the argument list", "simple": "Your shell splits the line into 4 pieces and starts `jw` with them. The quotes keep your question as one piece.", "deep": "After expansion `~/app` becomes an absolute path. Bash then starts the script; line 6 `set -euo pipefail` makes it stop on errors, on unset variables, and on failures inside pipes.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 6, "lang": "bash", "src": "set -euo pipefail\n\nORCH_ROOT=\"${ORCH_ROOT:-$HOME/.claude/orchestration}\"", "highlight": [6], "notes": {"6": "The safety net for the whole script. `-e` exit on error, `-u` unset variable is an error, `pipefail` a pipe fails if any part fails."}}, "state": [{"name": "$1", "value": "\"ask\"", "changed": true}, {"name": "$2 $3", "value": "\"--cwd\" \"/home/you/app\"", "changed": true}, {"name": "$4", "value": "\"where is auth handled?\"", "changed": true}, {"name": "ORCH_ROOT", "value": "\"/home/you/.claude/orchestration\"", "changed": true}]}, {"node": "router", "title": "Route to cmd_ask", "simple": "The router sees `ask` and calls `cmd_ask` with the remaining 3 arguments.", "deep": "`shift` removes `$1`, so inside `cmd_ask`, `$1` is now `--cwd`. Unknown commands hit `*)` and `die` exits with code 2.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 250, "lang": "bash", "src": "case \"${1:-}\" in\n  init) shift; cmd_init \"$@\";;\n  run) shift; cmd_run \"$@\";;\n  resume) shift; cmd_resume \"$@\";;\n  post) shift; cmd_post \"$@\";;\n  board) shift; cmd_board \"$@\";;\n  review) shift; cmd_review \"$@\";;\n  ask) shift; cmd_ask \"$@\";;\n  usage) cmd_usage;;\n  -h|--help|\"\") usage;;\n  *) die \"unknown command $1\";;\nesac", "highlight": [257], "notes": {"257": "`shift` throws away `ask`, then `\"$@\"` passes every remaining argument, each still correctly quoted."}}, "state": [{"name": "$@ (inside cmd_ask)", "value": "--cwd /home/you/app \"where is auth handled?\"", "changed": true}]}, {"node": "ask", "title": "Parse the flags", "simple": "A loop reads the arguments one at a time. Flags set settings. Anything else becomes the prompt.", "deep": "`while (($#))` loops while arguments remain. Flags with a value do `shift 2`; the prompt does `shift`. Note: any second bare word silently REPLACES the prompt, because `prompt=$1` overwrites.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 224, "lang": "bash", "src": "cmd_ask() { # [--cwd DIR] [--model M] [--timeout S] [--write] \"prompt\"\n  local cwd=\"$PWD\" model=\"gpt-6-sol\" tmo=900 write=0 prompt=\"\"\n  while (($#)); do\n    case $1 in\n      --cwd) cwd=$2; shift 2;; --model) model=$2; shift 2;; --timeout) tmo=$2; shift 2;;\n      --write) write=1; shift;; -*) die \"unknown flag $1\";; *) prompt=$1; shift;;\n    esac\n  done\n  [[ -n $prompt ]] || { usage; exit 2; }", "highlight": [229], "notes": {"229": "`*) prompt=$1` overwrites, it does not append. `jw ask foo bar` asks only `bar`."}}, "predict": {"q": "You forget the quotes: `jw ask where is auth`. What prompt is sent?", "options": ["\"where is auth\" as one prompt", "\"auth\", the last word only", "An error about too many args"], "answer": 1, "why": "Each bare word hits `*) prompt=$1`, overwriting the previous one. Only the last word survives, and no error is raised."}, "state": [{"name": "cwd", "value": "\"/home/you/app\"", "changed": true}, {"name": "model", "value": "\"gpt-6-sol\""}, {"name": "tmo", "value": "900"}, {"name": "write", "value": "0"}, {"name": "prompt", "value": "\"where is auth handled?\"", "changed": true}]}, {"node": "ask", "title": "Wrap the prompt with guardrails", "simple": "Because you did not pass `--write`, jw adds a read-only rule to your question. It also asks for one final answer.", "deep": "`(( write )) || prompt=...` runs the right side only when `write` is 0. These are prompt-level guardrails: the model is asked not to edit files, but nothing technically prevents it. The timestamp `ts` names the run files.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 233, "lang": "bash", "src": "  (( write )) || prompt=\"$prompt\n\nConstraints: read-only. Do NOT modify, create, or delete files; do not commit or push.\"\n  prompt=\"$prompt\n\nGive a single final answer; do not repeat or redraft it.\"\n  local ts; ts=$(date +%Y%m%d-%H%M%S)\n  JW_PRINT=full invoke adhoc \"ask-$ts\" \"$model\" \"$tmo\" \"$cwd\" \"$ORCH_ROOT/adhoc/runs/ask-$ts.json\" \"$prompt\"", "highlight": [233, 235], "notes": {"233": "Arithmetic test: `(( 0 ))` is false, so the `||` branch runs and appends the constraint."}}, "state": [{"name": "prompt", "value": "\"where is auth handled?\"\\n\\nConstraints: read-only. Do NOT modify... \\n\\nGive a single final answer...", "changed": true}, {"name": "ts", "value": "\"20260930-181502\"", "changed": true}], "aside": "A polite sign on the door, not a lock. Real isolation would need a sandbox or a read-only mount."}, {"node": "invoke", "title": "Run jcode inside a time limit", "simple": "jw starts jcode in your project folder, with a 15 minute limit. The reply goes to a file, errors to another file.", "deep": "The `( ... )` subshell means `cd` does not change jw's own directory. `timeout 900` kills jcode after 900 s and returns 124. `|| rc=$?` is the key trick: under `set -e` a failing command would kill the script, but a command on the left of `||` is exempt, so the exit code is saved instead.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 53, "lang": "bash", "src": "invoke() {\n  local slug=$1 task=$2 model=$3 tmo=$4 cwd=$5 out=$6; shift 6\n  mkdir -p \"$(dirname \"$out\")\"\n  local rc=0\n  (cd \"$cwd\" && timeout \"$tmo\" jcode run -p openai -m \"$model\" -C \"$cwd\" --json \"$@\") >\"$out\" 2>\"${out%.json}.err\" || rc=$?", "highlight": [57], "notes": {"57": "Three ideas in one line: subshell for `cd`, `timeout` for a hard limit, `|| rc=$?` to survive failure under `set -e`."}}, "predict": {"q": "jcode crashes with exit code 1. What does jw do next?", "options": ["The script stops right there", "It saves rc=1 and keeps going", "It retries jcode once more"], "answer": 1, "why": "`|| rc=$?` catches the failure, so `set -e` does not fire. jw continues, marks status `error(1)`, logs it, prints stderr and exits 3."}, "state": [{"name": "out", "value": "\".../adhoc/runs/ask-20260930-181502.json\"", "changed": true}, {"name": "rc", "value": "0", "changed": true}]}, {"node": "jcode", "title": "The worker answers", "simple": "jcode reads your repo, finds the answer and returns JSON with a `text` reply and a `session_id`.", "deep": "jw relies on only two fields from jcode's JSON. That narrow contract makes jw robust to jcode adding new fields, but fragile if those two are ever renamed.", "confidence": "inferred", "state": [{"name": ".session_id", "value": "\"ses_8f1c...\"", "changed": true}, {"name": ".text", "value": "\"Auth lives in src/auth/middleware.ts:12 ...\"", "changed": true}]}, {"node": "invoke", "title": "Decide: ok, empty, error or timeout", "simple": "jw pulls two fields out of the JSON and turns the result into one status word.", "deep": "`jq -r '.x // empty'` prints nothing (not `null`) if the field is missing. `2>/dev/null || true` means a corrupt JSON file just yields empty strings instead of killing the script. The order of checks matters: timeout (124) is tested before generic errors.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 59, "lang": "bash", "src": "  local sid text status\n  sid=$(jq -r '.session_id // empty' \"$out\" 2>/dev/null || true)\n  text=$(jq -r '.text // empty' \"$out\" 2>/dev/null || true)\n  if (( rc == 124 )); then status=\"timeout\"\n  elif (( rc != 0 )); then status=\"error($rc)\"\n  elif [[ -z \"$text\" ]]; then status=\"empty\"\n  else status=\"ok\"; fi", "highlight": [60, 62], "notes": {"62": "124 is the special exit code `timeout` uses. Checking it first gives a clearer status than `error(124)`."}}, "state": [{"name": "sid", "value": "\"ses_8f1c...\"", "changed": true}, {"name": "text", "value": "\"Auth lives in ...\"", "changed": true}, {"name": "status", "value": "\"ok\"", "changed": true}]}, {"node": "ledger", "title": "Log the run", "simple": "One row is added to the ledger so every run can be found later.", "deep": "The ledger row is written BEFORE the success check exits, so failed and timed-out runs are logged too. That ordering is what makes the ledger trustworthy for debugging.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 67, "lang": "bash", "src": "  ledger_row \"$slug\" \"$task\" \"$model\" \"${sid:-none}\" \"$status\"", "highlight": [67], "notes": {}}, "state": [{"name": "ledger.md +row", "value": "| 2026-09-30 18:15:47 | ask-20260930-181502 | gpt-6-sol | ses_8f1c... | ok |", "changed": true}]}, {"node": "shell", "title": "Print the summary and the reply", "simple": "You see a short header, then the reply. The full JSON stays on disk.", "deep": "Failure path: print the last 15 lines of stderr and exit 3. Empty reply: exit 4. For `ask`, `JW_PRINT=full` prints the first 100 lines of the reply. `run` uses the default mode and only prints the EVIDENCE block, which keeps an orchestrator's context small.", "confidence": "evidenced", "code": {"file": "~/.claude/bin/jw", "start": 69, "lang": "bash", "src": "  echo \"task:     $task\"\n  echo \"model:    $model\"\n  echo \"session:  ${sid:-none}\"\n  echo \"cwd:      $cwd\"\n  echo \"status:   $status\"\n  echo \"output:   $out\"\n  if [[ \"$status\" != ok && \"$status\" != empty ]]; then\n    echo \"--- stderr (last 15 lines) ---\"; tail -n 15 \"${out%.json}.err\" || true\n    exit 3\n  fi\n  [[ \"$status\" == empty ]] && exit 4\n\n  if [[ ${JW_PRINT:-evidence} == full ]]; then\n    echo \"--- reply (first 100 lines) ---\"; printf '%s\\n' \"$text\" | head -n 100\n    return 0\n  fi", "highlight": [75, 79, 81], "notes": {"81": "`JW_PRINT=full` was set on the same line as the `invoke` call in `cmd_ask`, so it applies only to that call.", "75": "Anything except ok/empty is a failure: show stderr, exit 3."}}, "state": [{"name": "exit code", "value": "0", "changed": true}]}]}], "whatifs": [{"title": "Remove `|| rc=$?`", "change": "Line 57 becomes just the jcode command, without `|| rc=$?`.", "outcome": "With `set -e`, any jcode failure or timeout now kills jw instantly. No ledger row is written, no status is printed and no stderr tail is shown. You get a silent exit and have to go digging in the .err file.", "lesson": "Under `set -e`, catch expected failures explicitly so you can report them.", "node": "invoke", "affects": ["ledger", "shell", "files"], "confidence": "evidenced"}, {"title": "Pass `--write` by habit", "change": "You run `jw ask --write \"...\"` for every question.", "outcome": "The read-only rule is no longer added. The worker may edit files directly in your working tree, not in a worktree. `jw run` isolates work in a git worktree; `ask` does not.", "lesson": "Guardrails in prompts are soft. Isolation (worktrees) is the hard boundary.", "node": "ask", "affects": ["invoke", "jcode"], "confidence": "evidenced"}, {"title": "Two asks in the same second", "change": "Two agents call `jw ask` at the same moment.", "outcome": "Both compute the same `ts`, so both write `ask-<ts>.json` and `.err`. The later one overwrites the earlier one's files, while the ledger gets two rows pointing at one file.", "lesson": "Timestamps with second precision are not unique ids.", "node": "files", "affects": ["invoke", "ledger"], "confidence": "inferred"}], "decisions": [{"title": "Full output to disk, summary to screen", "chosen": "Save jcode's complete JSON to a file and print only a summary or EVIDENCE block.", "simple": "The header comment says why: keep the orchestrator's context small.", "deep": "Lines 3-4 state the goal. An orchestrating Claude session pays tokens for everything printed. Printing a summary and a file path lets it read the full reply only when needed.", "alternatives": [{"name": "Print everything", "tradeoff": "Simpler, but every run floods the orchestrator's context and burns tokens."}, {"name": "Print nothing, only the path", "tradeoff": "Cheapest, but forces an extra read on every run, even when the summary would do."}], "confidence": "evidenced"}, {"title": "Bash + jq instead of Python", "chosen": "A single bash script using `jq` for JSON.", "simple": "It mostly glues CLI tools together (git, timeout, jcode, flock), which bash does natively.", "deep": "`timeout`, `flock`, `git worktree` and exit codes are first-class in bash. The cost is sharp edges: quoting, `set -e` exemptions, and argument parsing done by hand.", "alternatives": [{"name": "Python + argparse", "tradeoff": "Safer argument parsing and real data structures, but more boilerplate around subprocess, timeouts and locking."}], "confidence": "inferred"}], "risks": [{"title": "Extra words silently replace the prompt", "where": "~/.claude/bin/jw:229", "what": "`jw ask where is auth` sends only `auth`. There is no warning, so the answer can look plausible but be about the wrong thing.", "fix": "Die if `prompt` is already set, or join all positional words.", "severity": "medium", "confidence": "evidenced"}, {"title": "Missing flag value crashes with a cryptic error", "where": "~/.claude/bin/jw:228", "what": "`jw ask --cwd` with nothing after it reads `$2`, which is unset. `set -u` aborts with `$2: unbound variable` instead of the usage text.", "fix": "Check `(($# >= 2))` before `shift 2`, or use `${2:?--cwd needs a value}`.", "severity": "low", "confidence": "evidenced"}, {"title": "Run files can collide", "where": "~/.claude/bin/jw:239", "what": "`ts` has one-second precision, so parallel asks can overwrite each other's output files.", "fix": "Add `$$` or `%N` nanoseconds to `ts`.", "severity": "low", "confidence": "inferred"}], "quiz": [{"q": "Why does line 57 end with `|| rc=$?`?", "options": ["To keep going after jcode fails", "To retry jcode after a failure", "To hide jcode's error output"], "answer": 0, "why": "`set -e` would abort on failure. Putting the command left of `||` exempts it and saves the exit code for the status logic."}, {"q": "Where would you look for the complete reply of an ask?", "options": ["In the ledger table rows", "In adhoc/runs/ask-<ts>.json", "In the board.md message log"], "answer": 1, "why": "The ledger only stores a status row. The full jcode JSON is saved in the runs folder."}, {"q": "jcode runs past 900 s. What status does the ledger show?", "options": ["error(124) with exit 3", "empty with exit code 4", "timeout with exit code 3"], "answer": 2, "why": "`timeout` returns 124, which is checked first and mapped to `timeout`. Any non-ok, non-empty status exits 3."}, {"q": "What actually stops `jw ask` from editing files?", "options": ["Only a sentence in the prompt", "A read-only git worktree", "The --no-worktree flag"], "answer": 0, "why": "`ask` runs in your directory with a prompt-level constraint only. Worktrees are used by `jw run`, not `ask`."}], "glossary": [{"term": "subshell", "def": "A child copy of the shell, made with ( ... ). Changes inside it, such as cd, do not affect the parent."}, {"term": "set -e", "def": "Bash option: exit immediately when a command fails, except commands tested by if, &&, || and similar."}, {"term": "ledger", "def": "jw's markdown table of runs: time, task, model, session id and status."}, {"term": "worktree", "def": "A second working folder for the same git repo, on its own branch, so a worker can edit without touching your checkout."}]}</script>
+<script>
+(() => {
+const L = JSON.parse(document.getElementById('lesson').textContent);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nodes = L.nodes || [], edges = L.edges || [], traces = L.traces || [], EXPS = L.whatifs || [], QS = L.quiz || [];
+const DECS = L.decisions || [], RISKS = L.risks || [], GLOSS = L.glossary || [];
+const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+const hash = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36); };
+const KEY = 'lens:' + (L.id || L.title);
+const QKEY = 'quiz:' + hash(JSON.stringify(QS));
+const PKEY = 'answered:' + hash(JSON.stringify(traces.map(t => t.steps.map(s => s.predict || null))));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(KEY + ':' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(KEY + ':' + k, JSON.stringify(v)); } catch {} }
+};
+const S = {
+  depth: store.get('depth', 'simple'), trace: store.get('trace', 0), step: 0, last: store.get('last', null),
+  mode: 'route', node: null, origin: null, exp: null, ran: {},
+  answered: store.get(PKEY, {}), quiz: store.get(QKEY, {}), qi: 0, qorder: null, seen: {}
+};
+if (!traces[S.trace]) S.trace = 0;
+{ const th = store.get('theme', null); if (th) document.documentElement.dataset.theme = th; }
+const motionOK = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (motionOK) document.documentElement.classList.add('motion');
+
+// ---------- authored drawings ----------
+function mascot(mood = 'happy') {
+  const eyes = mood === 'think' ? '<circle cx="34" cy="38" r="3.4" fill="#1B1A17"/><circle cx="53" cy="36" r="3.4" fill="#1B1A17"/>'
+    : mood === 'oops' ? '<path d="M30 35l7 6M37 35l-7 6M49 33l7 6M56 33l-7 6" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>'
+    : '<circle cx="34" cy="40" r="3.4" fill="#1B1A17"/><circle cx="53" cy="38" r="3.4" fill="#1B1A17"/>';
+  const whites = mood === 'oops' ? '' : '<ellipse cx="33" cy="39" rx="7" ry="8" fill="#fff" stroke="#1B1A17" stroke-width="2"/><ellipse cx="52" cy="37" rx="7" ry="8" fill="#fff" stroke="#1B1A17" stroke-width="2"/>';
+  const mouth = { happy: '<path d="M33 53c5 6 14 6 19-1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    think: '<path d="M38 55c3-1 7-1 10 1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    oops: '<path d="M33 56c3-3 5 0 8-2s5 1 8-1" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>',
+    worry: '<path d="M34 57c5-5 13-5 17 0" fill="none" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/><path d="M26 27l11 4M58 26l-10 4" stroke="#1B1A17" stroke-width="2.6" stroke-linecap="round"/>' }[mood] || '';
+  const extra = { think: '<path d="M80 14c0-6 9-6 9 0 0 4-5 4-5 9M84 28v1" fill="none" stroke="#E0458A" stroke-width="3" stroke-linecap="round"/>',
+    happy: '<path d="M84 16l3-7M90 24l7-3M86 32l6 2" stroke="#1FA898" stroke-width="3" stroke-linecap="round"/>',
+    oops: '<path d="M70 26c3 5 5 8 2 10s-6-1-4-5z" fill="#7CC8F0" stroke="#1B1A17" stroke-width="1.6"/>',
+    worry: '<path d="M80 18l4 9M88 15l1 8" stroke="#E0458A" stroke-width="3" stroke-linecap="round"/>' }[mood] || '';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M64 66l22 22" stroke="#1B1A17" stroke-width="11" stroke-linecap="round"/><path d="M64 66l22 22" stroke="#FFD84D" stroke-width="6" stroke-linecap="round"/>` +
+    `<circle cx="43" cy="44" r="31" fill="#D3F1EC" stroke="#1FA898" stroke-width="6"/><circle cx="43" cy="44" r="34.5" fill="none" stroke="#1B1A17" stroke-width="2.4"/>` +
+    `<path d="M24 28c4-7 11-11 18-11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>${whites}${eyes}${mouth}${extra}</svg>`;
+}
+const ICON = {
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.3l1.7 1.6M17.1 17.1l1.7 1.7M5.2 18.7l1.7-1.6M17.1 6.9l1.7-1.6"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.6A8.4 8.4 0 0 1 9.4 4a8.6 8.6 0 1 0 10.6 10.6z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8.5h9.5a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5H9a1.5 1.5 0 0 1-1.5-1.5V10A1.5 1.5 0 0 1 9 8.5z"/><path d="M15.8 8.4V5a1.5 1.5 0 0 0-1.5-1.5H5A1.5 1.5 0 0 0 3.5 5v9.4A1.5 1.5 0 0 0 5 16h2.4"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.2s-6.6-6-6.6-11.1a6.6 6.6 0 0 1 13.2 0c0 5.1-6.6 11.1-6.6 11.1z"/><circle cx="12" cy="10" r="2.4"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6.3l11.6 11.4M17.8 6.1L6.2 17.9"/></svg>',
+  star: '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M16 3.5v25M4.5 9.5l23 13M27.5 9.5l-23 13"/></svg>',
+  arrow: '<svg viewBox="0 0 26 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 18C17 19 9 15 5 6"/><path d="M2.5 11.5 4.6 4.8l6.6 2.3"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M7 4.6v14.8l12-7.5z"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.6c2.6-1.6 12.4-1.9 15.4-.2 1.6 1 1.5 7.6.3 9-1.6 1.7-6.2 1.6-8.4 1.7L6.8 20l.6-3.9c-2.2-.3-3.4-.8-3.8-2.3-.6-2.3-.6-7.2.6-8.2z"/><path d="M8.6 10.6h.1M12 10.4h.1M15.4 10.6h.1"/></svg>'
+};
+// One button, two jobs: asks in the side panel when served by serve.py, copies a question when opened as a file.
+const askBtn = attr => `<button class="btn quiet" ${attr}><span class="if-ask">${ICON.chat} Ask Claude about this</span><span class="if-copy">${ICON.copy} Copy question for Claude</span></button>`;
+const ring = n => `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="27" fill="var(--card)"/><path class="ring" d="M32 4.5c15.6-.4 27.9 11.6 27.6 27.3C59.3 47.7 47 59.8 31.5 59.6 16 59.4 4.3 47 4.6 31.4 4.9 16.6 16.8 5.4 30 5.2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span style="position:relative">${n}</span>`;
+
+// ---------- text helpers ----------
+const gloss = GLOSS.slice().sort((a, b) => b.term.length - a.term.length);
+const glossRe = gloss.length ? new RegExp('\\b(' + gloss.map(g => g.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi') : null;
+const glossDef = Object.fromEntries(gloss.map(g => [g.term.toLowerCase(), g.def]));
+function rich(t) {
+  if (!t) return '';
+  return esc(t).split(/(`[^`]+`)/).map(part => {
+    if (/^`[^`]+`$/.test(part)) return '<code>' + part.slice(1, -1) + '</code>';
+    return glossRe ? part.replace(glossRe, m => `<span class="term" tabindex="0" data-def="${esc(glossDef[m.toLowerCase()] || '')}">${m}</span>`) : part;
+  }).join('');
+}
+const paras = t => (t || '').split(/\n\n+/).map(p => `<p>${rich(p)}</p>`).join('');
+const pick = o => o ? (S.depth === 'deep' ? (o.deep || o.simple) : (o.simple || o.deep)) : '';
+const CONF = { evidenced: ['seen in code', 'Read directly in the code, docs or tests'], inferred: ['likely', 'A reasonable reading of the code, not stated anywhere'], uncertain: ['a guess', 'One of several possible explanations'] };
+const conf = c => CONF[c] ? `<span class="stamp ${c}" title="${CONF[c][1]}">${CONF[c][0]}</span>` : '';
+const nodeName = id => esc(nodeById[id]?.label || id);
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+// ---------- code ----------
+const KW = new Set('if else elif for while return function def class const let var import from export async await try catch except finally raise throw new fn pub struct impl match case switch break continue in of do then fi done esac local echo type interface extends implements self this None null true false True False nil package func go defer yield with as not and or use mod static public private protected'.split(' '));
+function tint(line, lang) {
+  const hashc = /^(py|python|sh|bash|zsh|shell|rb|ruby|yaml|yml|toml|r|perl|make|makefile|dockerfile|conf)$/i.test(lang || '');
+  const re = hashc ? /(#.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g
+                   : /(\/\/.*$|--\s.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][\w]*)/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    if (m[1]) out += `<span class="tk-c">${esc(m[1])}</span>`;
+    else if (m[2]) out += `<span class="tk-s">${esc(m[2])}</span>`;
+    else if (m[3]) out += `<span class="tk-n">${esc(m[3])}</span>`;
+    else out += KW.has(m[4]) ? `<span class="tk-k">${esc(m[4])}</span>` : esc(m[4]);
+    last = re.lastIndex;
+  }
+  return out + esc(line.slice(last));
+}
+function codeBlock(c) {
+  if (!c || !c.src) return '';
+  const start = parseInt(c.start, 10) || 1, hl = new Set((c.highlight || []).map(Number)), notes = c.notes || {};
+  const lines = c.src.replace(/\n$/, '').split('\n'), end = start + lines.length - 1;
+  const rows = lines.map((ln, i) => {
+    const no = start + i, note = notes[no] ?? notes[String(no)];
+    return `<div class="ln${hl.has(no) ? ' hl' : ''}"><span class="n">${no}</span><span class="t">${tint(ln, c.lang) || ' '}</span></div>` +
+      (note ? `<div class="nt">${ICON.arrow}<span>${rich(note)}</span></div>` : '');
+  }).join('');
+  return `<figure class="code"><figcaption><span class="file">${esc(c.file || '')}</span><span class="lines-n">${end > start ? `lines ${start}–${end}` : `line ${start}`}</span></figcaption><div class="rows">${rows}</div></figure>`;
+}
+
+// ---------- the sketched map ----------
+const zones = (L.layers && L.layers.length) ? L.layers : [{ id: '_', name: '' }];
+const grid = (() => {
+  const cols = zones.map(z => nodes.filter(n => (n.layer || '_') === z.id));
+  nodes.filter(n => !zones.some(z => z.id === (n.layer || '_'))).forEach(n => cols[cols.length - 1].push(n));
+  const g = {}; cols.forEach((col, ci) => col.forEach((n, ri) => { g[n.id] = { c: n.col ?? ci, r: n.row ?? ri }; }));
+  return g;
+})();
+const nCols = Math.max(1, ...Object.values(grid).map(p => p.c + 1)), nRows = Math.max(1, ...Object.values(grid).map(p => p.r + 1));
+let M = null; // current geometry
+const meas = document.createElement('canvas').getContext('2d');
+const tw = (t, font) => { meas.font = font; return meas.measureText(t).width; };
+function geometry(width) {
+  const lastCol = nCols - 1, sideW = Math.max(0, ...edges.filter(e => e.label && grid[e.from] && grid[e.to] && grid[e.from].c === grid[e.to].c && grid[e.from].c === lastCol).map(e => tw(e.label, '400 14px "Shantell Sans", cursive')));
+  const PAD = 18, PR = sideW ? Math.round(sideW + 72) : 58, TOP = zones.some(z => z.name) ? 46 : 18, CG = Math.max(66, Math.min(92, width * .07));
+  const NW = Math.max(150, (width - PAD - PR - (nCols - 1) * CG) / nCols), NH = 112, RG = 44;
+  const pos = {}; for (const id in grid) pos[id] = { x: PAD + grid[id].c * (NW + CG), y: TOP + grid[id].r * (NH + RG), col: grid[id].c };
+  const W = PAD + PR + nCols * NW + (nCols - 1) * CG, H = TOP + nRows * NH + (nRows - 1) * RG + PAD + 4;
+  return { PAD, TOP, CG, NW, NH, W, H, pos };
+}
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const seedOf = s => parseInt(hash(String(s)), 36);
+const f1 = v => Math.round(v * 10) / 10;
+function wl(r, x1, y1, x2, y2, amp = 1.5) {
+  const j = () => (r() - .5) * 2 * amp, mx = (x1 + x2) / 2 + j() * 1.4, my = (y1 + y2) / 2 + j() * 1.4;
+  return `M${f1(x1 + j())},${f1(y1 + j())} Q${f1(mx)},${f1(my)} ${f1(x2 + j())},${f1(y2 + j())}`;
+}
+function roughRect(x, y, w, h, seed, passes = 2) {
+  const r = rng(seed); let d = '';
+  for (let p = 0; p < passes; p++) {
+    const o = 2 + r() * 2;
+    d += wl(r, x - o, y, x + w + o, y) + wl(r, x + w, y - o, x + w, y + h + o) + wl(r, x + w + o, y + h, x - o, y + h) + wl(r, x, y + h + o, x, y - o);
+  }
+  return d;
+}
+function softRect(x, y, w, h, seed) {
+  const r = rng(seed + 7), j = () => (r() - .5) * 3;
+  return `M${f1(x + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + j())} L${f1(x + w + j())},${f1(y + h + j())} L${f1(x + j())},${f1(y + h + j())}Z`;
+}
+function curve(a, b) {
+  const A = M.pos[a], B = M.pos[b]; if (!A || !B) return null;
+  const { NW, NH } = M;
+  if (A.col === B.col) {
+    const x = A.x + NW, y1 = A.y + NH / 2, y2 = B.y + NH / 2, bend = 34 + Math.abs(y2 - y1) * .16;
+    return { p: [x, y1, x + bend, y1, x + bend, y2, x, y2], mx: x + bend * .75 + 6, my: (y1 + y2) / 2 + 5, anchor: 'start' };
+  }
+  const fwd = B.x > A.x, x1 = fwd ? A.x + NW : A.x, x2 = fwd ? B.x : B.x + NW, y1 = A.y + NH / 2, y2 = B.y + NH / 2, dx = (x2 - x1) / 2;
+  const t = .5, u = 1 - t, bx = u*u*u*x1 + 3*u*u*t*(x1 + dx) + 3*u*t*t*(x2 - dx) + t*t*t*x2, by = u*u*u*y1 + 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t*y2;
+  return { p: [x1, y1, x1 + dx, y1, x2 - dx, y2, x2, y2], mx: bx, my: by - 8, anchor: 'middle' };
+}
+const cubicD = p => `M${f1(p[0])},${f1(p[1])} C${f1(p[2])},${f1(p[3])} ${f1(p[4])},${f1(p[5])} ${f1(p[6])},${f1(p[7])}`;
+function roughCurve(p, seed) {
+  const r = rng(seed); let d = '';
+  for (let k = 0; k < 2; k++) { const j = a => (r() - .5) * 2 * a; d += cubicD([p[0] + j(.8), p[1] + j(.8), p[2] + j(3), p[3] + j(3), p[4] + j(3), p[5] + j(3), p[6] + j(.6), p[7] + j(.6)]) + ' '; }
+  return d;
+}
+function head(p, rev) {
+  const [ex, ey, cx, cy] = rev ? [p[0], p[1], p[2], p[3]] : [p[6], p[7], p[4], p[5]];
+  const a = Math.atan2(ey - cy, ex - cx), L1 = 13;
+  const pt = s => `${f1(ex - L1 * Math.cos(a + s))},${f1(ey - L1 * Math.sin(a + s))}`;
+  return `M${pt(.45)} L${f1(ex)},${f1(ey)} L${pt(-.45)}`;
+}
+const edgeBetween = (a, b) => edges.find(e => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+const LBL = '700 18px "Atkinson Hyperlegible Next", system-ui, sans-serif', KND = '400 15px "Shantell Sans", cursive', ZN = '700 16px "Shantell Sans", cursive';
+function fit(t, max, font) { if (tw(t, font) <= max) return t; while (t.length > 1 && tw(t + '…', font) > max) t = t.slice(0, -1); return t.trimEnd() + '…'; }
+function wrapLabel(text, max, font = LBL, most = 2) {
+  const words = String(text).split(/\s+/), out = []; let cur = '';
+  words.forEach(w => { const next = (cur + ' ' + w).trim(); if (tw(next, font) > max && cur) { out.push(cur); cur = w; } else cur = next; });
+  if (cur) out.push(cur);
+  if (out.length > most) { out[most - 1] = out.slice(most - 1).join(' '); out.length = most; }
+  return out.map(l => fit(l, max, font));
+}
+function drawMap() {
+  const svg = $('#map'); if (!svg) return;
+  const wrap = svg.parentElement, width = Math.max(900, wrap.clientWidth);
+  M = geometry(width);
+  const { NW, NH, W, H, pos, PAD, CG } = M;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H);
+  let s = `<defs><pattern id="hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(40)"><rect width="9" height="9" style="fill:var(--teal-soft)"/><line x1="0" y1="0" x2="0" y2="9" style="stroke:var(--teal);stroke-width:3.2;opacity:.55"/></pattern>` +
+    `<pattern id="hatchP" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(-40)"><rect width="9" height="9" style="fill:var(--pink-soft)"/><line x1="0" y1="0" x2="0" y2="9" style="stroke:var(--pink);stroke-width:3;opacity:.6"/></pattern></defs>`;
+  zones.forEach((z, i) => { if (!z.name) return;
+    const x = PAD + i * (NW + CG) - 12;
+    s += `<g class="zone"><path d="${roughRect(x, 6, NW + 24, H - 12, seedOf('z' + z.id), 1)}"/><text x="${x + 12}" y="32">${esc(fit(z.name, NW, ZN))}</text></g>`; });
+  let labels = '';
+  edges.forEach(e => { const c = curve(e.from, e.to); if (!c) return; const sd = seedOf(e.from + '>' + e.to);
+    s += `<g class="edge" data-from="${esc(e.from)}" data-to="${esc(e.to)}"><path class="wire" d="${roughCurve(c.p, sd)}"/><path class="head" d="${head(c.p)}"/></g>`;
+    if (e.label) labels += `<text class="elabel" data-from="${esc(e.from)}" data-to="${esc(e.to)}" x="${f1(c.mx)}" y="${f1(c.my)}" text-anchor="${c.anchor}">${esc(e.label)}</text>`; });
+  s += `<g id="routeLayer"></g>`;
+  const room = NW - 26;
+  nodes.forEach(n => { const p = pos[n.id]; if (!p) return; const sd = seedOf(n.id), lines = wrapLabel(n.label, room, LBL, 3);
+    const kinds = n.kind ? wrapLabel(n.kind, room, KND, lines.length > 2 ? 1 : 2) : [];
+    const ly = Math.round((NH - (lines.length * 23 + kinds.length * 20)) / 2) + 17;
+    s += `<g class="node" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}" transform="translate(${f1(p.x)},${f1(p.y)})">` +
+      `<path class="fill" d="${softRect(0, 0, NW, NH, sd)}"/><path class="hatch" d="${softRect(0, 0, NW, NH, sd)}"/><path class="stroke" d="${roughRect(0, 0, NW, NH, sd)}"/>` +
+      lines.map((t, i) => `<text class="lbl" x="14" y="${ly + i * 23}">${esc(t)}</text>`).join('') +
+      kinds.map((t, i) => `<text class="kind" x="14" y="${ly + lines.length * 23 + 3 + i * 20}">${esc(t)}</text>`).join('') + `<title>${esc(n.label)}${n.kind ? ' (' + esc(n.kind) + ')' : ''}</title></g>`; });
+  svg.innerHTML = s + `<g class="labels">${labels}</g>`;
+  // nudge edge labels that land on top of each other
+  const placed = [];
+  $$('.elabel', svg).forEach(t => { let b = t.getBBox(), tries = 0;
+    while (tries++ < 6 && placed.some(q => b.x < q.x + q.width && q.x < b.x + b.width && b.y < q.y + q.height && q.y < b.y + b.height)) { t.setAttribute('y', +t.getAttribute('y') + 17); b = t.getBBox(); }
+    placed.push(b); });
+  $$('.node', svg).forEach(g => {
+    const go = () => openNode(g.dataset.id);
+    g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+  routeDrawn = -1; paintMap(false);
+}
+function dependents(id) {
+  const seen = new Set([id]), q = [id];
+  while (q.length) { const cur = q.shift(); edges.forEach(e => { if (e.to === cur && !seen.has(e.from)) { seen.add(e.from); q.push(e.from); } }); }
+  return seen;
+}
+let routeDrawn = -1;
+function paintMap(animate = true) {
+  if (!M) return;
+  const svg = $('#map'), steps = traces[S.trace]?.steps || [];
+  let hit = null, origin = null;
+  if (S.exp != null) { const w = EXPS[S.exp]; hit = new Set([...(w.affects || []), w.node].filter(Boolean)); origin = w.node; }
+  else if (S.mode === 'impact' && S.origin) { hit = dependents(S.origin); origin = S.origin; }
+  const upto = steps.slice(0, S.step + 1), visited = new Set(upto.map(s => s.node)), current = steps[S.step]?.node;
+  const layer = $('#routeLayer');
+  if (hit) { layer.innerHTML = ''; routeDrawn = -1; }
+  else if (S.step !== routeDrawn) {
+    let r = '';
+    for (let i = 1; i < steps.length; i++) { // the whole trip, faint, so the route is visible before you start
+      const a = steps[i - 1].node, b = steps[i].node; if (a === b) continue;
+      const e = edgeBetween(a, b), c = e && curve(e.from, e.to); if (c) r += `<path class="ghost" d="${cubicD(c.p)}"/>`;
+    }
+    for (let i = 1; i < upto.length; i++) {
+      const a = upto[i - 1].node, b = upto[i].node; if (a === b) continue;
+      const e = edgeBetween(a, b), c = e && curve(e.from, e.to); if (!c) continue;
+      const fresh = animate && motionOK && i > routeDrawn;
+      r += `<path class="route${fresh ? ' draw' : ''}" pathLength="1" d="${cubicD(e.from === a ? c.p : [c.p[6], c.p[7], c.p[4], c.p[5], c.p[2], c.p[3], c.p[0], c.p[1]])}"${fresh ? ` style="animation-delay:${Math.max(0, i - Math.max(1, routeDrawn + 1)) * .18}s"` : ''}/>`;
+    }
+    layer.innerHTML = r; routeDrawn = S.step;
+  }
+  $$('.node', svg).forEach(g => {
+    const id = g.dataset.id;
+    g.classList.toggle('active', !hit && id === current);
+    g.classList.toggle('onroute', !hit && visited.has(id));
+    g.classList.toggle('picked', !hit && id === S.node);
+    g.classList.toggle('hit', !!hit && hit.has(id) && id !== origin);
+    g.classList.toggle('origin', !!hit && id === origin);
+    g.classList.toggle('dim', !!hit && !hit.has(id) && id !== origin);
+  });
+  $$('.edge', svg).forEach(g => {
+    const on = !!hit && hit.has(g.dataset.from) && (hit.has(g.dataset.to) || g.dataset.to === origin);
+    g.classList.toggle('hit', on); g.classList.toggle('dimmed', !!hit && !on);
+  });
+  $$('.elabel', svg).forEach(t => t.classList.toggle('dimmed', !!hit && !(hit.has(t.dataset.from) && (hit.has(t.dataset.to) || t.dataset.to === origin))));
+  const t = traces[S.trace];
+  $('#mapHint').innerHTML = S.exp != null ? `Pink shows what <b>${rich(EXPS[S.exp].title)}</b> would damage. <a href="#" id="clearExp">Clear it</a>`
+    : hit ? `Pink shows everything that depends on <b>${nodeName(origin)}</b>. Change it and these could break.`
+    : S.mode === 'impact' ? 'Click any box to see what depends on it.'
+    : t ? `The teal line is <b>${esc(t.title)}</b> up to stop ${S.step + 1}. Click any box to read about it.` : 'Click any box to read about it.';
+  $('#clearExp')?.addEventListener('click', e => { e.preventDefault(); S.exp = null; paintMap(); });
+}
+
+// ---------- component note ----------
+function renderNode() {
+  const box = $('#nodeNote'), n = nodeById[S.node];
+  if (!n) { box.hidden = true; box.innerHTML = ''; return; }
+  const out = edges.filter(e => e.from === n.id), inc = edges.filter(e => e.to === n.id);
+  const link = (id, label) => `<a href="#" data-node="${esc(id)}">${nodeName(id)}</a>${label ? ` <span style="color:var(--ink-3)">(${esc(label)})</span>` : ''}`;
+  const at = []; traces.forEach((t, ti) => t.steps.forEach((s, si) => { if (s.node === n.id) at.push([ti, si, s.title]); }));
+  const dep = dependents(n.id).size - 1;
+  let main = `<div class="narr">${paras(pick(n))}</div>`;
+  if (n.analogy) main += `<div class="aside">${ICON.star}<span>${rich(n.analogy)}</span></div>`;
+  (n.functions || []).forEach((f, i) => { main += `<details class="inside"${i === 0 ? ' open' : ''}><summary>${esc(f.name)}<span>${esc(f.loc || '')}</span></summary><div class="narr" style="margin-top:8px">${paras(pick(f) || f.what)}</div>${codeBlock(f.code)}</details>`; });
+  let side = '';
+  if (inc.length || out.length) side += `<div class="side-h">Wired to</div><dl class="links">${inc.length ? `<dt>gets from</dt><dd>${inc.map(e => link(e.from, e.label)).join(', ')}</dd>` : ''}${out.length ? `<dt>sends to</dt><dd>${out.map(e => link(e.to, e.label)).join(', ')}</dd>` : ''}</dl>`;
+  side += `<div class="side-h">If you change it</div><div style="font-size:17px">${dep ? `${plural(dep, 'other part')} depend${dep === 1 ? 's' : ''} on this. <a href="#" id="showImpact">Show them on the map</a>` : 'Nothing else depends on this.'}</div>`;
+  if (at.length) side += `<div class="side-h">The route stops here</div><div class="at">${at.map(([ti, si, title]) => `<a href="#" data-jump="${ti}:${si}">${traces.length > 1 ? esc(traces[ti].title.split(':')[0]) + ', ' : ''}stop ${si + 1}: ${rich(title)}</a>`).join('')}</div>`;
+  box.innerHTML = `<button class="icon-btn close" id="closeNode" aria-label="Close">${ICON.x}</button><h3>${esc(n.label)} ${conf(n.confidence)}</h3>` +
+    `<div class="kindline">${esc(n.kind || '')}</div>${n.files?.length ? `<div class="files">${n.files.map(esc).join(' · ')}</div>` : ''}` +
+    `<div class="node-grid"><div>${main}</div><div>${side}<div class="stop-actions">${askBtn('id="askNode"')}</div></div></div>`;
+  box.hidden = false; markOverflow(box);
+  $('#closeNode').onclick = () => { S.node = null; renderNode(); paintMap(); };
+  $('#showImpact')?.addEventListener('click', e => { e.preventDefault(); setMode('impact'); S.origin = n.id; paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+  $('#askNode').onclick = () => askAbout(`the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`);
+  $$('[data-jump]', box).forEach(a => a.onclick = e => { e.preventDefault(); const [t, s] = a.dataset.jump.split(':').map(Number); jumpTo(t, s); });
+}
+function openNode(id) {
+  S.exp = null;
+  if (S.mode === 'impact') { S.origin = S.origin === id ? null : id; }
+  S.node = id; renderNode(); paintMap();
+  if (S.mode !== 'impact') $('#nodeNote').scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'nearest' });
+}
+document.addEventListener('click', e => { const a = e.target.closest('a[data-node]'); if (!a) return; e.preventDefault(); openNode(a.dataset.node); });
+
+function renderMapSection() {
+  $('#s-map').innerHTML = `<div class="map-top"><h2>The map</h2><div class="map-hint" id="mapHint"></div>
+      <div class="pill" id="mapMode" role="group" aria-label="Map mode"><button data-m="route">Follow the route</button><button data-m="impact">What depends on it?</button></div></div>
+    <div class="map-card"><div class="mapwrap"><svg id="map" role="img" aria-label="System map"></svg></div>
+      <div class="map-foot"><span>${L.legend ? rich(L.legend) : 'Arrows point from the caller to what it calls or hands data to.'}</span><span><i></i>route so far, dotted ahead</span><span><i class="p"></i>impact or damage</span><span>hatched: the current stop</span></div></div>
+    <div class="node-note" id="nodeNote" hidden></div>`;
+  $$('#mapMode button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+}
+
+// ---------- the trip ----------
+function stopHTML(tr, i) {
+  const st = tr.steps[i], key = S.trace + ':' + i, a = S.answered[key], gated = st.predict && a == null;
+  let h = `<article class="stop" id="stop-${i}" data-i="${i}"><div class="num">${ring(i + 1)}</div><div class="stop-body">`;
+  h += `<div class="stop-head"><h3 class="stop-title">${rich(st.title)}</h3>${conf(st.confidence)}</div>`;
+  h += `<div class="stop-meta"><span>in <a href="#" data-node="${esc(st.node)}">${nodeName(st.node)}</a></span><a href="#" data-showmap="${i}">see it on the map</a></div>`;
+  let gate = '';
+  if (st.predict) {
+    const ok = a === st.predict.answer;
+    gate += `<div class="turn${a != null ? ' done' : ''}"><div class="masc">${mascot(a == null ? 'think' : ok ? 'happy' : 'oops')}</div><div>
+      <div class="q">${rich(st.predict.q)}</div>
+      <div class="choices">${st.predict.options.map((o, j) => `<button class="choice ${a == null ? '' : j === st.predict.answer ? 'right' : j === a ? 'wrong' : ''}" data-p="${j}" data-stop="${i}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>
+      ${a != null ? `<div class="verdict ${ok ? 'ok' : 'no'}"><b>${ok ? 'Right.' : 'Not quite.'}</b>${rich(st.predict.why)}</div>` : ''}</div></div>`;
+  }
+  const memo = st.state?.length
+    ? `<dl>${st.state.map(v => { const masked = gated && v.changed;
+        return `<div class="mv${masked ? ' masked' : v.changed ? ' new' : ''}"><dt>${esc(v.name)}${v.changed && !masked ? '<span class="newtag">new</span>' : ''}</dt><dd>${masked ? '' : `<span>${esc(v.value)}</span>`}</dd></div>`; }).join('')}</dl>${gated && st.state.some(v => v.changed) ? '<p class="memo-lock">New values appear after your guess.</p>' : ''}`
+    : `<p class="memo-empty">Nothing new is stored at this stop.</p>`;
+  h += `<div class="cols"><div class="col-main">${gate}`;
+  h += gated ? `<p class="gate-wait">Read the code, make your guess, and the explanation appears.</p><div class="narr blurred" aria-hidden="true">${paras(pick(st))}</div>` : `<div class="narr">${paras(pick(st))}</div>`;
+  h += codeBlock(st.code);
+  if (st.aside && !gated) h += `<div class="aside">${ICON.star}<span>${rich(st.aside)}</span></div>`;
+  h += `<div class="stop-actions">${askBtn(`data-ask="${i}"`)}</div>`;
+  h += `</div><aside class="memo"><div class="memo-note"><div class="memo-h">In memory now</div>${memo}</div></aside></div></div></article>`;
+  return h;
+}
+function renderTrip() {
+  const sec = $('#s-trip'), tr = traces[S.trace];
+  if (!tr) { sec.hidden = true; return; }
+  let h = `<div class="sec-head"><h2>The trip</h2></div><p class="sec-intro">Follow one real input through the code, one stop at a time. The sticky note shows what is in memory at each stop.</p>`;
+  if (traces.length > 1) h += `<div class="tabs" role="tablist">${traces.map((t, i) => `<button role="tab" data-tr="${i}" aria-selected="${i === S.trace}">${esc(t.title)}</button>`).join('')}</div>`;
+  if (tr.trigger) h += `<div class="trigger"><span class="lab">It starts when</span><span>${rich(tr.trigger.replace(/^You /, 'you '))}</span></div>`;
+  h += `<div class="trip">${tr.steps.map((_, i) => stopHTML(tr, i)).join('')}</div>`;
+  sec.innerHTML = h;
+  $$('[data-tr]', sec).forEach(b => b.onclick = () => { S.trace = +b.dataset.tr; S.step = 0; store.set('trace', S.trace); S.seen = {}; renderTrip(); renderRail(); paintMap(); sec.scrollIntoView({ block: 'start' }); });
+  bindTrip(); observeStops(); markStops(); markOverflow(sec);
+}
+function bindTrip() {
+  const sec = $('#s-trip');
+  $$('[data-p]', sec).forEach(b => b.onclick = () => answer(+b.dataset.stop, +b.dataset.p));
+  $$('[data-ask]', sec).forEach(b => b.onclick = () => askAbout(stopWhere(+b.dataset.ask)));
+  $$('[data-showmap]', sec).forEach(a => a.onclick = e => { e.preventDefault(); setStep(+a.dataset.showmap); setMode('route'); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+function stopWhere(i, inCode) {
+  const tr = traces[S.trace], st = tr.steps[i];
+  return `${tr.title}, stop ${i + 1} ("${st.title}")${st.code?.file ? `${inCode ? ', in the code from' : ', code in'} ${st.code.file}:${parseInt(st.code.start, 10) || 1}` : ''}`;
+}
+function markOverflow(root = document) {
+  $$('.code .rows', root).forEach(r => { const upd = () => r.classList.toggle('more', r.scrollLeft + r.clientWidth < r.scrollWidth - 4); upd(); r.onscroll = upd; });
+}
+function rerenderStop(i) {
+  const tr = traces[S.trace], old = $('#stop-' + i); if (!old) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = stopHTML(tr, i); const fresh = tmp.firstElementChild;
+  old.replaceWith(fresh); bindTrip(); observeStops(); markStops(); markOverflow(fresh);
+}
+function answer(i, j) {
+  const st = traces[S.trace]?.steps[i]; if (!st?.predict || S.answered[S.trace + ':' + i] != null || j >= st.predict.options.length) return;
+  S.answered[S.trace + ':' + i] = j; store.set(PKEY, S.answered); rerenderStop(i); renderRail();
+}
+let io;
+function observeStops() {
+  io?.disconnect();
+  io = new IntersectionObserver(ents => {
+    ents.forEach(e => { if (e.isIntersecting) { const i = +e.target.dataset.i; e.target.classList.add('seen'); setStep(i, true); } });
+  }, { rootMargin: '-38% 0px -58% 0px' });
+  $$('.stop').forEach(el => { io.observe(el); if (S.seen[el.dataset.i]) el.classList.add('seen'); });
+}
+function setStep(i, fromScroll) {
+  const tr = traces[S.trace]; if (!tr) return;
+  i = Math.max(0, Math.min(i, tr.steps.length - 1)); S.seen[i] = true;
+  if (i === S.step && fromScroll) return;
+  S.step = i; store.set('last', { trace: S.trace, step: i }); store.set('trace', S.trace);
+  markStops(); renderRail(); paintMap();
+}
+function markStops() { $$('.stop').forEach(el => { const i = +el.dataset.i; el.classList.toggle('here', i === S.step); el.classList.toggle('past', i < S.step); }); }
+function jumpTo(t, i) {
+  if (t !== S.trace) { S.trace = t; store.set('trace', t); S.seen = {}; renderTrip(); }
+  setStep(i); const el = $('#stop-' + i); el?.scrollIntoView({ behavior: motionOK ? 'smooth' : 'auto', block: 'start' });
+}
+
+// ---------- break it ----------
+function renderExps() {
+  const sec = $('#s-break'); if (!EXPS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Break it</h2></div><p class="sec-intro">Each experiment is one realistic change. Guess what breaks, then run it.</p><div class="exps">${EXPS.map((w, i) => {
+    const ran = S.ran[i];
+    return `<div class="exp"><div class="change"><h3>${rich(w.title)}</h3><div>${rich(w.change)}</div></div>
+      <div class="result${ran ? ' shown' : ''}">${ran
+        ? `<div class="what">What happens ${conf(w.confidence)}</div><div>${rich(w.outcome)}</div>${w.lesson ? `<div class="takeaway">${rich(w.lesson)}</div>` : ''}${(w.affects?.length || w.node) ? `<button class="btn" data-show="${i}">${ICON.pin} Show the damage on the map</button>` : ''}`
+        : `<div class="guess">What do you think breaks?</div><button class="btn go" data-run="${i}">${ICON.play} Run the experiment</button>`}</div></div>`; }).join('')}</div>`;
+  $$('[data-run]', sec).forEach(b => b.onclick = () => { S.ran[b.dataset.run] = true; renderExps(); $(`[data-show="${b.dataset.run}"]`)?.focus(); });
+  $$('[data-show]', sec).forEach(b => b.onclick = () => { S.mode = 'route'; syncMode(); S.exp = +b.dataset.show; paintMap(); $('#s-map').scrollIntoView({ block: 'start' }); });
+}
+
+// ---------- why ----------
+function renderDecs() {
+  const sec = $('#s-why'); if (!DECS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Why it's built this way</h2></div><p class="sec-intro">The choices behind the code, and what the alternatives would have cost.</p>` +
+    DECS.map(d => `<div class="dec"><h3>${rich(d.title)} ${conf(d.confidence)}</h3>
+      <div class="chosen-wrap"><span class="lab">What the code does</span><span class="chosen">${rich(d.chosen)}</span></div>
+      <div class="narr">${paras(pick(d) || d.why)}</div>
+      ${(d.alternatives || []).length ? `<table class="alts"><thead><tr><th>Could have used</th><th>Trade-off</th></tr></thead><tbody>${d.alternatives.map(a => `<tr><td>${esc(a.name)}</td><td>${rich(a.tradeoff)}</td></tr>`).join('')}</tbody></table>` : ''}</div>`).join('');
+}
+
+// ---------- weak spots ----------
+function renderRisks() {
+  const sec = $('#s-weak'); if (!RISKS.length) { sec.hidden = true; return; }
+  const order = { high: 0, medium: 1, low: 2 };
+  sec.innerHTML = `<div class="sec-head risks-head">${mascot('worry')}<h2>Weak spots</h2></div><p class="sec-intro">Real problems found while reading the code, worst first, each with the smallest fix.</p><div class="risks">` +
+    RISKS.slice().sort((a, b) => (order[a.severity] ?? 3) - (order[b.severity] ?? 3)).map(r => `<div class="risk">
+      <div class="sev ${esc(r.severity)}">${esc(r.severity || '')}</div>
+      <div><h3>${rich(r.title)} ${conf(r.confidence)}</h3>${r.where ? `<div class="loc">${esc(r.where)}</div>` : ''}<p>${rich(r.what)}</p>${r.fix ? `<div class="fix"><b>Smallest fix:</b>${rich(r.fix)}</div>` : ''}</div></div>`).join('') + `</div>`;
+}
+
+// ---------- quiz ----------
+function quizOrder() { const rank = i => S.quiz[i] == null ? 1 : S.quiz[i] === QS[i].answer ? 2 : 0; return QS.map((_, i) => i).sort((a, b) => rank(a) - rank(b) || a - b); }
+function renderQuiz() {
+  const sec = $('#s-quiz'); if (!QS.length) { sec.hidden = true; return; }
+  if (!S.qorder) { S.qorder = quizOrder(); S.qi = S.qorder.findIndex(i => S.quiz[i] == null); }
+  const right = QS.filter((q, i) => S.quiz[i] === q.answer).length, missed = QS.filter((q, i) => S.quiz[i] != null && S.quiz[i] !== q.answer).length;
+  let h = `<div class="sec-head"><h2>Check yourself</h2></div><p class="sec-intro">${QS.length} questions that need understanding, not memory. Questions you miss come back first next time.</p><div class="quiz">`;
+  h += `<div class="pips">${S.qorder.map((qi, k) => `<button class="pip ${S.quiz[qi] == null ? '' : S.quiz[qi] === QS[qi].answer ? 'right' : 'wrong'}${k === S.qi ? ' cur' : ''}" data-k="${k}" aria-label="Question ${k + 1}"></button>`).join('')}</div>`;
+  if (S.qi < 0) {
+    h += `<div class="qcard"><div class="score-row">${mascot(right === QS.length ? 'happy' : 'oops')}<div><div class="score">${right}<small> of ${QS.length}</small></div>
+      <p style="margin-top:10px">${right === QS.length ? 'All correct. Come back in a few days and try again without looking at the map.' : `You missed ${missed}. Walk those stops again, then retry them.`}</p></div></div>
+      <div class="qnav">${missed ? `<button class="btn go" id="retryMissed">Retry the ${missed} I missed</button>` : ''}<button class="btn" id="restart">Start over</button></div></div>`;
+  } else {
+    const qi = S.qorder[S.qi], q = QS[qi], a = S.quiz[qi], more = S.qorder.some(i => S.quiz[i] == null);
+    h += `<div class="qcard"><div class="qnum">Question ${S.qi + 1} of ${QS.length}</div><div class="qtext">${rich(q.q)}</div><div class="choices">${q.options.map((o, j) =>
+      `<button class="choice ${a == null ? '' : j === q.answer ? 'right' : j === a ? 'wrong' : ''}" data-a="${j}"${a == null ? '' : ' disabled'}><span class="k">${j + 1}</span><span>${rich(o)}</span></button>`).join('')}</div>` +
+      (a != null ? `<div class="verdict ${a === q.answer ? 'ok' : 'no'}"><b>${a === q.answer ? 'Right.' : 'Not quite.'}</b>${rich(q.why)}</div><div class="qnav"><button class="btn go" id="qnext">${more ? 'Next question' : 'See my score'}</button></div>` : '') + `</div>`;
+  }
+  sec.innerHTML = h + `</div>`;
+  $$('.pip', sec).forEach(b => b.onclick = () => { S.qi = +b.dataset.k; renderQuiz(); });
+  $$('[data-a]', sec).forEach(b => b.onclick = () => qanswer(+b.dataset.a));
+  $('#qnext')?.addEventListener('click', qnext);
+  $('#retryMissed')?.addEventListener('click', () => { QS.forEach((q, i) => { if (S.quiz[i] != null && S.quiz[i] !== q.answer) delete S.quiz[i]; }); store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+  $('#restart')?.addEventListener('click', () => { S.quiz = {}; store.set(QKEY, S.quiz); S.qorder = null; renderQuiz(); renderRail(); });
+}
+function qanswer(j) {
+  if (S.qi < 0) return; const qi = S.qorder[S.qi]; if (S.quiz[qi] != null || j >= QS[qi].options.length) return;
+  S.quiz[qi] = j; store.set(QKEY, S.quiz); renderQuiz(); renderRail(); $('#qnext')?.focus({ preventScroll: true });
+}
+function qnext() { const later = S.qorder.findIndex((qi, k) => k > S.qi && S.quiz[qi] == null); S.qi = later >= 0 ? later : S.qorder.findIndex(qi => S.quiz[qi] == null); renderQuiz(); }
+
+// ---------- glossary ----------
+function renderTerms() {
+  const sec = $('#s-terms'); if (!GLOSS.length) { sec.hidden = true; return; }
+  sec.innerHTML = `<div class="sec-head"><h2>Words to know</h2></div><p class="sec-intro">Dotted words anywhere on the page show these definitions when you hover them.</p><dl class="terms">${GLOSS.map(g => `<div><dt>${esc(g.term)}</dt><dd>${esc(g.def)}</dd></div>`).join('')}</dl>`;
+}
+const tip = $('#tip');
+function showTip(el) { const r = el.getBoundingClientRect(); tip.innerHTML = `<b>${esc(el.textContent)}</b>: ${esc(el.dataset.def)}`; tip.classList.add('on');
+  const tw = tip.offsetWidth, th = tip.offsetHeight; let x = Math.min(Math.max(12, r.left + r.width / 2 - tw / 2), innerWidth - tw - 12), y = r.top - th - 10; if (y < 8) y = r.bottom + 10;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+const hideTip = () => tip.classList.remove('on');
+document.addEventListener('mouseover', e => { const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+document.addEventListener('focusin', e => { const t = e.target.closest('.term'); t ? showTip(t) : hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
+
+// ---------- rail ----------
+const SECS = [['s-map', 'The map', () => nodes.length], ['s-trip', 'The trip', () => traces.length], ['s-break', 'Break it', () => EXPS.length], ['s-why', 'Why this way', () => DECS.length],
+  ['s-weak', 'Weak spots', () => RISKS.length], ['s-quiz', 'Check yourself', () => QS.length], ['s-terms', 'Words to know', () => GLOSS.length]];
+let curSec = 's-map';
+function renderRail() {
+  const tr = traces[S.trace];
+  let h = `<div class="rail-brand">${mascot('happy')}<span>lens</span></div><ul class="toc">`;
+  SECS.filter(s => s[2]()).forEach(([id, name]) => {
+    const cnt = id === 's-quiz' ? `<span class="cnt">${Object.keys(S.quiz).length}/${QS.length}</span>` : id === 's-trip' && tr ? `<span class="cnt">${S.step + 1}/${tr.steps.length}</span>` : '';
+    h += `<li><a href="#${id}" class="${curSec === id ? 'on' : ''}">${name}${cnt}</a>`;
+    if (id === 's-trip' && tr) {
+      h += `<ol class="stops"><span class="fill"></span>${tr.steps.map((s, i) => { const gate = s.predict && S.answered[S.trace + ':' + i] == null;
+        return `<li class="${i < S.step ? 'done' : i === S.step ? 'here' : ''}${gate ? ' gate' : ''}"><span class="dot"></span><a href="#stop-${i}" data-go="${i}" data-lens-stop="${i}">${esc(s.title.replace(/`/g, ''))}</a></li>`; }).join('')}</ol>`;
+    }
+    h += `</li>`;
+  });
+  h += `</ul><div class="rail-foot"><div class="pill" role="group" aria-label="Detail level">${['simple', 'deep'].map(d => `<button data-d="${d}" aria-pressed="${S.depth === d}">${d === 'simple' ? 'Plain' : 'Deep'}</button>`).join('')}</div>
+    <div class="keys"><span><kbd>J</kbd><kbd>K</kbd> next / previous stop</span><span><kbd>P</kbd><kbd>D</kbd> plain / deep</span><span><kbd>1</kbd>–<kbd>3</kbd> answer a guess</span><span><kbd>A</kbd> ask about the selection</span></div></div>`;
+  const rail = $('#rail'); rail.innerHTML = h;
+  const here = $('.stops li.here', rail), fill = $('.stops .fill', rail);
+  if (here && fill) fill.style.setProperty('--h', Math.max(0, here.offsetTop + 8) + 'px');
+  $$('[data-go]', rail).forEach(a => a.onclick = e => { e.preventDefault(); jumpTo(S.trace, +a.dataset.go); });
+  $$('.rail-foot [data-d]', rail).forEach(b => b.onclick = () => setDepth(b.dataset.d));
+}
+const secIO = new IntersectionObserver(ents => { ents.forEach(e => { if (e.isIntersecting) { curSec = e.target.id; $$('.toc>li>a', $('#rail')).forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + curSec)); } }); }, { rootMargin: '-30% 0px -65% 0px' });
+
+// ---------- chrome ----------
+function syncMode() { $$('#mapMode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === S.mode)); }
+function setMode(m) { S.mode = m; S.exp = null; if (m === 'route') S.origin = null; syncMode(); paintMap(); }
+function setDepth(d) {
+  S.depth = d; store.set('depth', d);
+  $$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === d));
+  const y = scrollY; renderTrip(); renderNode(); renderDecs(); renderRail(); scrollTo(0, y);
+}
+let tt; function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), 2000); }
+function copy(text) {
+  const done = () => toast('Question copied. Paste it into Claude and finish it.');
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { prompt('Copy this:', text); } ta.remove(); };
+  navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(done, fallback) : fallback();
+}
+function themeIcon() { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; $('#themeBtn').innerHTML = dark ? ICON.sun : ICON.moon; return dark; }
+$('#themeBtn').onclick = () => { const dark = themeIcon(); document.documentElement.dataset.theme = dark ? 'light' : 'dark'; store.set('theme', document.documentElement.dataset.theme); themeIcon(); };
+$$('#depth button').forEach(b => b.onclick = () => setDepth(b.dataset.d));
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const num = /^[1-9]$/.test(e.key) ? +e.key - 1 : null, k = e.key.toLowerCase();
+  if (curSec === 's-quiz') { if (num != null) { qanswer(num); return; } if (e.key === 'Enter' && $('#qnext') && !e.target.closest('button,a')) { e.preventDefault(); qnext(); return; } }
+  if (k === 'arrowright' || k === 'j') { e.preventDefault(); jumpTo(S.trace, S.step + 1); }
+  else if (k === 'arrowleft' || k === 'k') { e.preventDefault(); jumpTo(S.trace, S.step - 1); }
+  else if (k === 'p') setDepth('simple'); else if (k === 'd') setDepth('deep');
+  else if (k === 'a') { e.preventDefault(); if (!askSelection()) curSec === 's-trip' && traces[S.trace] ? askAbout(stopWhere(S.step)) : ASK.on ? openAsk() : toast('Select some text first, then press A.'); }
+  else if (num != null && curSec === 's-trip') answer(S.step, num);
+});
+
+// ---------- ask claude ----------
+// serve.py answers POST /__lens/ask with NDJSON events; without it (file://) every ask copies a question instead.
+const ASK = { on: false, models: ['haiku', 'sonnet'], model: store.get('model', 'haiku'), session: null, pending: null, busy: null, key: '' };
+{ // serve.py's link carries its key in the #fragment; keep it for this origin and tidy the address bar
+  const m = location.hash.match(/(?:^#|&)k=([\w-]+)/);
+  try { if (m) localStorage.setItem('lens:key', m[1]); ASK.key = localStorage.getItem('lens:key') || ''; } catch { ASK.key = m?.[1] || ''; }
+  if (m) history.replaceState(null, '', location.pathname + location.search);
+}
+const askBox = $('#ask'), askLog = $('#askLog'), askIn = $('#askIn'), askPop = $('#askPop');
+const modelName = m => m[0].toUpperCase() + m.slice(1);
+const inl = s => esc(s).split(/(`[^`]+`)/).map(p => /^`[^`]+`$/.test(p) ? `<code>${p.slice(1, -1)}</code>`
+  : p.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s.,;:!?)]|$)/g, '$1<i>$2</i>')).join('');
+const LI = /^\s*([-*]|\d+\.)\s+/;
+function md(t) {
+  // Small, escape-first markdown: fenced code, paragraphs, bullet and numbered lists, `code`, **bold**.
+  return String(t).split('```').map((b, i) => i % 2 ? `<pre><code>${esc(b.replace(/^[\w+-]*\n/, '').replace(/\n$/, ''))}</code></pre>`
+    : b.split(/\n{2,}/).filter(p => p.trim()).map(p => {
+      let out = '', run = [], kind = null;
+      const flush = () => { if (!run.length) return; const ol = /^\s*\d/.test(run[0]);
+        out += kind === 'p' ? `<p>${run.map(inl).join('<br>')}</p>` : `<${ol ? 'ol' : 'ul'}>${run.map(l => `<li>${inl(l.replace(LI, ''))}</li>`).join('')}</${ol ? 'ol' : 'ul'}>`; run = []; };
+      p.split('\n').forEach(l => { const k = LI.test(l) ? 'li' : 'p'; if (k !== kind) { flush(); kind = k; } run.push(k === 'p' ? l.replace(/^#+\s*/, '') : l); });
+      flush(); return out; }).join('')).join('');
+}
+function whereOf(el) {
+  const stop = el.closest('.stop');
+  if (stop && traces[S.trace]) return stopWhere(+stop.dataset.i, !!el.closest('figure.code'));
+  const n = el.closest('#nodeNote') && nodeById[S.node];
+  if (n) return `the ${n.label} component${n.files?.[0] ? ` (${n.files[0]})` : ''}`;
+  const sec = el.closest('section.sec'), name = SECS.find(s => s[0] === sec?.id)?.[1];
+  return name ? `the "${name}" section` : 'the lesson introduction';
+}
+function selInfo() {
+  const s = getSelection(); if (!s || s.isCollapsed || !s.rangeCount) return null;
+  const text = s.toString().trim(), r = s.getRangeAt(0), a = r.commonAncestorContainer, el = a.nodeType === 1 ? a : a.parentElement;
+  if (text.length < 2 || !el?.closest('main') || el.closest('[aria-hidden="true"]')) return null;
+  return { quote: text.slice(0, 1500), where: whereOf(el), rect: r.getBoundingClientRect() };
+}
+let selNow = null, selT;
+function placePop() {
+  selNow = selInfo(); askPop.classList.toggle('on', !!selNow); if (!selNow) return;
+  askPop.innerHTML = ASK.on ? `${ICON.chat} Ask Claude <kbd>A</kbd>` : `${ICON.copy} Copy question <kbd>A</kbd>`;
+  const r = selNow.rect, w = askPop.offsetWidth, h = askPop.offsetHeight;
+  let y = r.top - h - 12; if (y < 8) y = r.bottom + 12;
+  askPop.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+  askPop.style.top = Math.min(Math.max(8, y), innerHeight - h - 8) + 'px';
+}
+document.addEventListener('selectionchange', () => { clearTimeout(selT); selT = setTimeout(placePop, 160); });
+addEventListener('scroll', () => { if (selNow) placePop(); }, { passive: true });
+askPop.addEventListener('mousedown', e => e.preventDefault()); // keep the selection while clicking
+askPop.onclick = () => askSelection();
+function askSelection() { const s = selNow || selInfo(); if (!s) return false; askPop.classList.remove('on'); askAbout(s.where, s.quote); getSelection().removeAllRanges(); return true; }
+
+function askAbout(where, quote) {
+  if (!ASK.on) return copy(`About the "${L.title}" lesson, ${where}${quote ? `, this part:\n"${quote}"\n\n` : ': '}`);
+  ASK.pending = { where, quote }; $('.ask-pending', askLog)?.remove(); $('.ask-empty', askLog)?.remove();
+  const d = document.createElement('div'); d.className = 'ask-pending';
+  d.innerHTML = (quote ? `<div class="ask-quote"><span class="where">${esc(where)}</span>${esc(quote)}</div>` : `<div class="ask-about">About ${esc(where)}</div>`) +
+    `<div class="ask-chips" style="margin-top:12px">${[['Explain it simply', 'Explain this in plain words.'], ['Why this way?', 'Why is it done this way, and what would go wrong otherwise?'], ['Show me the code', 'Show me where this happens in the code.']]
+      .map(([l, q]) => `<button type="button" data-q="${esc(q)}">${l}</button>`).join('')}</div>`;
+  askLog.appendChild(d); $$('[data-q]', d).forEach(b => b.onclick = () => send(b.dataset.q));
+  openAsk(); d.scrollIntoView({ block: 'nearest' });
+}
+function openAsk() {
+  askBox.classList.add('on'); document.body.classList.add('asking'); askBox.removeAttribute('inert');
+  if (!askLog.children.length) askLog.innerHTML = `<div class="ask-empty">${mascot('think')}<span>Select any text in the lesson and press <b>Ask Claude</b> (or <kbd>A</kbd>), or just type a question. ${modelName(ASK.model)} answers from this repo's real code.</span></div>`;
+  askIn.focus({ preventScroll: true });
+}
+function closeAsk() { askBox.classList.remove('on'); document.body.classList.remove('asking'); askBox.setAttribute('inert', ''); } // an answer in progress keeps streaming
+function syncAsk() {
+  $$('#askModel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.model === ASK.model));
+  $('#askSend').textContent = ASK.busy ? 'Stop' : 'Send'; $('#askSend').classList.toggle('go', !ASK.busy);
+}
+const toolLabel = v => { const [tool, ...rest] = v.split(' '), arg = rest.join(' '), short = arg.split('/').slice(-2).join('/');
+  return tool === 'Read' ? `Reading ${short}…` : tool === 'Grep' ? `Searching the code for “${arg}”…` : tool === 'Glob' ? `Looking for files like ${arg}…` : `${tool}…`; };
+async function send(q) {
+  if (ASK.busy) return toast('Wait for this answer, or press Stop.');
+  q = q.trim() || (ASK.pending ? 'Explain this in plain words.' : ''); if (!q) return;
+  const ctx = ASK.pending || {}; ASK.pending = null; askIn.value = '';
+  const pend = $('.ask-pending', askLog); if (pend) { $('.ask-chips', pend)?.remove(); pend.className = 'ask-sent'; }
+  $('.ask-empty', askLog)?.remove();
+  askLog.insertAdjacentHTML('beforeend', `<div class="ask-me">${esc(q)}</div><div class="ask-ai"><div class="who">${modelName(ASK.model)}</div><div class="body"></div><div class="ask-status">${modelName(ASK.model)} is thinking…</div></div>`);
+  const ai = askLog.lastElementChild, body = $('.body', ai), status = $('.ask-status', ai);
+  const near = () => askLog.scrollHeight - askLog.scrollTop - askLog.clientHeight < 80, stick = () => { askLog.scrollTop = askLog.scrollHeight; };
+  stick();
+  const ctrl = new AbortController(); ASK.busy = ctrl; syncAsk();
+  let text = '', failed = false, finished = false;
+  const fail = m => { failed = true; status.textContent = ''; body.insertAdjacentHTML('beforeend', `<p class="ask-err">${esc(m)}</p>`); };
+  try {
+    const r = await fetch('/__lens/ask', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lens-Key': ASK.key }, signal: ctrl.signal,
+      body: JSON.stringify({ q, model: ASK.model, session: ASK.session, lesson: L.title, quote: ctx.quote, where: ctx.where }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `The helper answered ${r.status}.`);
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) {
+      const { value, done } = await rd.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (!line.trim()) continue;
+        const ev = JSON.parse(line), stuck = near();
+        if (ev.t === 'session') ASK.session = ev.v;
+        else if (ev.t === 'text') { text += ev.v; body.innerHTML = md(text); status.textContent = ''; }
+        else if (ev.t === 'tool') status.textContent = toolLabel(ev.v);
+        else if (ev.t === 'error') fail(ev.v);
+        else if (ev.t === 'done') finished = true;
+        if (stuck) stick();
+      }
+    }
+    if (!finished && !failed) fail('The answer was cut off. Ask again, or press New chat.');
+    else if (!text && !failed) fail('No answer came back. Try again, or switch model.');
+  } catch (e) {
+    if (e.name === 'AbortError') status.textContent = 'Stopped.';
+    else fail(/fetch/i.test(e.message) ? 'Lost the connection to serve.py. Is it still running?' : e.message);
+  } finally { ASK.busy = null; syncAsk(); }
+}
+$('#askForm').onsubmit = e => { e.preventDefault(); ASK.busy ? ASK.busy.abort() : send(askIn.value); };
+askIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); if (!ASK.busy) send(askIn.value); } });
+$('#askClose').innerHTML = ICON.x; $('#askClose').onclick = closeAsk;
+$('#askNew').onclick = () => { ASK.busy?.abort(); ASK.session = null; ASK.pending = null; askLog.innerHTML = ''; openAsk(); };
+$$('#askModel button').forEach(b => b.onclick = () => { ASK.model = b.dataset.model; store.set('model', ASK.model); syncAsk(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && askBox.classList.contains('on')) closeAsk(); });
+askBox.setAttribute('inert', ''); syncAsk();
+if (location.protocol.startsWith('http')) fetch('/__lens/health').then(r => r.ok ? r.json() : null).then(h => {
+  if (!h?.lens) return;
+  ASK.on = true; ASK.models = h.models; if (!h.models.includes(ASK.model)) ASK.model = h.model;
+  $$('#askModel button').forEach(b => { b.hidden = !h.models.includes(b.dataset.model); }); document.body.classList.add('can-ask'); syncAsk();
+}).catch(() => {});
+
+// ---------- boot ----------
+{ const i = L.title.indexOf(': '); $('#title').innerHTML = i > 0 ? `${rich(L.title.slice(0, i + 1))} <span class="swipe">${rich(L.title.slice(i + 2))}</span>` : rich(L.title); } $('#subtitle').innerHTML = rich(L.subtitle || '');
+$('#heroMascot').innerHTML = mascot('happy'); themeIcon();
+$$('#depth button').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === S.depth));
+$('#end').innerHTML = `${mascot('happy')}<span>That's the whole trip. Come back in a few days and take the quiz again before reading anything.</span>`;
+renderMapSection(); syncMode(); renderTrip(); renderExps(); renderDecs(); renderRisks(); renderQuiz(); renderTerms(); renderRail();
+drawMap(); renderNode();
+$$('section.sec').forEach(s => secIO.observe(s));
+if (S.last && traces[S.last.trace] && S.last.step > 0) {
+  const t = traces[S.last.trace], st = t.steps[S.last.step];
+  if (st) { $('#resume').innerHTML = `<div class="resume"><span>Welcome back. You stopped at <b>stop ${S.last.step + 1}${traces.length > 1 ? ' of ' + esc(t.title) : ''}: ${rich(st.title)}</b></span><button class="btn go" id="resumeBtn">Jump back in</button></div>`;
+    $('#resumeBtn').onclick = () => { $('#resume').innerHTML = ''; jumpTo(S.last.trace, S.last.step); }; }
+}
+document.fonts?.ready.then(() => drawMap());
+let rz; new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { drawMap(); markOverflow(); }, 120); }).observe($('#s-map'));
+})();
+</script>
+</body>
+</html>

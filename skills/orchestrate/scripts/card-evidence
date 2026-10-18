@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Judge a card by evidence, not by a worker's claim: commits on its branch, uncommitted files in
+# its worktree, and the card's own check command run inside that worktree. Read-only.
+#
+# Usage: card-evidence REPO BASE BRANCH WT [-- CHECK]
+#   CHECK is one string, run as `bash -c "$CHECK"` in WT under `timeout ${CARD_CHECK_TIMEOUT:-900}`.
+# Prints the last 15 lines of the check's combined output between "--- check tail ---" and "--- end ---",
+# then, as the last stdout line:  EVIDENCE commits=<n> dirty=<n> check=<exit code|skipped|none>
+#   commits  BASE..BRANCH commit count (0 when the branch does not exist)
+#   dirty    lines of `git status --porcelain` in WT (-1 when WT is missing)
+#   check    the check's exit code; skipped when commits=0 or WT is missing; none when no CHECK was given
+# Exit: 0 whenever EVIDENCE was printed (a failing check is data), 2 bad usage.
+set -euo pipefail
+
+usage() { echo "usage: card-evidence REPO BASE BRANCH WT [-- CHECK]" >&2; exit 2; }
+{ [ $# -eq 4 ] || { [ $# -eq 6 ] && [ "$5" = "--" ]; }; } || usage
+repo=$1 base=$2 branch=$3 wt=$4 check=${6:-}
+
+top=$(git -C "$repo" rev-parse --show-toplevel)
+commits=0
+if git -C "$top" show-ref --verify --quiet "refs/heads/$branch"; then
+  commits=$(git -C "$top" rev-list --count "$base..refs/heads/$branch")
+fi
+
+dirty=-1
+if [ -d "$wt" ] && porcelain=$(git --no-optional-locks -C "$wt" status --porcelain); then
+  dirty=$(printf '%s' "$porcelain" | grep -c '' || true)
+fi
+
+result=none
+if [ -n "$check" ]; then
+  result=skipped
+  if [ "$commits" -gt 0 ] && [ "$dirty" -ge 0 ]; then
+    log=$(mktemp)
+    trap 'rm -f "$log"' EXIT
+    result=0
+    (cd "$wt" && timeout "${CARD_CHECK_TIMEOUT:-900}" bash -c "$check") > "$log" 2>&1 || result=$?
+    echo "--- check tail ---"
+    tail -n 15 "$log"
+    echo "--- end ---"
+  fi
+fi
+echo "EVIDENCE commits=$commits dirty=$dirty check=$result"

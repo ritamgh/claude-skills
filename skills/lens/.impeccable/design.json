@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T00:00:00Z",
+  "title": "Design System: Lens (zine theme)",
+  "extensions": {
+    "colorMeta": {
+      "paper": {"role": "neutral", "displayName": "Zine Paper", "canonical": "#FBF6EA", "dark": "#1A1915"},
+      "paper-2": {"role": "neutral", "displayName": "Deep Paper", "canonical": "#F3EBD8", "dark": "#24221D"},
+      "card": {"role": "neutral", "displayName": "Card Cream", "canonical": "#FFFDF8", "dark": "#25231E"},
+      "ink": {"role": "neutral", "displayName": "Marker Ink", "canonical": "#1B1A17", "dark": "#F3EDE0"},
+      "ink-2": {"role": "neutral", "displayName": "Soft Ink", "canonical": "#46413A", "dark": "#D3CBBA"},
+      "ink-3": {"role": "neutral", "displayName": "Pencil Ink", "canonical": "#6B6458", "dark": "#A79F8F"},
+      "teal": {"role": "primary", "displayName": "Route Teal", "canonical": "#1FA898", "dark": "#34C7B5"},
+      "teal-ink": {"role": "primary", "displayName": "Deep Teal Ink", "canonical": "#0A6B60", "dark": "#6FDCCD"},
+      "teal-soft": {"role": "primary", "displayName": "Teal Wash", "canonical": "#D3F1EC", "dark": "#173F3A"},
+      "pink": {"role": "secondary", "displayName": "Marker Pink", "canonical": "#FF7EB6", "dark": "#FF86BC"},
+      "pink-ink": {"role": "secondary", "displayName": "Raspberry Ink", "canonical": "#B21F5C", "dark": "#FF9CC8"},
+      "pink-soft": {"role": "secondary", "displayName": "Pink Wash", "canonical": "#FFE0EE", "dark": "#46202F"},
+      "yellow": {"role": "secondary", "displayName": "Highlighter Yellow", "canonical": "#FFD84D", "dark": "#F2CB4E"},
+      "yellow-ink": {"role": "secondary", "displayName": "Mustard Ink", "canonical": "#7A5A00", "dark": "#F5D46B"},
+      "highlight-yellow": {"role": "secondary", "displayName": "Yellow Swipe", "canonical": "#FFE680", "dark": "rgba(255,216,77,.30)"},
+      "highlight-pink": {"role": "secondary", "displayName": "Pink Swipe", "canonical": "#FFC3DD", "dark": "rgba(255,126,182,.30)"},
+      "highlight-teal": {"role": "secondary", "displayName": "Teal Swipe", "canonical": "#BDEDE5", "dark": "rgba(52,199,181,.28)"},
+      "sticky": {"role": "neutral", "displayName": "Sticky Yellow", "canonical": "#FFF3B0", "dark": "#3B3520"},
+      "token-comment": {"role": "neutral", "displayName": "Syntax comment", "canonical": "#857D70", "dark": "#9C9483"},
+      "token-string": {"role": "neutral", "displayName": "Syntax string", "canonical": "#0A6B60", "dark": "#7FDCCB"},
+      "token-number": {"role": "neutral", "displayName": "Syntax number", "canonical": "#A3470F", "dark": "#F3A46F"},
+      "token-keyword": {"role": "neutral", "displayName": "Syntax keyword", "canonical": "#B21F5C", "dark": "#FF9CC8"}
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Display", "purpose": "Lesson title only (h1), Permanent Marker."},
+      "headline": {"displayName": "Headline", "purpose": "Section h2 with a teal squiggle underline; marker numerals share the face."},
+      "title": {"displayName": "Title", "purpose": "Stop, node, experiment, decision, risk and question titles in bold sans."},
+      "body": {"displayName": "Body", "purpose": "All reading text, 19px, 68ch measure."},
+      "annotation": {"displayName": "Annotation", "purpose": "Shantell Sans for rail, buttons, captions, stamps and margin notes."},
+      "code": {"displayName": "Code", "purpose": "JetBrains Mono for code rows, file names and memory values."}
+    },
+    "shadows": [
+      {"name": "paper-lift", "value": "2px 4px 14px rgba(60,48,20,.12)", "purpose": "Raised cards; dark theme uses 2px 6px 18px rgba(0,0,0,.45)."},
+      {"name": "sticky-lift", "value": "2px 6px 16px rgba(60,48,20,.18)", "purpose": "Memory note and glossary tooltip."},
+      {"name": "current-ring", "value": "0 0 0 4px var(--teal-soft)", "purpose": "Current stop dot; quiz pip uses var(--hl-y)."}
+    ],
+    "motion": [
+      {"name": "ease-out-expo-ish", "value": "cubic-bezier(.16,1,.3,1)", "purpose": "Route draw (.7s), highlighter swipe (.8s), rail fill (.5s), toast (.3s)."},
+      {"name": "hover", "value": ".15s", "purpose": "Buttons, choices, tooltip."},
+      {"name": "reduced-motion", "value": "animation:none; transition:none", "purpose": "Applied to everything under prefers-reduced-motion."}
+    ],
+    "breakpoints": [
+      {"name": "wide", "value": "1280px"},
+      {"name": "rail-collapse", "value": "1120px"},
+      {"name": "phone", "value": "760px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Action Button", "kind": "custom", "refersTo": "button-go",
+      "description": "Yellow primary action in the hand face; ghost variant is the card button.",
+      "html": "<button class=\"ds-btn go\">Run the experiment</button> <button class=\"ds-btn\">Copy question</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:8px;border:2px solid #1B1A17;border-radius:14px 18px 12px 20px / 18px 12px 20px 14px;background:#FFFDF8;padding:8px 18px;cursor:pointer;font:600 17px 'Shantell Sans',cursive;color:#1B1A17;transition:transform .15s,background .15s}.ds-btn:hover{transform:translateY(-1px) rotate(-.4deg);background:#F3EBD8}.ds-btn:focus-visible{outline:3px solid #1FA898;outline-offset:3px}.ds-btn.go{background:#FFD84D}.ds-btn.go:hover{background:#FFE47A}"
+    },
+    {
+      "name": "Depth Pill", "kind": "chip", "refersTo": "pill-selected",
+      "description": "Plain/Deep toggle; selected segment is solid ink.",
+      "html": "<div class=\"ds-pill\"><button aria-pressed=\"true\">Plain</button><button aria-pressed=\"false\">Deep</button></div>",
+      "css": ".ds-pill{display:inline-flex;border:2px solid #1B1A17;border-radius:999px;padding:3px;background:#FFFDF8}.ds-pill button{border:0;background:none;padding:5px 16px;border-radius:999px;cursor:pointer;font:600 16px 'Shantell Sans',cursive;color:#46413A}.ds-pill button[aria-pressed=true]{background:#1B1A17;color:#FBF6EA}.ds-pill button:not([aria-pressed=true]):hover{background:#F3EBD8}"
+    },
+    {
+      "name": "Guess Gate Choice", "kind": "custom", "refersTo": "gate-choice",
+      "description": "Predict-before-reveal option; hover yellow, right teal, wrong pink.",
+      "html": "<button class=\"ds-choice\"><span class=\"k\">A</span>It reads the cached file</button> <button class=\"ds-choice right\"><span class=\"k\">B</span>It calls the API</button>",
+      "css": ".ds-choice{display:flex;gap:14px;align-items:center;text-align:left;background:#FBF6EA;border:2px solid #1B1A17;border-radius:14px 18px 12px 20px / 18px 12px 20px 14px;padding:11px 16px;cursor:pointer;font:400 18px/1.4 'Atkinson Hyperlegible Next',system-ui,sans-serif;color:#1B1A17;transition:transform .15s,background .15s}.ds-choice:hover{background:#FFE680;transform:translateX(3px)}.ds-choice:focus-visible{outline:3px solid #1FA898;outline-offset:3px}.ds-choice .k{display:grid;place-items:center;width:30px;height:30px;border:2px solid #1B1A17;border-radius:50%;font:700 15px 'Shantell Sans',cursive}.ds-choice.right{background:#BDEDE5;border-color:#0A6B60}.ds-choice.right .k{background:#0A6B60;border-color:#0A6B60;color:#FBF6EA}"
+    },
+    {
+      "name": "Code Card", "kind": "card", "refersTo": "code-card",
+      "description": "Verbatim code with caption, yellow highlighter swipe and a pink handwritten margin note.",
+      "html": "<figure class=\"ds-code\"><figcaption><span class=\"file\">extract/router.py</span><span class=\"n\">lines 41-43</span></figcaption><div class=\"row hl\"><span class=\"no\">41</span><span class=\"t\">if tokens &lt;= 200_000:</span></div><div class=\"note\">Small papers skip retrieval.</div><div class=\"row\"><span class=\"no\">42</span><span class=\"t\">    return full_context(md)</span></div></figure>",
+      "css": ".ds-code{margin:0;background:#FFFDF8;border:2.5px solid #1B1A17;border-radius:16px 22px 14px 24px / 22px 14px 24px 16px;box-shadow:2px 4px 14px rgba(60,48,20,.12);overflow:hidden;font:400 15.5px/1.7 'JetBrains Mono',monospace;color:#1B1A17}.ds-code figcaption{display:flex;gap:12px;padding:9px 18px;border-bottom:2px solid #1B1A17;background:#F3EBD8;color:#6B6458;font-family:'Shantell Sans',cursive}.ds-code .file{font:600 16px 'JetBrains Mono',monospace;color:#1B1A17}.ds-code .n{margin-left:auto}.ds-code .row{display:grid;grid-template-columns:4.2em max-content}.ds-code .no{text-align:right;padding-right:16px;color:#6B6458}.ds-code .row.hl .t{background:linear-gradient(100deg,transparent 0,#FFE680 1%,#FFE680 98.5%,transparent 100%) no-repeat 0 55%/100% 86%}.ds-code .row.hl .no{color:#1B1A17;font-weight:600}.ds-code .note{margin:2px 0 8px 4.2em;font:600 16.5px/1.45 'Shantell Sans',cursive;color:#B21F5C}"
+    },
+    {
+      "name": "Memory Sticky Note", "kind": "custom", "refersTo": "memory-note",
+      "description": "Rotated sticky with tape; changed values get a pink swipe and a new tag.",
+      "html": "<div class=\"ds-memo\"><h4>In memory</h4><dl><div class=\"mv\"><dt>tokens</dt><dd>148_203</dd></div><div class=\"mv new\"><dt>route</dt><dd><span>full_context</span> <b>new</b></dd></div></dl></div>",
+      "css": ".ds-memo{position:relative;background:#FFF3B0;color:#1B1A17;padding:26px 20px 18px;border-radius:3px 3px 18px 3px;box-shadow:2px 6px 16px rgba(60,48,20,.18);transform:rotate(.8deg);max-width:300px}.ds-memo::before{content:'';position:absolute;top:-12px;left:50%;width:96px;height:26px;transform:translateX(-50%) rotate(-3deg);background:rgba(189,237,229,.85);border-radius:2px}.ds-memo h4{font:700 19px 'Shantell Sans',cursive;margin:0 0 10px}.ds-memo dl{margin:0}.ds-memo .mv{padding:7px 0;border-top:1.5px dashed rgba(27,26,23,.25)}.ds-memo dt{font:600 15px 'JetBrains Mono',monospace;opacity:.75}.ds-memo dd{margin:2px 0 0;font:400 15.5px/1.45 'JetBrains Mono',monospace}.ds-memo .new dd span{background:linear-gradient(100deg,transparent 0,#FFC3DD 2%,#FFC3DD 97%,transparent 100%);padding:0 2px}.ds-memo b{font:700 14px 'Shantell Sans',cursive;color:#B21F5C;margin-left:6px}"
+    },
+    {
+      "name": "Stamps and Severity", "kind": "chip", "refersTo": "stamp",
+      "description": "Tilted confidence stamps and filled severity badges.",
+      "html": "<span class=\"ds-stamp\">seen in code</span> <span class=\"ds-stamp inf\">likely</span> <span class=\"ds-stamp g\">a guess</span> <span class=\"ds-sev high\">high</span> <span class=\"ds-sev med\">medium</span>",
+      "css": ".ds-stamp{display:inline-block;font:700 15px 'Shantell Sans',cursive;padding:1px 10px;border:2px solid currentColor;border-radius:8px 12px 9px 13px;transform:rotate(-2deg);color:#0A6B60}.ds-stamp.inf{color:#7A5A00}.ds-stamp.g{color:#B21F5C}.ds-sev{display:inline-block;font:700 16px 'Shantell Sans',cursive;padding:4px 14px;border:2.5px solid #1B1A17;border-radius:12px 16px 10px 18px;transform:rotate(-3deg);color:#1B1A17}.ds-sev.high{background:#FF7EB6}.ds-sev.med{background:#FFD84D}"
+    },
+    {
+      "name": "Contents Rail", "kind": "nav", "refersTo": "pill-selected",
+      "description": "Sticky sketched contents: current section highlighter, stop dots on a dashed line.",
+      "html": "<ul class=\"ds-toc\"><li><a class=\"on\" href=\"#\">The map</a></li><li><a href=\"#\">The trip</a></li><li><a href=\"#\">Weak spots</a></li></ul>",
+      "css": ".ds-toc{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;width:200px}.ds-toc a{display:flex;padding:5px 10px;border-radius:10px;font:600 17px 'Shantell Sans',cursive;color:#46413A;text-decoration:none}.ds-toc a:hover{background:#F3EBD8;color:#1B1A17}.ds-toc a:focus-visible{outline:3px solid #1FA898;outline-offset:3px}.ds-toc a.on{color:#1B1A17;background:linear-gradient(100deg,transparent 2%,#FFE680 4%,#FFE680 94%,transparent 97%)}"
+    },
+    {
+      "name": "Section Heading", "kind": "custom", "refersTo": "headline",
+      "description": "Marker h2 with a hand-drawn teal squiggle underline; no eyebrow above it.",
+      "html": "<h2 class=\"ds-h2\">Weak spots</h2>",
+      "css": ".ds-h2{font:400 40px/1.1 'Permanent Marker','Comic Sans MS',cursive;margin:0;letter-spacing:.01em;color:#1B1A17}.ds-h2::after{content:'';display:block;height:10px;width:calc(100% + 16px);margin-top:4px;background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 10' preserveAspectRatio='none'%3E%3Cpath d='M2 6 C 40 2, 80 9, 120 5 S 180 3, 198 6' fill='none' stroke='%231FA898' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E\") no-repeat;background-size:100% 100%}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Friend's Zine",
+    "overview": "A lesson is a hand-made zine about one codebase: dot-grid paper, black marker ink, and three flat highlighters. One long scroll of sketched panels in which a real input travels through real code. One thing is in focus at a time; there are no side-by-side panels and no dashboard chrome. Marker lettering and a hand-written annotation voice carry personality, while the reading surface stays calm enough for an hour of study.",
+    "keyCharacteristics": [
+      "Dot-grid paper (22px grid, 1.2px dots) under every surface.",
+      "Marker face only for h1, h2 and big numerals; annotation hand face for labels and margin voice; sans for all reading text.",
+      "Uneven corner radii (--wob) on every drawn box; 2 to 2.5px ink borders; soft paper-colored shadows, never hard offsets.",
+      "Highlighter swipes are gradients with feathered ends, not flat rectangles.",
+      "The signature is the route drawing on and the contents rail ticking off stops."
+    ],
+    "rules": [
+      {"name": "The Three Highlighters Rule", "body": "Yellow means attention or change, pink means wrong or risk, teal means route or right. No color is used for decoration, and no fourth accent exists.", "section": "colors"},
+      {"name": "The Ink-Text Rule", "body": "Colored text uses the -ink variant of its highlighter (teal-ink, pink-ink, yellow-ink), never the fill color.", "section": "colors"},
+      {"name": "The Marker Is Rare Rule", "body": "Permanent Marker appears on h1, h2 and numerals only. Titles of cards, stops and questions are bold sans.", "section": "typography"},
+      {"name": "The No-Eyebrow Rule", "body": "Headings carry no kicker or small label above them. Hand-face labels appear inline beside or below content as annotations, never stacked above a heading as a category tag.", "section": "typography"},
+      {"name": "The Border First Rule", "body": "A raised thing has a 2 to 2.5px ink border and the soft lift; the shadow alone never defines an edge.", "section": "elevation"}
+    ],
+    "dos": [
+      "Do use yellow for attention or changes, pink for wrong or risk, teal for route or right, and the -ink variant for any colored text.",
+      "Do set h1, h2 and numerals in Permanent Marker and every other title in bold Atkinson Hyperlegible.",
+      "Do keep doodles (mascot, arrows, squiggles, stars) in headings, the map, margins and state moments (gate, score, empty states).",
+      "Do give every drawn box --wob or an asymmetric variant, a 2 to 2.5px ink border, and the soft Paper Lift shadow.",
+      "Do keep narrative lines at or under 68ch and body at 19px or larger (18px on phones).",
+      "Do respect prefers-reduced-motion and keep the light and dark palettes in step."
+    ],
+    "donts": [
+      "Don't put icons, doodles, or highlighter noise inside paragraphs; the only inline marks are code chips, glossary underlines and single swipes on short phrases.",
+      "Don't set body copy or cards' titles in the marker or hand faces.",
+      "Don't add eyebrows or kickers above headings.",
+      "Don't introduce hard offset shadows, a fourth accent color, or flat square corners on drawn boxes.",
+      "Don't return to side-by-side dashboard panels; the lesson is one scroll (the trace tabs only choose which trace to read).",
+      "Don't let the horizontal layout scroll the page at 390px; only the map and code rows scroll sideways."
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "id": "data-mini",
+  "title": "Data sections fixture",
+  "subtitle": "One of every data block, in a small code lesson",
+  "nodes": [
+    {"id": "a", "label": "Reader", "simple": "Reads the file."},
+    {"id": "b", "label": "Writer", "simple": "Writes the result."}
+  ],
+  "edges": [{"from": "a", "to": "b", "label": "feeds"}],
+  "traces": [{"title": "One run", "steps": [
+    {"node": "a", "title": "Read it", "simple": "Open the file."},
+    {"node": "b", "title": "Write it", "simple": "Save the output."}
+  ]}],
+  "glossary": [{"term": "mean@4", "def": "Average over four attempts."}],
+  "data": [
+    {"title": "Headline", "at": "start", "intro": "Numbers first.", "blocks": [
+      {"type": "stats", "items": [
+        {"value": 57.2, "unit": "%", "label": "benchmark errors", "note": "143 of 250"},
+        {"value": 38, "unit": "%", "label": "grader errors"},
+        {"value": "4.8%", "label": "model errors"}]},
+      {"type": "note", "title": "Read with care", "tone": "warn", "text": "Scores are `mean@4`.\n\nAudit covers missed questions only."}
+    ]},
+    {"title": "Scores", "intro": "Per benchmark.", "blocks": [
+      {"type": "text", "text": "First paragraph.\n\nSecond paragraph."},
+      {"type": "table", "caption": "Pre and corrected", "columns": ["Benchmark", {"label": "Pre", "align": "right"}, {"label": "Corrected", "align": "right", "unit": "%"}],
+       "rows": [["PHYBench", 26.5, 90.23], ["PRISM", 13, 94.59], ["UGPhysics", 83, 92.07]], "highlight": [1], "foot": "Table 1 of the paper."},
+      {"type": "bars", "caption": "Accuracy", "unit": "%", "max": 100, "rows": [
+        {"label": "Model A", "value": 54.8, "note": "calibration error 39"}, {"label": "Model B", "value": 46.5, "hi": true}, {"label": "Model C", "value": 2.7}]},
+      {"type": "dumbbell", "caption": "Before and after", "unit": "%", "max": 100, "step": 25, "from_label": "pre-audit", "to_label": "corrected", "rows": [
+        {"label": "PHYBench", "from": 26.5, "to": 90.2}, {"label": "UGPhysics", "from": 83, "to": 92.1, "note": "smallest gap"}]},
+      {"type": "stack", "caption": "Who was wrong", "unit": "%", "rows": [
+        {"label": "HLE-Physics", "parts": [{"name": "benchmark", "value": 87.76}, {"name": "grader", "value": 8.16}, {"name": "model", "value": 4.08}]},
+        {"label": "PHYBench", "parts": [{"name": "benchmark", "value": 23.21}, {"name": "grader", "value": 71.43}, {"name": "model", "value": 5.36}]}]}
+    ]},
+    {"title": "Sources", "blocks": [
+      {"type": "sources", "items": [
+        {"label": "Re-grading paper", "url": "https://arxiv.org/abs/2609.13009", "note": "audit labels"},
+        {"label": "A source with no link"}]}
+    ]}
+  ]
+}

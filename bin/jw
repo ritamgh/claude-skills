@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+# jw — run a jcode (OpenAI) worker for an orchestrated task.
+# Keeps the orchestrator's context small: full output goes to disk, only a
+# short summary (session id, worktree, status, EVIDENCE block) is printed.
+# Never pushes, never deletes worktrees or branches.
+set -euo pipefail
+
+ORCH_ROOT="${ORCH_ROOT:-$HOME/.claude/orchestration}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  jw init   SLUG ["goal text"]
+  jw run   --slug S --task T --repo DIR [--model gpt-6.1-sol] [--base REF] [--timeout 1800] [--no-worktree] BRIEF_FILE
+  jw resume --slug S --task T [--model M] [--timeout 1800] [--cwd DIR] SESSION_ID MESSAGE
+  jw post   SLUG WORKER TYPE "text"        TYPE: DECISION|QUESTION|ANSWER|BLOCKER|HANDOFF|INFO
+  jw board  SLUG [--since N] [--type QUESTION,BLOCKER]
+  jw review [--repo DIR] [--base HEAD] [--model gpt-6.1-sol] ["focus"]
+  jw ask    [--cwd DIR] [--model gpt-6.1-sol] [--write] "prompt"
+  jw usage
+
+post    Appends one line to $ORCH_ROOT/SLUG/board.md (the shared message board), flock-safe.
+board   Prints board lines after line N (numbered), optionally filtered by type.
+review  Read-only cross-family review of uncommitted changes vs BASE (incl. untracked files).
+ask     One-off question/task; read-only unless --write. Runs in --cwd (default: current dir).
+        review/ask need no init; they log under $ORCH_ROOT/adhoc and print the full reply.
+
+init   Creates $ORCH_ROOT/SLUG/{ledger.md,notes/,runs/,briefs/} and registers the ledger for this
+        Claude session (CLAUDE_CODE_SESSION_ID) so the compaction hook re-injects it.
+run     Creates (or reuses) worktree DIR/.claude/worktrees/jw-S-T on branch jw/S/T from REF
+        (default HEAD), runs jcode there with the brief, saves JSON to
+        $ORCH_ROOT/S/runs/T.json and appends a row to $ORCH_ROOT/S/ledger.md.
+        --no-worktree runs directly in DIR (read-only tasks such as reviews).
+resume  Sends a follow-up message to an existing jcode session.
+usage   One line per OpenAI account with 5-hour / 7-day usage.
+
+Exit codes: 0 ok, 2 bad args, 3 jcode failed / timed out, 4 empty output,
+            75 usage_limit_reached (quota exhausted; fall back to a Claude worker).
+EOF
+}
+
+die() { echo "jw: $*" >&2; exit 2; }
+
+validate_base() {
+  [[ $1 != -* ]] || die "invalid --base: $1 (must be a revision, not an option)"
+}
+
+validate_name() { # label value
+  [[ $2 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $2 != *..* ]] || die "invalid $1: $2 (use letters, digits, '.', '_' or '-', start with a letter or digit, and no '..')"
+}
+
+ledger_row() { # slug task model session status
+  local dir="$ORCH_ROOT/$1"
+  mkdir -p "$dir"
+  if [[ ! -f "$dir/ledger.md" ]]; then
+    printf '# Ledger: %s\n\n## jcode runs\n| time | task | model | session | status |\n|---|---|---|---|---|\n' "$1" > "$dir/ledger.md"
+  fi
+  printf '| %s | %s | %s | %s | %s |\n' "$(date '+%F %T')" "$2" "$3" "$4" "$5" >> "$dir/ledger.md"
+}
+
+# Run jcode, capture JSON, print summary. Args: slug task model timeout cwd out_json -- jcode args...
+invoke() {
+  local slug=$1 task=$2 model=$3 tmo=$4 cwd=$5 out=$6; shift 6
+  mkdir -p "$(dirname "$out")"
+  local rc=0
+  (cd "$cwd" && timeout "$tmo" jcode run -p openai -m "$model" -C "$cwd" --json "$@") >"$out" 2>"${out%.json}.err" || rc=$?
+
+  local sid text status
+  sid=$(jq -r '.session_id // empty' "$out" 2>/dev/null || true)
+  text=$(jq -r '.text // empty' "$out" 2>/dev/null || true)
+  if (( rc == 124 )); then status="timeout"
+  elif (( rc != 0 )) && grep -qs usage_limit_reached "${out%.json}.err"; then status="quota"  # stderr only: the reply may quote it
+  elif (( rc != 0 )); then status="error($rc)"
+  elif [[ -z "$text" ]] && grep -qs usage_limit_reached "${out%.json}.err"; then status="quota"
+  elif [[ -z "$text" ]]; then status="empty"
+  else status="ok"; fi
+
+  ledger_row "$slug" "$task" "$model" "${sid:-none}" "$status"
+
+  echo "task:     $task"
+  echo "model:    $model"
+  echo "session:  ${sid:-none}"
+  echo "cwd:      $cwd"
+  echo "status:   $status"
+  echo "output:   $out"
+  if [[ "$status" == quota ]]; then
+    echo "jw: usage_limit_reached on the active OpenAI account (jw cannot switch accounts); fall back to a Claude worker"
+    exit 75
+  fi
+  if [[ "$status" != ok && "$status" != empty ]]; then
+    echo "--- stderr (last 15 lines) ---"; tail -n 15 "${out%.json}.err" || true
+    exit 3
+  fi
+  [[ "$status" == empty ]] && exit 4
+
+  if [[ ${JW_PRINT:-evidence} == full ]]; then
+    echo "--- reply (first 100 lines) ---"; printf '%s\n' "$text" | head -n 100
+    return 0
+  fi
+  # Print the EVIDENCE block (from the last "EVIDENCE:" line on), else the head of the reply.
+  local ev
+  ev=$(printf '%s\n' "$text" | awk '/^[#*[:space:]]*EVIDENCE:?/{buf=""; f=1} f{buf=buf $0 "\n"} END{printf "%s", buf}')
+  if [[ -n "$ev" ]]; then
+    echo "--- evidence ---"; printf '%s\n' "$ev" | head -n 60
+  else
+    echo "--- reply (first 40 lines; no EVIDENCE block) ---"; printf '%s\n' "$text" | head -n 40
+  fi
+}
+
+cmd_run() {
+  local slug="" task="" repo="" model="gpt-6.1-sol" base="HEAD" tmo=1800 wt=1 brief=""
+  while (($#)); do
+    case $1 in
+      --slug) validate_name --slug "${2:-}"; slug=$2; shift 2;;
+      --task) validate_name --task "${2:-}"; task=$2; shift 2;; --repo) repo=$2; shift 2;;
+      --model) model=$2; shift 2;; --base) validate_base "${2:-}"; base=$2; shift 2;; --timeout) tmo=$2; shift 2;;
+      --no-worktree) wt=0; shift;; -h|--help) usage; exit 0;;
+      -*) die "unknown flag $1";; *) brief=$1; shift;;
+    esac
+  done
+  [[ -n $slug && -n $task && -n $repo && -n $brief ]] || { usage; exit 2; }
+  [[ -f $brief ]] || die "brief file not found: $brief"
+  repo=$(cd "$repo" && git rev-parse --show-toplevel) || die "not a git repo: $repo"
+
+  local cwd=$repo
+  if (( wt )); then
+    cwd="$repo/.claude/worktrees/jw-$slug-$task"
+    if [[ ! -d $cwd ]]; then
+      local branch="jw/$slug/$task"
+      if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch"; then
+        git -C "$repo" worktree add -q "$cwd" "$branch" >&2
+      else
+        git -C "$repo" worktree add -q -b "$branch" "$cwd" "$base" >&2
+      fi
+    fi
+  fi
+  invoke "$slug" "$task" "$model" "$tmo" "$cwd" "$ORCH_ROOT/$slug/runs/$task.json" "$(cat "$brief")"
+}
+
+cmd_resume() {
+  local slug="" task="" model="gpt-6.1-sol" tmo=1800 cwd="$PWD" pos=()
+  while (($#)); do
+    case $1 in
+      --slug) validate_name --slug "${2:-}"; slug=$2; shift 2;;
+      --task) validate_name --task "${2:-}"; task=$2; shift 2;; --model) model=$2; shift 2;;
+      --timeout) tmo=$2; shift 2;; --cwd) cwd=$2; shift 2;; -h|--help) usage; exit 0;;
+      -*) die "unknown flag $1";; *) pos+=("$1"); shift;;
+    esac
+  done
+  [[ -n $slug && -n $task && ${#pos[@]} -eq 2 ]] || { usage; exit 2; }
+  local n=1; while [[ -e "$ORCH_ROOT/$slug/runs/$task.resume$n.json" ]]; do n=$((n+1)); done
+  invoke "$slug" "$task" "$model" "$tmo" "$cwd" "$ORCH_ROOT/$slug/runs/$task.resume$n.json" \
+    --resume "${pos[0]}" "${pos[1]}"
+}
+
+cmd_init() {
+  local slug=${1:-} goal=${2:-}
+  (($#)) || { usage; exit 2; }
+  validate_name slug "$slug"
+  local dir="$ORCH_ROOT/$slug" ledger="$ORCH_ROOT/$slug/ledger.md"
+  mkdir -p "$dir/notes" "$dir/runs" "$dir/briefs" "$ORCH_ROOT/active"
+  if [[ ! -f $ledger ]]; then
+    cat > "$ledger" <<EOF
+# Ledger: $slug
+
+## Goal
+${goal:-<one paragraph: outcome + success criteria>}
+
+## Mode
+<A: Opus orchestrates | B: Sonnet orchestrates, Opus consulted>
+
+## Tasks
+| id | owner (worker+model) | files owned | acceptance check | eta | status | rework |
+|---|---|---|---|---|---|---|
+
+## Decisions
+
+## Next step
+
+## jcode runs (appended by jw; keep this section last)
+| time | task | model | session | status |
+|---|---|---|---|---|
+EOF
+  fi
+  if [[ -n ${CLAUDE_CODE_SESSION_ID:-} ]]; then
+    echo "$ledger" > "$ORCH_ROOT/active/$CLAUDE_CODE_SESSION_ID"
+    echo "registered for compaction hook: session $CLAUDE_CODE_SESSION_ID"
+  else
+    echo "warning: CLAUDE_CODE_SESSION_ID not set; ledger not registered for compaction hook" >&2
+  fi
+  echo "ledger: $ledger"
+}
+
+cmd_post() { # SLUG WORKER TYPE TEXT...
+  (($# >= 4)) || { usage; exit 2; }
+  local slug=$1 worker=$2 type=${3^^}; shift 3
+  validate_name slug "$slug"
+  [[ $type =~ ^(DECISION|QUESTION|ANSWER|BLOCKER|HANDOFF|INFO)$ ]] || die "bad type $type"
+  local board="$ORCH_ROOT/$slug/board.md"
+  mkdir -p "$(dirname "$board")"
+  local line; line="[$(date '+%F %T')] [$worker] $type: ${*//$'\n'/ }"
+  ( flock 9; printf '%s\n' "$line" >> "$board"; echo "posted to $board (line $(wc -l < "$board"))" ) 9>>"$board.lock"
+}
+
+cmd_board() { # SLUG [--since N] [--type A,B]
+  local slug=${1:-}; (($#)) || { usage; exit 2; }; shift
+  validate_name slug "$slug"
+  local since=0 types=""
+  while (($#)); do
+    case $1 in --since) since=$2; shift 2;; --type) types=${2^^}; shift 2;; *) die "unknown arg $1";; esac
+  done
+  local board="$ORCH_ROOT/$slug/board.md"
+  [[ -f $board ]] || { echo "(board empty)"; return 0; }
+  awk -v s="$since" -v t="${types//,/|}" \
+    'NR > s && (t == "" || $0 ~ ("\\] (" t "):")) { printf "%d: %s\n", NR, $0 }' "$board"
+  echo "(board has $(wc -l < "$board") lines)"
+}
+
+cmd_review() { # [--repo DIR] [--base REF] [--model M] [--timeout S] ["focus"]
+  local repo="$PWD" base="HEAD" model="gpt-6.1-sol" tmo=900 focus=""
+  while (($#)); do
+    case $1 in
+      --repo) repo=$2; shift 2;; --base) validate_base "${2:-}"; base=$2; shift 2;; --model) model=$2; shift 2;;
+      --timeout) tmo=$2; shift 2;; -*) die "unknown flag $1";; *) focus=$1; shift;;
+    esac
+  done
+  repo=$(cd "$repo" && git rev-parse --show-toplevel) || die "not a git repo: $repo"
+  git -C "$repo" rev-parse --verify --quiet --end-of-options "$base^{commit}" >/dev/null || die "unknown --base revision: $base"
+  if git -C "$repo" diff --quiet --end-of-options "$base" -- && [[ -z $(git -C "$repo" ls-files --others --exclude-standard) ]]; then
+    die "nothing to review: no changes vs $base and no untracked files"
+  fi
+  local msg="You are an independent code reviewer. Do NOT modify any files, do not commit, do not push.
+Review the changes in this repository: run \`git diff $base\` and \`git status --short\` (read untracked files too).
+${focus:+Focus: $focus
+}Find real defects: correctness bugs, edge cases, broken error handling, security issues, and tests that don't test what they claim (assertions on mocks, expected values computed by the code under test, tests that would pass without the change). Read surrounding code as needed. Run the existing tests if that's cheap.
+The change's intent is not a full spec: where it is silent, judge by what a reasonable user of this software would expect, and grade severity by the effect on that user. Treat commit messages and code comments that justify a choice as claims to check, not as reasons to lower severity.
+Skip style nits.
+Output: a numbered list of findings, most severe first. Each finding: file:line, severity (high/medium/low), one-sentence defect, concrete failure scenario. If you find nothing real, say \"No findings\".
+Then a \"DECLINED TO JUDGE:\" list: behaviors you considered and set aside as out of scope, one line each with the reason (\"none\" if empty).
+End with a block starting with \"EVIDENCE:\" listing the commands you ran and key results. Give a single final answer; do not repeat or redraft it."
+  local ts; ts=$(date +%Y%m%d-%H%M%S)
+  JW_PRINT=full invoke adhoc "review-$ts" "$model" "$tmo" "$repo" "$ORCH_ROOT/adhoc/runs/review-$ts.json" "$msg"
+}
+
+cmd_ask() { # [--cwd DIR] [--model M] [--timeout S] [--write] "prompt"
+  local cwd="$PWD" model="gpt-6.1-sol" tmo=900 write=0 prompt=""
+  while (($#)); do
+    case $1 in
+      --cwd) cwd=$2; shift 2;; --model) model=$2; shift 2;; --timeout) tmo=$2; shift 2;;
+      --write) write=1; shift;; -*) die "unknown flag $1";; *) prompt=$1; shift;;
+    esac
+  done
+  [[ -n $prompt ]] || { usage; exit 2; }
+  (( write )) || prompt="$prompt
+
+Constraints: read-only. Do NOT modify, create, or delete files; do not commit or push."
+  prompt="$prompt
+
+Give a single final answer; do not repeat or redraft it."
+  local ts; ts=$(date +%Y%m%d-%H%M%S)
+  JW_PRINT=full invoke adhoc "ask-$ts" "$model" "$tmo" "$cwd" "$ORCH_ROOT/adhoc/runs/ask-$ts.json" "$prompt"
+}
+
+cmd_usage() {
+  timeout 60 jcode usage --json | jq -r '
+    .providers[] | select(.provider_name | startswith("OpenAI")) |
+    "\(.provider_name | sub(" \\(.*"; "")): " +
+    ([.limits[] | "\(.name) \(.usage_percent)%"] | join(", "))'
+}
+
+case "${1:-}" in
+  init) shift; cmd_init "$@";;
+  run) shift; cmd_run "$@";;
+  resume) shift; cmd_resume "$@";;
+  post) shift; cmd_post "$@";;
+  board) shift; cmd_board "$@";;
+  review) shift; cmd_review "$@";;
+  ask) shift; cmd_ask "$@";;
+  usage) cmd_usage;;
+  -h|--help|"") usage;;
+  *) die "unknown command $1";;
+esac
