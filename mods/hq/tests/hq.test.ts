@@ -524,7 +524,7 @@ test('the HQ role tells HQ to relay a lead\'s reply in three short lines with th
   expect(role).toContain('at most 3 short lines')
   expect(role).toContain('**Needs you:**')
   expect(role).toContain('Open: <link>')
-  expect(role).toContain('tmux: claude:<window>')
+  expect(role).toContain('`tmux://<tmux target>` (its `tmux` target as a link')
   expect(role).toContain('Point to the full report path')
   expect(role).toContain('"→ sent to <session>: <gist>" with the same `Open: <link>`')
 })

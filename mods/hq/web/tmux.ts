@@ -67,7 +67,9 @@ export async function capture(deps: TmuxDeps, target: string, scrollback?: numbe
   return ran.code === 0 ? cleanPane(ran.stdout) : null
 }
 
-export type SendResult = { ok: true } | { ok: false; status: number; error: string; reason?: string }
+// `typed`: the text was already sent to the pane when this failed, so a retry would type it a second time.
+// `enterPending`: it may well be in the composer unsubmitted; `submitTyped` can press the Enter later.
+export type SendResult = { ok: true } | { ok: false; status: number; error: string; reason?: string; typed?: boolean; enterPending?: boolean }
 
 const NOT_FOREGROUND = 'Claude is not in the foreground of the pane'
 const CLAUDE_COMM = /^(?:claude|\d+\.\d+\.\d+)$/
@@ -113,15 +115,32 @@ export async function claudeInForeground(deps: TmuxDeps, target: string): Promis
   return false
 }
 
-// The composer is the last line that starts with the prompt mark; `-J` has joined it if it wrapped.
-function composerEndsWith(screen: string, text: string): boolean {
+// What the composer shows, as text without whitespace: the `❯` row and the rows under it down to the rule or a blank row.
+// With `whole`, a blank row is part of the composer (the user pressed Shift+Enter twice) and only a rule ends it; a screen
+// that ends first gives no entries, since rows may be missing.
+// Claude Code wraps a long composer onto indented rows that `-J` does not join, and the break eats the space, so
+// whitespace is dropped on both sides of a comparison. One entry per row count, since a footer may follow with no rule.
+function composerTexts(screen: string, whole = false): string[] {
   const lines = screen.split('\n')
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (/^\s*❯/.test(lines[i]!)) return lines[i]!.replace(/ /g, ' ').trimEnd().endsWith(text)
+    if (!/^\s*❯/.test(lines[i]!)) continue
+    const seen: string[] = []
+    let row = lines[i]!.replace(/^\s*❯/, '')
+    for (let j = i + 1; ; j++) {
+      seen.push(`${seen.at(-1) ?? ''}${row.replace(/\s/g, '')}`)
+      if (j >= lines.length) return whole ? [] : seen
+      if (/^\s*[─━]{8,}\s*$/.test(lines[j]!) || (!whole && lines[j]!.trim() === '')) return seen // a rule is a row of dashes: a user row that merely starts with one is text
+      row = lines[j]!
+    }
   }
 
-  return false
+  return []
 }
+
+const squeeze = (text: string) => text.replace(/\s/g, '')
+const composerEndsWith = (screen: string, text: string): boolean => composerTexts(screen).some(t => t.endsWith(squeeze(text)))
+// The whole composer, down to its rule: rows the user typed under the text count against it.
+const composerIs = (screen: string, text: string): boolean => composerTexts(screen, true).at(-1) === squeeze(text)
 
 // One send at a time per pane: two messages never interleave their keys.
 const locks = new Map<string, Promise<unknown>>()
@@ -161,25 +180,49 @@ export function sendText(deps: TmuxDeps, target: string, rawText: string): Promi
     if (open) return { ok: false, status: 409, error: 'a prompt is open in the pane: answer it in tmux', reason: open }
 
     const typed = await run([deps.tmuxBin, 'send-keys', '-t', target, '-l', '--', text], deps.env, 10_000)
-    if (typed.code !== 0) return { ok: false, status: 502, error: `tmux send-keys failed: ${typed.stderr.trim()}` }
+    // tmux may have taken some of the keys before failing (or timing out): not safe to type again.
+    if (typed.code !== 0) return { ok: false, status: 502, error: `tmux send-keys failed: ${typed.stderr.trim()}`, typed: true }
 
     const deadline = Date.now() + (deps.settleMs ?? 1000)
     for (;;) {
       const now = await capture(deps, target)
-      if (now === null) return { ok: false, status: 502, error: 'could not read the pane; Enter was not pressed' }
+      if (now === null) return { ok: false, status: 502, error: 'could not read the pane; Enter was not pressed', typed: true }
       const appeared = promptOpen(now)
       if (appeared) {
-        return { ok: false, status: 409, error: 'a prompt opened while typing: nothing more was sent, and the text is still in the composer', reason: appeared }
+        return { ok: false, status: 409, error: 'a prompt opened while typing: nothing more was sent, and the text is still in the composer', reason: appeared, typed: true }
       }
       if (composerEndsWith(now, text)) break
-      if (Date.now() >= deadline) return { ok: false, status: 409, error: 'the text did not show up in the composer: Enter was not pressed, and the text may still be there' }
+      if (Date.now() >= deadline) return { ok: false, status: 409, error: 'the text did not show up in the composer: Enter was not pressed, and the text may still be there', typed: true, enterPending: true }
       await sleep(25)
     }
-    if (!(await claudeInForeground(deps, target))) return { ok: false, status: 409, error: `${NOT_FOREGROUND}: Enter was not pressed, and the text may still be in the pane` }
+    if (!(await claudeInForeground(deps, target))) return { ok: false, status: 409, error: `${NOT_FOREGROUND}: Enter was not pressed, and the text may still be in the pane`, typed: true }
 
     const entered = await run([deps.tmuxBin, 'send-keys', '-t', target, 'Enter'], deps.env, 10_000)
-    if (entered.code !== 0) return { ok: false, status: 502, error: `tmux send-keys failed: ${entered.stderr.trim()}` }
+    if (entered.code !== 0) return { ok: false, status: 502, error: `tmux send-keys failed: ${entered.stderr.trim()}`, typed: true }
 
     return { ok: true }
+  })
+}
+
+// The late Enter for a `sendText` that failed with `enterPending`. It never types: it presses Enter only when the
+// composer holds exactly `rawText` (text of the user's own, or anything around it, is left alone) and no prompt is open.
+// A refusal without `typed` may be retried; with `typed`, the text is no longer there as sent.
+export function submitTyped(deps: TmuxDeps, target: string, rawText: string): Promise<SendResult> {
+  if (!isTarget(target)) return Promise.resolve({ ok: false, status: 400, error: 'bad target', typed: true })
+  const text = sanitizeText(rawText)
+
+  return exclusive(target, async (): Promise<SendResult> => {
+    if (!inTmux(await liveSessions(deps)).some(s => s.target === target)) return { ok: false, status: 403, error: 'not a live claude session in tmux' }
+    if (!(await claudeInForeground(deps, target))) return { ok: false, status: 409, error: NOT_FOREGROUND }
+
+    const screen = await capture(deps, target)
+    if (screen === null) return { ok: false, status: 502, error: 'could not read the pane' }
+    const open = promptOpen(screen)
+    if (open) return { ok: false, status: 409, error: 'a prompt is open in the pane: answer it in tmux', reason: open }
+    if (!composerIs(screen, text)) return { ok: false, status: 409, error: 'the composer no longer holds the text alone: Enter was not pressed', typed: true }
+
+    const entered = await run([deps.tmuxBin, 'send-keys', '-t', target, 'Enter'], deps.env, 10_000)
+
+    return entered.code === 0 ? { ok: true } : { ok: false, status: 502, error: `tmux send-keys failed: ${entered.stderr.trim()}`, typed: true }
   })
 }

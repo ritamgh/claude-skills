@@ -660,6 +660,132 @@ class CoreTests(unittest.TestCase):
         self.assertNotIn(b"ROLLEDBACK", b"".join(before))
         self.assertEqual(self.plan()["rev"], 96)
 
+    def ask(self, text, node="Q7"):
+        event = {"type": "ask", "text": text}
+        if node:
+            event["node"] = node
+        return self.event(event, by="user", source="page")["event"]["id"]
+
+    def test_ask_on_a_node_appends_a_user_thread_entry_and_still_adds_the_request(self):
+        """An ask that adds only the request (no thread entry), or a nodeless ask that grows a thread, must fail."""
+        ref = self.ask(" Why last-write-wins? ")
+        entry = self.node("Q7")["thread"][0]
+        self.assertEqual((entry["role"], entry["text"], entry["ref"]), ("user", "Why last-write-wins?", ref))
+        self.assertRegex(entry["at"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertIn((ref, "ask", "Q7"), [(r["ref"], r["type"], r["node"]) for r in self.plan()["requests"]])
+        self.ask("General question", node=None)
+        self.event({"type": "note", "text": "a note", "node": "Q8"}, by="user", source="page")
+        self.assertTrue(all("thread" not in n for n in self.plan()["nodes"] if n["id"] != "Q7"))
+        self.assertEqual(self.node("Q7")["rev"], 95)  # chatter is not a spec change
+
+    def test_reply_appends_a_session_entry_and_removes_the_request(self):
+        """A reply that leaves the request open, drops the user's question, or mis-attributes the entry must fail."""
+        ref = self.ask("Why last-write-wins?")
+        response = self.event({"type": "reply", "ref": ref, "text": " Because merges need CRDTs. "})
+        self.assertEqual(response["summary"], "replied on Q7")
+        thread = self.node("Q7")["thread"]
+        self.assertEqual([(e["role"], e["text"], e["ref"]) for e in thread],
+                         [("user", "Why last-write-wins?", ref), ("session", "Because merges need CRDTs.", ref)])
+        self.assertNotIn(ref, [r["ref"] for r in self.plan()["requests"]])
+        self.assertEqual(self.plan()["recent"][0]["summary"], "replied on Q7")
+
+    def test_reply_refuses_bad_refs_non_asks_nodeless_asks_and_user_senders(self):
+        """A reply that accepts an unknown/resolved/non-ask request or a page sender must fail."""
+        ref = self.ask("Why?")
+        note = self.event({"type": "note", "text": "a note", "node": "Q7"}, by="user", source="page")["event"]["id"]
+        for event, by in (({"type": "reply", "ref": "e-000000000000", "text": "x"}, "session"),
+                          ({"type": "reply", "ref": note, "text": "x"}, "session"),
+                          ({"type": "reply", "ref": ref, "text": "   "}, "session"),
+                          ({"type": "reply", "ref": ref, "text": "x" * 2001}, "session"),
+                          ({"type": "reply", "ref": ref, "text": "x"}, "user")):
+            before = self.snapshot()
+            self.event(event, code=2, by=by)
+            self.assertEqual(self.snapshot(), before)
+        self.event({"type": "reply", "ref": ref, "text": "Because."})
+        self.event({"type": "reply", "ref": ref, "text": "Again"}, code=2)
+        self.assertEqual(len(self.node("Q7")["thread"]), 2)
+
+    def test_reply_without_text_is_refused_not_a_traceback(self):
+        """A reply that reads event["text"] before checking it (KeyError, exit 1) or accepts blank/non-text must fail."""
+        ref = self.ask("Why?")
+        for event in ({"type": "reply", "ref": ref}, {"type": "reply", "ref": ref, "text": ""},
+                      {"type": "reply", "ref": ref, "text": " \n "}, {"type": "reply", "ref": ref, "text": 7}):
+            before = self.snapshot()
+            self.event(event, code=2)
+            self.assertEqual(self.snapshot(), before)
+
+    def test_reply_to_an_ask_whose_node_was_removed_lands_in_the_plan_thread(self):
+        """QA1-F1: a reply refused (or crashing) after remove leaves the user's question unanswerable forever."""
+        ref = self.ask("Why?")
+        self.event({"type": "remove", "node": "Q7"})
+        self.event({"type": "reply", "ref": ref, "text": "Too late"})
+        self.assertEqual([(e["role"], e["text"]) for e in self.plan()["thread"][-2:]], [("user", "Why?"), ("session", "Too late")])
+        self.assertNotIn(ref, [r["ref"] for r in self.plan()["requests"]])
+
+    def test_thread_keeps_the_last_forty_entries(self):
+        """A thread that grows past 40 entries, or drops the newest instead of the oldest, must fail."""
+        for i in range(21):
+            self.event({"type": "reply", "ref": self.ask(f"q{i}"), "text": f"a{i}"})
+        thread = self.node("Q7")["thread"]
+        self.assertEqual(len(thread), 40)
+        self.assertEqual((thread[0]["text"], thread[-1]["text"]), ("q1", "a20"))
+        self.assertEqual([e["text"] for e in thread[:3]], ["q1", "a1", "q2"])
+
+    def test_upsert_cannot_write_or_clear_a_thread_and_remove_drops_it(self):
+        """A session upsert that overwrites or clears thread, or a removed node that keeps its thread, must fail."""
+        self.ask("Why?")
+        before = self.node("Q7")["thread"]
+        for value in ([], None, [{"role": "session", "text": "forged", "at": "2026-10-17T00:00:00Z", "ref": "e-x"}]):
+            self.event({"type": "upsert", "node": {"id": "Q7", "thread": value}}, code=2)
+        self.event({"type": "upsert", "node": {"kind": "story", "label": "New", "thread": []}}, code=2)
+        self.event({"type": "upsert", "node": {"id": "Q7", "label": "Renamed"}})
+        self.assertEqual(self.node("Q7")["thread"], before)
+        for kind_event in ({"type": "park", "node": "Q7"}, {"type": "reopen", "node": "Q7"},
+                           {"type": "answer", "node": "Q7", "choice": "a"}, {"type": "reopen", "node": "Q7"}):
+            self.event(kind_event, by="user", source="page")
+        self.assertEqual(self.node("Q7")["thread"], before)
+        self.event({"type": "remove", "node": "Q7"})
+        self.assertFalse(any(n["id"] == "Q7" for n in self.plan()["nodes"]))
+        self.assertTrue(all("thread" not in n for n in self.plan()["nodes"]))
+        self.assertEqual(self.plan()["thread"][-1]["text"], "Why?")  # the open ask's question moves to the plan thread
+
+    def test_hand_edited_malformed_thread_is_rejected_on_load(self):
+        """A loader that accepts a thread entry with a bad role, extra key or over-cap length must fail."""
+        plan = self.plan()
+        node = next(n for n in plan["nodes"] if n["id"] == "Q7")
+        good = {"role": "user", "text": "hi", "at": "2026-10-17T00:00:00Z", "ref": "e-1"}
+        for bad in ([dict(good, role="bot")], [dict(good, extra=1)], [dict(good, text="")], [dict(good, at="yesterday")],
+                    [good] * 41, "text"):
+            node["thread"] = bad
+            (self.directory / "plan.json").write_text(json.dumps(plan), encoding="utf-8")
+            self.cli("show", self.task, code=2)
+        node["thread"] = [good]
+        (self.directory / "plan.json").write_text(json.dumps(plan), encoding="utf-8")
+        self.cli("show", self.task)
+
+    def test_news_carries_the_ask_text_and_node(self):
+        """A news line for an ask that lacks its text or node forces the session to open plan.json."""
+        ref = self.ask("Why last-write-wins?")
+        news = json.loads(self.cli("news", self.task, "--json"))
+        self.assertEqual([(e["id"], e["type"], e["node"], e["text"]) for e in news],
+                         [(ref, "ask", "Q7", "Why last-write-wins?")])
+
+    def test_threads_never_reach_the_prd(self):
+        """Rendering a thread into PRD.md, or letting chatter stamp 'changed since approval', must fail."""
+        self.ready()
+        self.event({"type": "approve_prd"}, by="user", source="page")
+        prd_path = self.directory / "PRD.md"
+        ref = self.ask("Secret chatter about FR-001?", node="FR-001")
+        self.event({"type": "reply", "ref": ref, "text": "Private answer"})
+        self.assertTrue(self.node("FR-001")["thread"])
+        self.assertNotIn("Private answer", prd_path.read_text())
+        self.assertNotIn("changed since", prd_path.read_text())
+        plan = self.plan()
+        for node in plan["nodes"]:
+            node.pop("thread", None)
+        import prd
+        self.assertEqual(prd_path.read_text(), prd.render(plan))
+
 
 if __name__ == "__main__":
     unittest.main()

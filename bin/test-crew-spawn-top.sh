@@ -102,6 +102,8 @@ claude
 fix-bug
 --model
 sonnet
+--effort
+high
 Fix the login bug.
 
 You are a top-level lead (crew); run \`crew whoami\` first." "$(last_tmux)"
@@ -111,7 +113,7 @@ check "meta: no lead until the session starts" test -z "$(grep '^lead' "$CREW_RO
 check "no link was made" test -z "$(ls -A "$CREW_ROOT/.links" 2>/dev/null)"
 eq "the brief is the first message" "Fix the login bug." "$(cat "$CREW_ROOT/$id/brief.md")"
 eq "the reservation says top and has no parent" $'parent_name=\nparent_sid=\nchild_name=fix-bug\nwindow_id=@1\npane_pid='"$$"$'\ntop=1' "$(grep -v '^token=' "$CREW_ROOT/.pending/$id")"
-eq "state is running" "running	top-level lead launched in claude:fix-bug" "$(tail -n 1 "$CREW_ROOT/$id/status" | cut -f2-3)"
+eq "state is running" "running	top-level lead launched in claude:fix-bug (model sonnet, effort high)" "$(tail -n 1 "$CREW_ROOT/$id/status" | cut -f2-3)"
 
 # --- the new session's first crew call makes it the lead of its own task ---
 live_sub fix-bug SID-FB
@@ -168,6 +170,10 @@ eq "the message reaches claude as one argument, verbatim" "cwd=$T/repo
 task=$D-quoted
 -n
 quoted
+--model
+sonnet
+--effort
+high
 $msg
 
 You are a top-level lead (crew); run \`crew whoami\` first.
@@ -178,7 +184,7 @@ plain spawn --top dashed --repo "$T/repo" -- "- a list item first" >/dev/null
 eq "a first message starting with a dash follows --" "--
 - a list item first
 
-You are a top-level lead (crew); run \`crew whoami\` first." "$(last_tmux | sed -n '/^claude$/,$p' | sed 1,3d)"
+You are a top-level lead (crew); run \`crew whoami\` first." "$(last_tmux | sed -n '/^claude$/,$p' | sed 1,7d)"
 
 # --- the cap: 5 live top-level leads, the 6th is refused ---
 rm -rf "$CREW_ROOT" "$CREW_SESSIONS"/*; mkdir -p "$CREW_SESSIONS"; reset_fake
@@ -214,9 +220,25 @@ eq "--resume used the stored model, repo and no lead prefix" "-n
 heavy
 --model
 haiku
+--effort
+high
 heavy job
 
 You are a top-level lead (crew); run \`crew whoami\` first." "$(last_tmux | sed -n '/^claude$/,$p' | sed 1d)"
+
+# --- model and effort: the same sonnet/high default, the same overrides ---
+reset_fake
+plain spawn --top eff-default --repo "$T/repo" "m" >/dev/null
+eq "--top without flags starts on sonnet at effort high" "-n
+eff-default
+--model
+sonnet
+--effort
+high" "$(last_tmux | sed -n '/^claude$/,$p' | sed -n '2,7p')"
+check "meta records the default model and effort" grep -qx 'spawn_effort=high' "$CREW_ROOT/$D-eff-default/meta"
+plain spawn --top eff-opus --repo "$T/repo" --model opus --effort xhigh "m" >/dev/null
+eq "--top --model opus --effort xhigh passes both" "--model opus --effort xhigh" "$(last_tmux | sed -n '/^claude$/,$p' | sed -n '4,7p' | paste -sd' ')"
+eq "--top with a bad effort is refused" "crew: bad --effort 'huge' (low, medium, high, xhigh or max)" "$(plain spawn --top eff-bad --repo "$T/repo" --effort huge "m")"
 
 # --- existing sub-lead spawn is unchanged: no top flag, a lead prefix ---
 reset_fake

@@ -36,7 +36,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans);o
 button{font:inherit;color:inherit;cursor:pointer}
 a{color:var(--focus)}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.app{max-width:1360px;margin:0 auto;padding:0 20px 24px}
+.app{padding:0 24px 24px}
 body.busy .btn,body.busy .opt,body.busy .b-btn{pointer-events:none;opacity:.6}
 
 /* notice */
@@ -89,6 +89,7 @@ body.busy .btn,body.busy .opt,body.busy .b-btn{pointer-events:none;opacity:.6}
 
 /* NOW card */
 #now{padding:14px 14px 12px}
+#now .here{margin:10px 0 0;padding:8px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:13px}
 #now h2{margin:6px 0 2px;font:600 17px/1.25 var(--serif);overflow-wrap:anywhere}
 .qid{font:600 12px var(--mono);color:var(--focus)}
 .why{margin:4px 0 10px;font-size:13px;color:var(--muted)}
@@ -108,6 +109,7 @@ body.busy .btn,body.busy .opt,body.busy .b-btn{pointer-events:none;opacity:.6}
 .btn:hover{border-color:var(--muted)}
 .btn.primary{background:var(--focus);border-color:var(--focus);color:#fff}
 @media (prefers-color-scheme:dark){.btn.primary{color:#0b1a1d}}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.primary.big{flex:1 1 100%;order:-1}
 .field{display:block;width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--surface);color:var(--ink)}
@@ -124,7 +126,8 @@ textarea.field{min-height:66px;resize:vertical}
 .req-i{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:5px 0;border-bottom:1px dotted var(--line)}
 .req-i:last-child{border-bottom:0}
 .req-i .ty{font:600 11px var(--mono);color:var(--warn)}
-.req-i .tx{flex:1 1 160px;min-width:0;overflow-wrap:anywhere}
+.req-i .tx{flex:1 1 160px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-more{padding:5px 0;color:var(--muted);font-size:12px}
 .req-i .at{font:11.5px var(--mono);color:var(--muted)}
 .linkbtn{background:none;border:0;padding:0;color:var(--focus);font:600 12px var(--mono);cursor:pointer}
 .done-card{padding:6px 0;color:var(--muted)}
@@ -137,7 +140,8 @@ textarea.field{min-height:66px;resize:vertical}
 .panel.on{display:block}
 
 /* lanes */
-.lanes{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.lanes{display:grid;grid-template-columns:repeat(7,minmax(112px,1fr));gap:10px}
+.lanes-wrap{overflow-x:auto;margin:0 -4px;padding:0 4px}
 .lane-h{display:flex;align-items:baseline;justify-content:space-between;width:100%;background:none;border:0;padding:0 2px 6px;margin-bottom:8px;border-bottom:1px solid var(--line);text-align:left;cursor:default}
 .lane-h .n{font:600 12px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .lane-h .c{font:11px var(--mono);color:var(--muted)}
@@ -148,6 +152,10 @@ textarea.field{min-height:66px;resize:vertical}
 .node .g{font:700 13px/1 var(--sans)}
 .node .t{display:block;font-weight:600;font-size:12.5px;line-height:1.25;margin-top:2px;overflow-wrap:anywhere}
 .node .s{display:block;font-size:11.5px;line-height:1.3;color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+@media (min-width:641px){
+  .node .t,.node .s{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;-webkit-line-clamp:3}
+  .node .s{-webkit-line-clamp:2}
+}
 .node .chip .wd{display:none}
 .node .chip{padding:3px 6px}
 .node.s-settled{border-left-color:var(--ok)} .node.s-settled .g{color:var(--ok)}
@@ -165,14 +173,6 @@ textarea.field{min-height:66px;resize:vertical}
 .node.fresh{animation:fresh 1.8s ease-out}
 @keyframes fresh{0%,30%{box-shadow:0 0 0 3px var(--ok)}100%{box-shadow:0 0 0 3px transparent}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 10px;margin:2px 0 12px;font-size:12px;color:var(--muted);align-items:center}
-.actbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);font-size:13px}
-.actbar .who{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
-.actbar .who b{font-family:var(--mono)}
-.actbar .who.hint{color:var(--muted)}
-.actbar .deps{color:var(--muted);font-size:12px}
-.actbar .btn{padding:6px 11px}
-.actbar .frm{flex:1 1 100%;display:flex;gap:8px;flex-wrap:wrap}
-.actbar .frm .field{flex:1 1 220px;min-width:0;padding:6px 10px}
 .buildlink{display:none;margin-top:12px}
 
 /* PRD */
@@ -180,7 +180,13 @@ textarea.field{min-height:66px;resize:vertical}
 .prdhead b{color:var(--ink)}
 .prdhead .appr{color:var(--ok);font-weight:600}
 .prdhead .appr.drift{color:var(--warn)}
-.prd{font:15px/1.6 var(--serif);max-width:76ch}
+.prd-wrap{display:block}
+.prd-outline{display:none}
+.prd-outline a{display:flex;gap:7px;align-items:baseline;padding:5px 10px;border-radius:6px;color:var(--muted);text-decoration:none;font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.prd-outline a:hover{color:var(--ink);background:var(--surface2)}
+.prd-outline a[aria-current=true]{color:var(--ink);background:var(--focus-bg);font-weight:600}
+.prd-outline .no{font:600 11px var(--mono);flex:none}
+.prd{font:15px/1.6 var(--serif);max-width:84ch}
 .prd section{padding:10px 0 8px;border-bottom:1px solid var(--line);scroll-margin-top:12px}
 .prd h1{margin:6px 0 4px;font:600 17px/1.3 var(--serif)}
 .prd h2{margin:0 0 4px;font:600 15px/1.3 var(--serif)}
@@ -198,7 +204,8 @@ textarea.field{min-height:66px;resize:vertical}
 .prd table{border-collapse:collapse;font:13px/1.4 var(--sans);min-width:100%}
 .prd th,.prd td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
 .prd th{background:var(--surface2)}
-.prd section.empty{opacity:.55}
+.prd td code{overflow-wrap:break-word} /* a path or command wraps at its spaces, never mid-word (the generic code rule breaks anywhere) */
+.prd section.empty>h2,.prd section.empty>blockquote{opacity:.55} /* the placeholder fades, comments in the section stay full strength */
 .prd section.empty h2{color:var(--muted)}
 .prd section.empty blockquote{border:0;padding:0;margin:0;font-style:italic}
 .prd section.empty .pend{font:600 10px var(--sans);letter-spacing:.07em;text-transform:uppercase;border:1px dashed var(--muted);border-radius:3px;padding:1px 5px;margin-left:8px;color:var(--muted)}
@@ -262,6 +269,9 @@ textarea.field{min-height:66px;resize:vertical}
 .b-card{position:relative;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;padding:12px;display:flex;flex-direction:column;gap:9px;min-width:0;box-shadow:3px 3px 0 var(--shadow);transition:transform .16s,box-shadow .16s}
 .b-card:hover{transform:translateY(-3px) rotate(-.3deg);box-shadow:5px 7px 0 var(--shadow)}
 .b-card.target{outline:3px dashed var(--focus);outline-offset:3px}
+.b-card.sel{outline:2px solid var(--focus);outline-offset:2px}
+.b-open{display:inline;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;overflow-wrap:anywhere}
+.b-open:hover{text-decoration:underline}
 .b-card.flash{animation:bpop .5s cubic-bezier(.3,1.6,.5,1)}
 @keyframes bpop{0%{transform:scale(1)}40%{transform:scale(1.03) rotate(.5deg)}100%{transform:scale(1)}}
 .b-top{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
@@ -392,11 +402,224 @@ textarea.field{min-height:66px;resize:vertical}
 .plans .pm{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:6px;font-size:12.5px;color:var(--muted)}
 .plans .pm .mono{font-family:var(--mono)}
 
+/* node panel: a fixed column on the right (the page makes room for it), a drawer below 1100px, a full-screen sheet on a phone */
+:root{--npw:400px}
+.np{position:fixed;top:12px;right:12px;bottom:12px;width:min(var(--npw),calc(100vw - 24px));z-index:45;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 36px rgb(0 0 0 / .18);overflow:hidden}
+.np:focus{outline:none}
+.np-head{flex:none;padding:12px 16px 12px;border-bottom:1px solid var(--line)}
+.np-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.np-id{font:600 12px var(--mono);color:var(--focus)}
+.np-kind,.np-lane{font-size:12px;color:var(--muted)}
+.np-close{margin-left:auto;padding:5px 11px}
+.np h2{margin:8px 0 0;font:600 18px/1.3 var(--serif);overflow-wrap:anywhere}
+.np-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 16px 28px}
+.np-sec{padding:14px 0;border-top:1px solid var(--line)}
+.np-sec:first-child{border-top:0}
+.np-sec h3{margin:0 0 8px;font:600 14px var(--serif)}
+.np-err{margin:12px 0 0;padding:7px 10px;border-radius:6px;background:var(--bad-bg);color:var(--bad);font-size:13px;overflow-wrap:anywhere}
+.np-kv{margin:0;font-size:13.5px}
+.np-kv dt{margin-top:10px;font:600 12px var(--sans);color:var(--muted)}
+.np-kv dt:first-child{margin-top:0}
+.np-kv dd{margin:2px 0 0;overflow-wrap:anywhere;white-space:pre-line}
+.np-kv ul,.np-ol{margin:2px 0 0;padding-left:18px}
+.np-ol{list-style:none;padding:0}
+.np-kv li,.np-ol li{margin:2px 0}
+.np-kv code{font:12px var(--mono);background:var(--surface2);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+.np-kv small,.np-ol small{display:block;color:var(--muted);font-size:12px}
+.np-ol .star{color:var(--warn);font-weight:700}
+.np-gr{margin-top:12px}
+.np .b-bar,.np .b-chips{margin-top:8px}
+.np-ans .opts{margin-bottom:10px}
+.np-acts{display:flex;flex-wrap:wrap;gap:8px}
+.np-acts .btn{padding:6px 11px}
+.np-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.np-form .field{flex:1 1 220px;min-width:0;padding:6px 10px}
+.np-grp+.np-grp{margin-top:10px}
+.np-grp h4{margin:0 0 3px;font:600 12px var(--sans);color:var(--muted)}
+.np-link{display:flex;align-items:baseline;gap:8px;width:100%;padding:5px 6px;border:0;border-radius:6px;background:none;text-align:left}
+.np-link:hover{background:var(--surface2)}
+.np-link .qid{flex:none}
+.np-link .lb{flex:1;min-width:0;overflow-wrap:anywhere}
+.np-link .chip{flex:none}
+.np-link.gone{color:var(--muted);cursor:default}
+.np-hist ul{margin:0;padding:0;list-style:none}
+.np-hist li{padding:6px 0;border-bottom:1px dotted var(--line)}
+.np-hist li:last-child{border-bottom:0}
+.np-sum{display:block;overflow-wrap:anywhere}
+.np-meta{display:block;font-size:12px;color:var(--muted)}
+.np-empty{margin:0;font-size:13px;color:var(--muted)}
+/* conversation: the thread scrolls on its own, the composer sits under it */
+.th-list{display:flex;flex-direction:column;gap:10px;max-height:min(50vh,420px);overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 2px 0;margin-bottom:10px}
+.th-msg{max-width:90%;min-width:0}
+.th-msg.user{align-self:flex-end}
+.th-meta{display:flex;gap:6px;align-items:baseline;margin-bottom:2px;font-size:11.5px;color:var(--muted)}
+.th-meta b{font-weight:600}
+.th-msg.user .th-meta{justify-content:flex-end}
+.th-text{padding:7px 10px;border:1px solid var(--line);border-radius:10px 10px 10px 3px;background:var(--surface2);font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.th-msg.user .th-text{border-color:transparent;border-radius:10px 10px 3px 10px;background:var(--focus-bg)}
+.th-wait{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted)}
+.th-wait .dot{flex:none;width:7px;height:7px;margin-top:6px;border-radius:50%;background:var(--muted)}
+.th-wait small{display:block;font-size:12px}
+.th-composer .field{min-height:60px}
+.th-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px}
+.th-count{font-size:12px;color:var(--muted)}
+
+/* PRD-wide pane: a fixed column beside the PRD from 1800px (the page makes room, like the node panel), a right sheet below, a full-screen sheet on a phone */
+:root{--pw:30rem}
+.pane{position:fixed;top:12px;right:12px;bottom:12px;width:min(var(--pw),calc(100vw - 24px));z-index:44;display:none;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 36px rgb(0 0 0 / .18);overflow:hidden}
+.pane:focus{outline:none}
+.pane-head{flex:none;display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.pane-head h2{margin:0;font:600 17px/1.3 var(--serif)}
+.pane-close{margin-left:auto;padding:5px 11px}
+.pane-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 16px 0}
+.pane .th-list{flex:1;min-height:0;max-height:none;margin-bottom:0;padding-bottom:10px}
+.pane-empty{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.pane-starts{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:12px}
+.pane-start{text-align:left;font-weight:500;overflow-wrap:anywhere}
+.pane-comp{flex:none;padding:10px 16px 14px;border-top:1px solid var(--line)}
+.pane-links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:4px;font-size:11.5px;color:var(--muted)}
+.pane-chip{max-width:100%;padding:0 6px;border:0;border-radius:4px;background:var(--focus-bg);color:var(--focus);font:600 11.5px/1.6 var(--mono);text-align:left;overflow-wrap:anywhere}
+.pane-chip.gone{background:var(--surface2);color:var(--muted);cursor:default}
+.pane-acts{margin-top:6px}
+.pane-turn{padding:4px 10px;font-size:12px}
+.pane-ask,.cm-jump{padding:5px 11px;font-size:12.5px;color:var(--ink)}
+.pane-ask{position:relative;margin-left:auto}
+.cm-jump{margin-left:auto}
+.cm-jump+.pane-ask{margin-left:0}
+.pane-dot{position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:var(--focus);box-shadow:0 0 0 2px var(--surface)}
+.cm.hl{box-shadow:0 0 0 3px var(--focus)}
+
+/* teammate comments on the PRD (contract §13). Selectors are .cm .x deep so the .prd serif/p/ul rules never reach a card. */
+.cm-top{max-width:84ch;margin-top:22px;border-top:1px solid var(--line)}
+.cm-box{padding:12px 0 14px;border-bottom:1px solid var(--line)}
+.cm-box h2,.cm-grp h3,.cm-sec .cm-sh{margin:0 0 6px;font:600 15px/1.3 var(--serif)}
+.cm-box .cm-hint{display:block;margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+.cm-box textarea.field{min-height:84px}
+.cm-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cm-row .field{flex:1 1 180px;min-width:0}
+.cm-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:8px}
+.cm-count{font-size:12px;color:var(--muted)}
+.cm-count:empty,.th-count:empty{display:none}
+.cm-grp{padding:12px 0 6px;border-bottom:1px solid var(--line)}
+.cm-grp h3,.cm-sec .cm-sh{font-size:13px;color:var(--muted)}
+.cm-sec{margin-top:10px}
+.cm{margin:8px 0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:13.5px/1.45 var(--sans);color:var(--ink);min-width:0;break-inside:avoid}
+.cm[data-state=proposed]{border-color:var(--warn)}
+.cm.quiet{padding:2px 10px;background:none}
+.cm .cm-head{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;min-width:0}
+.cm .cm-tog{display:flex;align-items:center;flex:1 1 0;flex-wrap:wrap;gap:4px 10px;min-width:0;min-height:36px;padding:4px 0;border:0;background:none;text-align:left}
+.cm .cm-chev{flex:none;width:10px;color:var(--muted);font-size:11px}
+.cm .cm-au{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.cm .cm-head time{font-size:12px;color:var(--muted);white-space:nowrap}
+.cm .cm-sum{flex:1 1 8ch;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.cm .cm-badge{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border:1px solid currentColor;border-radius:99px;font:600 11.5px/1.6 var(--sans);white-space:nowrap}
+.cm .cm-badge .g{font-size:11px}
+.cm .st-open{color:var(--muted);background:var(--surface2)}
+.cm .st-proposed{color:var(--warn);background:var(--warn-bg)}
+.cm .st-accepted{color:var(--ok);background:var(--ok-bg)}
+.cm .st-answered{color:var(--focus);background:var(--focus-bg)}
+.cm .st-declined{color:var(--block);background:var(--block-bg)}
+.cm .cm-anchor{padding:0 6px;border:0;border-radius:4px;background:var(--surface2);color:var(--muted);font:600 11.5px/1.6 var(--mono);overflow-wrap:anywhere}
+.cm button.cm-anchor{background:var(--focus-bg);color:var(--focus)}
+.cm .cm-body{margin-top:6px}
+.cm .cm-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.cm .cm-text.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+.cm .cm-more{padding:4px 0;border:0;background:none;color:var(--focus);font:600 12.5px var(--sans)}
+.cm .cm-wait{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.cm .cm-prop{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--surface2)}
+.cm .cm-pl{margin-bottom:4px;font:600 12px var(--sans);color:var(--muted)}
+.cm .cm-pt{white-space:pre-wrap;overflow-wrap:anywhere}
+.cm .cm-changes{margin-top:6px}
+.cm .cm-change{padding:6px 0;border-top:1px dotted var(--line)}
+.cm .cm-ch-h{font-weight:600;overflow-wrap:anywhere}
+.cm .cm-note{font-size:12.5px;color:var(--focus)}
+.cm .cm-ref{display:block;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.cm .cm-f{margin:4px 0 0}
+.cm .cm-f>div{display:flex;gap:8px;margin-top:2px}
+.cm .cm-f dt{flex:0 0 5.5em;font:12px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.cm .cm-f dd{flex:1;min-width:0;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm .cm-acts,.cm .cm-rw,.cm .cm-confirm{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.cm .cm-acts .btn,.cm .cm-rw .btn,.cm .cm-confirm .btn{padding:6px 11px}
+.cm .cm-rw .field{flex:1 1 220px;min-width:0;padding:6px 10px}
+.cm .cm-confirm span{color:var(--bad);font-weight:600}
+.cm-scratch{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0}
+
+/* GitHub review PR (contract §14): the strip above the comments, source tags and reply boxes on the cards, the sticky post bar */
+.rv{max-width:84ch;margin:12px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:13.5px/1.45 var(--sans);color:var(--ink)}
+.rv .rv-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-width:0}
+.rv .rv-row+.rv-row,.rv .rv-pending{margin-top:8px}
+.rv .rv-h{font:600 15px/1.3 var(--serif)}
+.rv .rv-pr{font-weight:600;color:var(--focus)}
+.rv .rv-branch{min-width:0;font:12px var(--mono);overflow-wrap:anywhere}
+.rv .rv-note,.rv .rv-pulled,.rv .rv-next,.rv .rv-rev,.rv .rv-pending{font-size:12.5px;color:var(--muted)}
+.rv .rv-drift{font-size:12.5px;font-weight:600;color:var(--warn)}
+.rv .rv-note{flex:1 1 24ch;min-width:0}
+.rv .btn{padding:6px 11px;white-space:nowrap}
+.rv .rv-confirm{display:inline-flex;flex-wrap:wrap;align-items:center;gap:8px}
+.rv .rv-confirm>span{color:var(--warn);font-weight:600}
+.rv label,.cm .cm-reply label{display:inline-flex;align-items:center;gap:8px;min-height:28px}
+.rv input[type=checkbox],.cm .cm-reply input[type=checkbox]{flex:none;width:16px;height:16px;margin:0;accent-color:var(--focus)}
+.btn[aria-disabled=true]{opacity:.5;cursor:not-allowed}
+.cm .cm-tag{padding:0 8px;border:1px solid var(--line);border-radius:99px;background:var(--surface2);color:var(--muted);font:600 11.5px/1.6 var(--sans);white-space:nowrap}
+.cm a.cm-tag{color:var(--focus);text-decoration:none}
+.cm .cm-tag.resolved{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.cm .cm-reply{display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;margin-top:6px;font-size:12.5px}
+.cm .cm-reply label{font-weight:600}
+.cm .cm-reply .hint{min-width:0;color:var(--muted)}
+.cm .cm-reply a{font-weight:600;color:var(--focus)}
+.cm .cm-thread{margin:8px 0 2px 6px;padding-left:10px;border-left:2px solid var(--line)}
+.cm .cm-thread .cm{margin:6px 0}
+.prd-foot{position:sticky;bottom:0;z-index:20}
+.rv-bar{position:sticky;bottom:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;max-width:84ch;margin-top:12px;padding:8px 12px;border:1px solid var(--focus);border-radius:8px;background:var(--surface);box-shadow:0 -2px 12px rgba(0,0,0,.12);font-size:13px}
+.rv-bar>span{min-width:0;color:var(--muted)}
+
+/* a sheet over the page dims it (the full-screen phone sheet needs no scrim) */
+@media (min-width:641px){body.pane-sheet::before{content:'';position:fixed;inset:0;z-index:43;pointer-events:none;background:rgb(0 0 0 / .36)}}
+
 /* toast */
-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;max-width:min(92vw,520px);opacity:0;pointer-events:none;transition:.25s;z-index:30}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;max-width:min(92vw,520px);opacity:0;pointer-events:none;transition:.25s;z-index:60}
 .toast.on{opacity:1;transform:translateX(-50%)}
 
 .bottomnav{display:none}
+
+/* ---- wide screens: the page uses the width, and the panel's column is kept free while it is open ---- */
+@media (min-width:1100px){
+  .prd-wrap{display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:36px;align-items:start}
+  .prd-outline{display:block;position:sticky;top:12px;max-height:calc(100dvh - 24px);overflow:auto}
+  body.np-open .app{padding-right:calc(var(--npw) + 36px)}
+  body.np-open .prd-wrap{grid-template-columns:minmax(0,1fr)}
+  body.np-open .prd-outline{display:none}
+  body.np-open .pane{right:calc(var(--npw) + 24px)}
+}
+@media (min-width:1100px) and (max-width:1799px){
+  body.np-open #now{display:none}
+  body.np-open .main{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:1799px){.pane.open{display:flex}}
+@media (min-width:1800px){
+  :root{--npw:480px}
+  .main{grid-template-columns:340px minmax(0,1fr)}
+  .node .t{-webkit-line-clamp:5}
+  .node .s{-webkit-line-clamp:3}
+  .prd{max-width:none;column-width:560px;column-gap:48px}
+  .prd h1{column-span:all}
+  .prd h2,.prd h3{break-after:avoid}
+  .prd pre,.prd .tw,.prd blockquote,.prd li{break-inside:avoid}
+  .cm-top{max-width:none;display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:0 48px;align-items:start}
+  .cm-lists{column-width:520px;column-gap:48px}
+  .cm-grp{border-bottom:0;padding-top:0}
+  .cm-grp h3{break-after:avoid}
+  /* the pane is docked on the PRD view: the page keeps its column free, and the node panel's column beside it while that is open */
+  body[data-view=prd] .pane{display:flex}
+  body[data-view=prd] .app{padding-right:calc(var(--pw) + 36px)}
+  body.np-open[data-view=prd] .app{padding-right:calc(var(--pw) + var(--npw) + 60px)}
+  .pane-close,.pane-ask{display:none}
+}
+@media (min-width:1800px) and (max-width:2199px){
+  body.np-open[data-view=prd] #now{display:none}
+  body.np-open[data-view=prd] .main{grid-template-columns:minmax(0,1fr)}
+}
+@media (min-width:2200px){:root{--npw:520px}}
 
 /* ---- phone ---- */
 @media (max-width:1100px) and (min-width:641px){
@@ -453,10 +676,13 @@ textarea.field{min-height:66px;resize:vertical}
   .gate .ap .btn{width:100%}
   .strip{display:none}
   .buildlink{display:block}
-  .actbar{position:fixed;left:0;right:0;bottom:58px;margin:0;border-radius:10px 10px 0 0;border-width:1px 0 0;z-index:20;padding:10px 16px}
-  .actbar.none{display:none}
-  .actbar .who{flex:1 1 100%}
-  .actbar .btn{flex:1 1 40%}
+  .np{inset:0;width:auto;border:0;border-radius:0;box-shadow:none;z-index:50}
+  .np-close{min-height:44px}
+  body.np-open,body.pane-open{overflow:hidden}
+  .pane{inset:0;width:auto;border:0;border-radius:0;box-shadow:none;z-index:48}
+  .pane-close,.pane-ask{min-height:44px}
+  .pane-close{flex:none;padding:12px 18px}
+  .pane-turn,.pane-chip{min-height:36px}
   .bottomnav{display:flex;position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:25;padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav button{flex:1;background:none;border:0;min-height:56px;font-weight:600;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
   .bottomnav button[aria-selected=true]{color:var(--ink);box-shadow:inset 0 2px 0 var(--focus)}
@@ -464,6 +690,14 @@ textarea.field{min-height:66px;resize:vertical}
   .toast{bottom:130px}
   .prd{font-size:15.5px}
   .prd h2{font-size:16px}
+  .cm-top{max-width:none}
+  .cm .cm-acts .btn,.cm .cm-rw .btn,.cm .cm-confirm .btn{min-height:44px}
+  .cm .cm-rw .field{min-height:44px}
+  .cm .cm-more{min-height:36px}
+  .rv .btn,.rv-bar .btn{min-height:44px}
+  .rv label,.cm .cm-reply label{min-height:44px}
+  .prd-foot{display:contents}
+  .rv-bar{bottom:calc(60px + env(safe-area-inset-bottom));padding:6px 12px}
   .legend{display:none}
   .b-layout{grid-template-columns:minmax(0,1fr)}
   .b-rail{position:static;max-height:none}
@@ -513,6 +747,8 @@ textarea.field{min-height:66px;resize:vertical}
   <div id="fatal" class="fatal" hidden></div>
 </div>
 
+<aside id="nodepanel" class="np" tabindex="-1" aria-label="Node details" hidden></aside>
+<aside id="prdpane" class="pane" tabindex="-1" aria-label="Ask about the PRD"></aside>
 <nav class="bottomnav" id="bnav" role="tablist" aria-label="Sections" hidden></nav>
 <div class="toast" id="toast" role="status"></div>
 
@@ -545,13 +781,27 @@ const SETTLED = ['settled', 'done', 'killed']
 const segs = location.pathname.split('/').filter(Boolean)
 let task = null
 if (segs.length > 1) { try { task = decodeURIComponent(segs[segs.length - 1]) } catch (e) { task = '' } }
+// The comment author is remembered per browser; storage can throw (private windows), and the page works without it.
+function cmAuthor() { try { return localStorage.getItem('hq.plan.author') || '' } catch (e) { return '' } }
+// The half-typed comment (text, anchor) is kept per task, so a reload does not lose it; it is dropped when emptied or sent.
+const cmDraftKey = () => 'hq.plan.draft.' + task
+function cmDraftLoad() { try { const d = JSON.parse(localStorage.getItem(cmDraftKey())); return d && typeof d.text === 'string' ? d : null } catch (e) { return null } }
+function cmDraftSave() {
+  try { if (S.cm.text.trim()) localStorage.setItem(cmDraftKey(), JSON.stringify({ text: S.cm.text, anchor: S.cm.anchor })); else localStorage.removeItem(cmDraftKey()) } catch (e) { /* not kept */ }
+}
+function rvAutoPref() { try { return localStorage.getItem('hq.plan.autopull') === '1' } catch (e) { return false } }
 const S = {
-  plan: null, prd: '', rev: null, sel: null, view: null, collapsed: {}, collapsedInit: false,
-  pick: null, form: null, busy: false, lint: null, err: null, online: true, missing: false,
+  cm: { text: '', author: cmAuthor(), anchor: '', open: {}, more: {}, rw: null, del: null }, // composer draft, quiet cards expanded, long texts expanded, the one rework input / delete confirm open
+  rv: { confirm: false, picks: {}, auto: rvAutoPref(), at: Date.now() }, // review PR: "Open" asked once, reply boxes ticked (by comment id), auto-pull on, when the last auto pull was asked (or the toggle turned on)
+  plan: null, prd: '', rev: null, sel: null, opener: null, npPick: null, view: null, collapsed: {}, collapsedInit: false,
+  pick: null, form: null, busy: false, lint: null, err: null, errStale: false, online: true, missing: false,
   bd: { open: {}, shortOnly: false, kill: null, killText: '', killErr: false, focusKill: false, promote: null, merge: null },
-  focusDraft: false, nodeJson: {}, prdChunks: {}, flash: { nodes: new Set(), prd: new Set(), recent: new Set() },
+  pane: { open: false, draft: '', sent: {}, asking: null, seen: null, hl: null }, // the PRD pane: sheet open, composer draft, answers already sent as comments (by ref), rev of our last ask, last session answer seen, comment marked by a chip
+  ask: {}, asking: {}, focusDraft: false, nodeJson: {}, prdChunks: {}, flash: { nodes: new Set(), prd: new Set(), recent: new Set() },
 }
 
+const cmDraft = task ? cmDraftLoad() : null
+if (cmDraft) Object.assign(S.cm, { text: cmDraft.text, anchor: typeof cmDraft.anchor === 'string' ? cmDraft.anchor : '' })
 if (location.hash === '#board') S.view = 'board'
 const isPhone = () => window.matchMedia('(max-width:640px)').matches
 function curView() {
@@ -564,6 +814,7 @@ function curView() {
 const node = id => (S.plan.nodes || []).find(n => n.id === id)
 const laneOf = n => (LANES.some(l => l[0] === n.lane) ? n.lane : KIND_LANE[n.kind] || 'scope')
 const arr = v => (Array.isArray(v) ? v : [])
+const byId = (base, id) => base + '[data-id="' + CSS.escape(id) + '"]' // where focus returns when the node panel closes
 
 // ---------- derived node state (contract §5: a question is blocked when open but not eligible) ----------
 function unsettledDeps(n) {
@@ -617,7 +868,7 @@ function mdInline(parent, text) {
     else if (m[3] != null) { const e = h('del'); mdInline(e, m[3]); parent.append(e) }
     else if (m[4] != null) {
       const id = m[4].trim().split(/[\s,]+/)[0]
-      parent.append(h('a', { class: 'ncl', href: '#' + id, onclick: ev => { ev.preventDefault(); jumpTo(id) } }, '[NEEDS CLARIFICATION: ' + m[4].trim() + ']'))
+      parent.append(h('a', { class: 'ncl', href: '#' + id, 'data-id': id, onclick: ev => { ev.preventDefault(); selectNode(id, byId('#p-prd a.ncl', id)) } }, '[NEEDS CLARIFICATION: ' + m[4].trim() + ']'))
     }
     else if (m[5] != null) parent.append(m[5] === m[6] ? m[5] : m[5] + ' (' + m[6] + ')')
     else { const e = h('em'); mdInline(e, m[7]); parent.append(e) }
@@ -694,15 +945,18 @@ function mdBlocks(parent, lines) {
     } else if (isTableAt(lines, i)) {
       const head = splitRow(line)
       i += 2
+      const rows = []
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) rows.push(splitRow(lines[i++]))
+      // The task map's P (priority) column is drawn only when some row has a value.
+      const cols = head.map((c, k) => k).filter(k => !(head[k].trim() === 'P' && rows.every(r => !(r[k] || '').trim())))
       const tb = h('tbody')
-      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
+      for (const cells of rows) {
         const tr = h('tr')
-        const cells = splitRow(lines[i++])
-        for (let c = 0; c < head.length; c++) { const td = h('td'); mdInline(td, cells[c] || ''); tr.append(td) }
+        for (const c of cols) { const td = h('td'); mdInline(td, cells[c] || ''); tr.append(td) }
         tb.append(tr)
       }
       const hr = h('tr')
-      for (const c of head) { const th = h('th'); mdInline(th, c); hr.append(th) }
+      for (const c of cols) { const th = h('th'); mdInline(th, head[c]); hr.append(th) }
       parent.append(h('div', { class: 'tw' }, h('table', {}, h('thead', {}, hr), tb)))
     } else if (LI.test(line)) i = mdList(parent, lines, i)
     else {
@@ -729,6 +983,7 @@ function prdChunks(md) {
 function renderPrdBody(md, flash) {
   const art = h('article', { class: 'prd' })
   let filled = 0, total = 0
+  const toc = []
   for (const c of prdChunks(md)) {
     if (!c.head) { if (c.lines.some(l => l.trim() && !/^<!--.*-->\s*$/.test(l))) mdBlocks(art, c.lines); continue }
     const hm = /^##\s+(?:(\d+)\.\s+)?(.*?)\s*$/.exec(c.head)
@@ -738,23 +993,38 @@ function renderPrdBody(md, flash) {
     const pending = !!only && only.tagName === 'BLOCKQUOTE' && /^Pending:/.test(only.textContent)
     total++
     if (!pending) filled++
-    const h2 = h('h2', {}, hm[1] != null ? h('span', { class: 'no' }, '§' + hm[1]) : null)
-    mdInline(h2, hm[2])
+    const title = h('span')
+    mdInline(title, hm[2])
+    const id = hm[1] != null ? 'prd-' + hm[1] : 'prd-s' + total
+    toc.push({ id, no: hm[1] != null ? '§' + hm[1] : '', text: title.textContent })
+    const h2 = h('h2', {}, hm[1] != null ? h('span', { class: 'no' }, '§' + hm[1]) : null, ...title.childNodes)
     if (pending) h2.append(h('span', { class: 'pend' }, 'pending'))
-    const sec = h('section', { class: (pending ? 'empty' : '') + (flash.has(c.head) ? ' fresh' : ''), id: hm[1] != null ? 'prd-' + hm[1] : null }, h2)
+    const sec = h('section', { class: (pending ? 'empty' : '') + (flash.has(c.head) ? ' fresh' : ''), id }, h2)
     sec.append(...body.childNodes)
     art.append(sec)
   }
-  return { art, filled, total }
+  return { art, filled, total, toc }
 }
 
 // ---------- rendering ----------
 function chip(d, withWord) {
   return h('span', { class: 'chip ' + d }, h('span', { class: 'g', 'aria-hidden': 'true' }, GL[d]), h('span', { class: withWord ? '' : 'wd' }, WD[d]))
 }
+// The toast sits at the bottom centre; a sticky bar there (reply bar, Approve gate, the pane composer) would hide it, so lift it above whichever one reaches into its slot.
+function toastLift(t) {
+  t.style.bottom = ''
+  const base = parseFloat(getComputedStyle(t).bottom), tr = t.getBoundingClientRect()
+  let lift = base
+  for (const e of document.querySelectorAll('.prd-foot, .gate, #rv-bar, #prdpane .pane-comp')) {
+    const r = e.getBoundingClientRect()
+    if (r.height && r.top < innerHeight && r.bottom > innerHeight - base - 45 && r.left < tr.right && r.right > tr.left) lift = Math.max(lift, innerHeight - r.top + 10)
+  }
+  if (lift > base) t.style.bottom = lift + 'px'
+}
 function toast(m) {
   const t = $('#toast')
   t.textContent = m
+  toastLift(t)
   t.classList.add('on')
   clearTimeout(toast.t)
   toast.t = setTimeout(() => t.classList.remove('on'), 4200)
@@ -820,7 +1090,7 @@ function formBox(where, kind, o) {
   }
   field.addEventListener('input', () => { S.form = { where, kind, text: field.value, node: o.node }; send.disabled = !field.value.trim() })
   field.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape') { S.form = null; renderAll() }
+    if (ev.key === 'Escape') { ev.preventDefault(); S.form = null; renderAll() }
     else if (ev.key === 'Enter' && (!o.multi || ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); submit() }
   })
   return { field, send, cancel }
@@ -831,15 +1101,19 @@ function openForm(where, kind, text, node) {
   renderAll()
 }
 
-function requestsBlock(cls) {
+// One line per request (the full text is the title) and at most REQ_SHOWN of them: a long comment must not turn the Now card into a page of its own.
+const REQ_SHOWN = 5, REQ_CHARS = 100
+const reqLine = text => { const cs = Array.from(String(text || '').replace(/\s+/g, ' ').trim()); return cs.length > REQ_CHARS ? cs.slice(0, REQ_CHARS - 1).join('') + '…' : cs.join('') }
+function requestsBlock(cls, scope) {
   const rs = arr(S.plan.requests)
   if (!rs.length) return null
   return h('div', { class: cls }, h('div', { class: 'eyebrow' }, 'Waiting for the session · ' + rs.length),
-    h('ul', {}, rs.map(r => h('li', { class: 'req-i' },
+    h('ul', {}, rs.slice(0, REQ_SHOWN).map(r => h('li', { class: 'req-i' },
       h('span', { class: 'ty' }, r.type),
-      r.node && node(r.node) ? h('button', { class: 'linkbtn', onclick: () => jumpTo(r.node) }, r.node) : null,
-      h('span', { class: 'tx' }, r.text || ''),
-      h('span', { class: 'at', title: r.at }, fmtAt(r.at))))))
+      r.node && node(r.node) ? h('button', { class: 'linkbtn', 'data-id': r.node, onclick: () => selectNode(r.node, byId(scope + ' .linkbtn', r.node)) }, r.node) : null,
+      h('span', { class: 'tx', title: r.text || null }, reqLine(r.text)),
+      h('span', { class: 'at', title: r.at }, fmtAt(r.at)))),
+    rs.length > REQ_SHOWN ? h('li', { class: 'req-more' }, '+' + (rs.length - REQ_SHOWN) + ' more') : null))
 }
 const fmtAt = at => (at ? String(at).slice(5, 16).replace('T', ' ') : '')
 
@@ -855,31 +1129,35 @@ function renderNow() {
     const picked = S.pick.key
     root.append(h('h2', {}, h('span', { class: 'qid' }, f.id), ' · ' + f.label))
     if (f.why) root.append(h('p', { class: 'why' }, h('b', {}, 'Why it matters:'), ' ' + f.why))
-    if (opts.length) {
-      root.append(h('div', { class: 'opts', role: 'radiogroup', 'aria-label': 'Options' },
-        opts.map(o => h('button', { class: 'opt' + (picked === o.key ? ' pick' : ''), role: 'radio', 'aria-checked': String(picked === o.key), 'data-key': o.key, onclick: () => { S.pick = { q: f.id, key: o.key }; renderNow() } },
-          h('b', {}, o.label), o.key === rec ? [' ', h('span', { class: 'star', title: 'Recommended' }, '★')] : null, o.why ? h('small', {}, o.why) : null)),
-        h('button', { class: 'opt other', 'data-act': 'other', onclick: () => (S.form && S.form.where === 'now' && S.form.kind === 'other' ? (S.form = null, renderNow()) : openForm('now', 'other', '', f.id)) }, 'Other… (type your own)')))
-      const ro = opts.find(o => o.key === rec)
-      if (ro) root.append(h('div', { class: 'reason' }, h('b', {}, '★ Recommended: ' + ro.label + '.'), ro.why ? ' ' + ro.why : ''))
+    // One answer box per question: while the panel is open on this very question it owns the input.
+    if (S.sel === f.id) root.append(h('p', { class: 'here', role: 'status' }, 'Answering in the panel'))
+    else {
+      if (opts.length) {
+        root.append(h('div', { class: 'opts', role: 'radiogroup', 'aria-label': 'Options' },
+          opts.map(o => h('button', { class: 'opt' + (picked === o.key ? ' pick' : ''), role: 'radio', 'aria-checked': String(picked === o.key), 'data-key': o.key, onclick: () => { S.pick = { q: f.id, key: o.key }; renderNow() } },
+            h('b', {}, o.label), o.key === rec ? [' ', h('span', { class: 'star', title: 'Recommended' }, '★')] : null, o.why ? h('small', {}, o.why) : null)),
+          h('button', { class: 'opt other', 'data-act': 'other', onclick: () => (S.form && S.form.where === 'now' && S.form.kind === 'other' ? (S.form = null, renderNow()) : openForm('now', 'other', '', f.id)) }, 'Other… (type your own)')))
+        const ro = opts.find(o => o.key === rec)
+        if (ro) root.append(h('div', { class: 'reason' }, h('b', {}, '★ Recommended: ' + ro.label + '.'), ro.why ? ' ' + ro.why : ''))
+      }
+      const freeOnly = !opts.length
+      const showOther = freeOnly || (S.form && S.form.where === 'now' && S.form.kind === 'other')
+      const showAsk = S.form && S.form.where === 'now' && S.form.kind === 'discuss'
+      if (showOther) {
+        const fb = formBox('now', 'other', { node: f.id, multi: true, max: 2000, placeholder: 'Your own answer', submit: 'Send answer', onSubmit: text => post({ type: 'answer', node: f.id, text }) })
+        root.append(h('div', { class: 'form' }, fb.field, h('div', { class: 'btns' }, freeOnly ? null : fb.cancel, fb.send)))
+      }
+      if (showAsk) {
+        const fb = formBox('now', 'discuss', { node: f.id, multi: true, max: 2000, placeholder: 'What do you want to ask or say about ' + f.id + '?', submit: 'Send', onSubmit: text => post({ type: 'ask', node: f.id, text }) })
+        root.append(h('div', { class: 'form' }, fb.field, h('div', { class: 'btns' }, fb.cancel, fb.send)))
+      }
+      const accept = !picked ? h('button', { class: 'btn primary big', disabled: true }, 'Pick an option')
+        : picked === rec ? h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: f.id, choice: 'recommended' }) }, 'Accept ★')
+        : h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: f.id, choice: picked }) }, 'Choose “' + optionLabel(f, picked) + '”')
+      root.append(h('div', { class: 'btns' }, opts.length ? accept : null,
+        h('button', { class: 'btn', 'data-act': 'later', onclick: () => post({ type: 'park', node: f.id }) }, 'Decide later'),
+        h('button', { class: 'btn', 'data-act': 'discuss', onclick: () => (showAsk ? (S.form = null, renderNow()) : openForm('now', 'discuss', '', f.id)) }, 'Discuss')))
     }
-    const freeOnly = !opts.length
-    const showOther = freeOnly || (S.form && S.form.where === 'now' && S.form.kind === 'other')
-    const showAsk = S.form && S.form.where === 'now' && S.form.kind === 'discuss'
-    if (showOther) {
-      const fb = formBox('now', 'other', { node: f.id, multi: true, max: 2000, placeholder: 'Your own answer', submit: 'Send answer', onSubmit: text => post({ type: 'answer', node: f.id, text }) })
-      root.append(h('div', { class: 'form' }, fb.field, h('div', { class: 'btns' }, freeOnly ? null : fb.cancel, fb.send)))
-    }
-    if (showAsk) {
-      const fb = formBox('now', 'discuss', { node: f.id, multi: true, max: 2000, placeholder: 'What do you want to ask or say about ' + f.id + '?', submit: 'Send', onSubmit: text => post({ type: 'ask', node: f.id, text }) })
-      root.append(h('div', { class: 'form' }, fb.field, h('div', { class: 'btns' }, fb.cancel, fb.send)))
-    }
-    const accept = !picked ? h('button', { class: 'btn primary big', disabled: true }, 'Pick an option')
-      : picked === rec ? h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: f.id, choice: 'recommended' }) }, 'Accept ★')
-      : h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: f.id, choice: picked }) }, 'Choose “' + optionLabel(f, picked) + '”')
-    root.append(h('div', { class: 'btns' }, opts.length ? accept : null,
-      h('button', { class: 'btn', 'data-act': 'later', onclick: () => post({ type: 'park', node: f.id }) }, 'Decide later'),
-      h('button', { class: 'btn', 'data-act': 'discuss', onclick: () => (showAsk ? (S.form = null, renderNow()) : openForm('now', 'discuss', '', f.id)) }, 'Discuss')))
   } else {
     S.pick = null
     root.append(...kidsOf([h('h2', {}, 'Nothing left in focus'),
@@ -889,11 +1167,11 @@ function renderNow() {
   const up = p.frontier.slice(1).map(node).filter(Boolean)
   const blocked = p.nodes.filter(n => n.kind === 'question' && n.status === 'open' && !p.frontier.includes(n.id))
   if (up.length || blocked.length) {
-    const li = (n, d) => h('li', {}, h('span', { class: 'qid' }, n.id), h('button', { class: 't', onclick: () => jumpTo(n.id) }, n.label), chip(d, true))
+    const li = (n, d) => h('li', {}, h('span', { class: 'qid' }, n.id), h('button', { class: 't', 'data-id': n.id, onclick: () => selectNode(n.id, byId('#now .next .t', n.id)) }, n.label), chip(d, true))
     root.append(h('div', { class: 'next' }, h('div', { class: 'eyebrow' }, 'Up next'),
       h('ul', {}, up.map(n => li(n, 'open')), blocked.map(n => li(n, 'blocked')))))
   }
-  const rq = requestsBlock('reqs')
+  const rq = requestsBlock('reqs', '#now')
   if (rq) root.append(rq)
 }
 
@@ -907,7 +1185,7 @@ function renderLanes() {
     S.collapsedInit = true
     for (const [l] of LANES) { const ns = p.nodes.filter(n => laneOf(n) === l); if (ns.length && ns.every(n => display(n) === 'settled')) S.collapsed[l] = true }
   }
-  root.append(h('div', { class: 'legend' }, ['settled', 'focus', 'assumed', 'blocked', 'parked', 'open'].map(s => chip(s, true)), h('span', {}, 'Select a node to see what depends on it.')))
+  root.append(h('div', { class: 'legend' }, ['settled', 'focus', 'assumed', 'blocked', 'parked', 'open'].map(s => chip(s, true)), h('span', {}, 'Select a node to open it and see what depends on it.')))
   const lanes = h('div', { class: 'lanes' })
   for (const [l, name] of LANES) {
     const ns = p.nodes.filter(n => laneOf(n) === l)
@@ -917,38 +1195,13 @@ function renderLanes() {
         h('span', { class: 'n' }, name), h('span', { class: 'c' }, ns.filter(n => display(n) === 'settled').length + '/' + ns.length)),
       h('div', { class: 'nodes' }, ns.map(n => {
         const d = display(n)
-        return h('button', { class: 'node s-' + d + (S.sel === n.id ? ' sel' : '') + (dep.has(n.id) ? ' dep' : '') + (pre.has(n.id) ? ' pre' : '') + (S.flash.nodes.has(n.id) ? ' fresh' : ''), 'data-id': n.id, 'aria-pressed': String(S.sel === n.id), onclick: () => { S.sel = S.sel === n.id ? null : n.id; S.form = S.form && S.form.where === 'node' ? null : S.form; renderLanes() } },
+        return h('button', { class: 'node s-' + d + (S.sel === n.id ? ' sel' : '') + (dep.has(n.id) ? ' dep' : '') + (pre.has(n.id) ? ' pre' : '') + (S.flash.nodes.has(n.id) ? ' fresh' : ''), 'data-id': n.id, 'aria-pressed': String(S.sel === n.id), onclick: () => toggleNode(n.id, byId('.node', n.id)) },
           h('span', { class: 'r1' }, h('span', { class: 'id' }, n.id), chip(d, false)),
           h('span', { class: 't' }, n.label), h('span', { class: 's' }, sub(n, d)))
       }))))
   }
-  root.append(h('div', { class: 'lanes-wrap' }, lanes), actbar(sel, dep), h('button', { class: 'btn buildlink', onclick: () => { S.view = 'build'; renderTabs(); window.scrollTo(0, 0) } }, 'Build view →'))
+  root.append(h('div', { class: 'lanes-wrap' }, lanes), h('button', { class: 'btn buildlink', onclick: () => { S.view = 'build'; renderTabs(); window.scrollTo(0, 0) } }, 'Build view →'))
 }
-function actbar(sel, dep) {
-  if (!sel) return h('div', { class: 'actbar none', id: 'actbar' }, h('span', { class: 'who hint' }, 'Select a node → Reopen · Park · Expand · Edit label · Add note'))
-  const d = display(sel)
-  const bar = h('div', { class: 'actbar', id: 'actbar' },
-    h('span', { class: 'who' }, h('b', {}, sel.id), ' · ' + sel.label + ' ', chip(d, true), h('br'), h('span', { class: 'deps' }, dep.size ? 'Highlighted: ' + [...dep].join(', ') + ' depend on this' : 'Nothing depends on this')))
-  const ev = (label, e) => bar.append(h('button', { class: 'btn', 'data-act': e.type, onclick: () => post(e) }, label))
-  if (!['open', 'todo'].includes(sel.status)) ev('Reopen', { type: 'reopen', node: sel.id })
-  if (sel.kind !== 'task' && sel.status !== 'parked') ev('Park', { type: 'park', node: sel.id })
-  if (sel.kind === 'question' && sel.status === 'open') ev('Prioritize', { type: 'prioritize', node: sel.id })
-  if (sel.kind === 'assumption' && sel.status !== 'killed') ev('Strike', { type: 'strike', node: sel.id })
-  ev('Expand', { type: 'expand', node: sel.id })
-  const open = (label, kind) => bar.append(h('button', { class: 'btn', 'data-act': kind, onclick: () => openForm('node', kind, kind === 'edit_label' ? sel.label : '') }, label))
-  open('Edit label', 'edit_label')
-  open('Ask', 'ask')
-  open('Add note', 'note')
-  if (S.form && S.form.where === 'node') {
-    const k = S.form.kind
-    const fb = formBox('node', k, k === 'edit_label'
-      ? { max: 120, placeholder: 'New label', submit: 'Save', initial: sel.label, onSubmit: label => post({ type: 'edit_label', node: sel.id, label }) }
-      : { max: 2000, placeholder: k === 'ask' ? 'Ask about ' + sel.id : 'Note on ' + sel.id, submit: 'Send', onSubmit: text => post({ type: k, node: sel.id, text }) })
-    bar.append(h('div', { class: 'frm' }, fb.field, fb.send, fb.cancel))
-  }
-  return bar
-}
-
 function gateChecks() {
   const ns = S.plan.nodes
   const li = (cls, g, t) => h('li', {}, h('b', { class: cls }, g), t)
@@ -967,7 +1220,7 @@ function gate() {
   const p = S.plan
   const lis = S.lint
     ? S.lint.map(f => h('li', {}, h('b', { class: f.severity === 'block' ? 'x' : 'w' }, f.severity === 'block' ? '✗' : '⚠'),
-        h('span', {}, f.node ? [h('button', { class: 'linkbtn', onclick: () => jumpTo(f.node) }, f.node), ' '] : null, f.message || f.rule)))
+        h('span', {}, f.node ? [h('button', { class: 'linkbtn', 'data-id': f.node, onclick: () => selectNode(f.node, byId('#p-prd .gate .linkbtn', f.node)) }, f.node), ' '] : null, f.message || f.rule)))
     : gateChecks()
   const ap = h('div', { class: 'ap' })
   if (p.stage === 'shape') {
@@ -977,17 +1230,342 @@ function gate() {
   else ap.append(h('small', {}, 'Approval opens at stage shape (now: ' + p.stage + ')'))
   return h('div', { class: 'gate' }, h('ul', { class: 'lint', 'aria-label': 'Readiness' }, lis), ap)
 }
+// ---------- teammate comments on the PRD (contract §13). Comment text, authors and proposal fields only ever enter through h(). ----------
+const CM_ST = { open: ['○', 'open'], proposed: ['◆', 'proposed'], accepted: ['✓', 'accepted'], answered: ['↵', 'answered'], declined: ['✕', 'declined'] }
+const cmState = c => (CM_ST[c.state] ? c.state : 'open')
+const cmQuiet = c => ['accepted', 'answered', 'declined'].includes(cmState(c))
+const cmOpenCount = () => arr(S.plan.comments).filter(c => ['open', 'proposed'].includes(cmState(c))).length
+const cmStr = v => (typeof v === 'string' ? v : JSON.stringify(v))
+function cmAgo(at) {
+  const t = Date.parse(at)
+  if (isNaN(t)) return fmtAt(at)
+  const m = Math.floor((Date.now() - t) / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return m + ' min ago'
+  if (m < 1440) return Math.floor(m / 60) + ' h ago'
+  return m < 10080 ? Math.floor(m / 1440) + ' d ago' : fmtAt(at)
+}
+// A comment on a node shows in the PRD list and in the node panel; `loc` says which copy a control belongs to, so focus and the open input go back to the right one.
+const cmRoot = loc => (loc === 'panel' ? '#nodepanel ' : '#p-prd ')
+const cmSel = (id, loc, act) => cmRoot(loc) + '.cm[data-id="' + CSS.escape(id) + '"] [data-act="' + act + '"]'
+function cmRefresh(focus) {
+  renderAll()
+  const f = focus && $(focus)
+  if (f) f.focus({ preventScroll: true })
+}
+// post() re-renders before this continues, so a draft is dropped only after the server accepted the event. A refused event (a stale proposal, a comment already deleted) means the list is out of date: poll at once.
+async function cmPost(ev, done) {
+  const d = await post(ev)
+  if (d) { if (done) done(); renderAll() } else pollNow()
+  return d
+}
+async function cmCopy(text) {
+  try { await navigator.clipboard.writeText(text); toast('Copied'); return } catch (e) { /* no clipboard API (plain http, old browsers): select and copy */ }
+  const prev = document.activeElement
+  const ta = h('textarea', { class: 'cm-scratch', 'aria-hidden': 'true', tabindex: '-1' })
+  document.body.append(ta)
+  ta.value = text
+  ta.focus()
+  ta.select()
+  let ok = false
+  try { ok = document.execCommand('copy') } catch (e) { /* refused */ }
+  ta.remove()
+  if (prev && prev.focus) prev.focus({ preventScroll: true })
+  toast(ok ? 'Copied' : 'Could not copy. Select the text and copy it by hand.')
+}
+// A change that creates a node never settles it: the node joins the plan as an open draft until the owner confirms it (§13.4), so say so before Accept and after.
+// The applied ids live only in the audit event; the node an accept created is the one stamped with that accept's rev (plan.recent keeps the last 30 events).
+const cmCreates = ch => ch.type === 'upsert' && !!ch.node && typeof ch.node === 'object' && !(ch.node.id && node(ch.node.id))
+function cmNote(c, ch) {
+  const st = cmState(c)
+  if (!cmCreates(ch) || (st !== 'proposed' && st !== 'accepted')) return null
+  if (st === 'proposed') return 'Added as a draft; it joins the PRD once you confirm it'
+  const nd = ch.node, ev = arr(S.plan.recent).find(r => r.type === 'comment_accept' && r.summary === 'accepted ' + c.id)
+  const made = ev && arr(S.plan.nodes).find(n => n.rev === ev.rev && n.kind === nd.kind && n.label === String(nd.label).trim())
+  return 'Applied: added ' + (made ? made.id : 'a new ' + (nd.kind || 'node')) + ' as a draft'
+}
+// One proposed change, shown in full before Accept: kind, id (or "new") and every field of an upsert, the node and label of the rest.
+function cmChange(ch, note) {
+  const kind = ch.type
+  let head, ref = null, fields = null
+  if (kind === 'upsert') {
+    const nd = ch.node && typeof ch.node === 'object' ? ch.node : {}
+    const k = nd.kind || (nd.id && (node(nd.id) || {}).kind)
+    head = ['Upsert', k, nd.id || 'new'].filter(Boolean).join(' · ')
+    fields = Object.entries(nd).filter(([f]) => f !== 'id' && f !== 'kind')
+  } else if (kind === 'reopen') {
+    head = 'Reopen · ' + cmStr(ch.node)
+    const n = node(ch.node)
+    ref = n ? n.label : null
+  } else if (kind === 'edit_label') head = 'Edit label · ' + cmStr(ch.node) + ' → “' + cmStr(ch.label) + '”'
+  else if (kind === 'set') head = 'Set ' + cmStr(ch.field) + ' → “' + cmStr(ch.value) + '”'
+  else { head = cmStr(kind); fields = Object.entries(ch).filter(([f]) => f !== 'type') }
+  return h('div', { class: 'cm-change', 'data-kind': String(kind) },
+    h('div', { class: 'cm-ch-h' }, head),
+    note ? h('div', { class: 'cm-note' }, note) : null,
+    ref ? h('span', { class: 'cm-ref' }, ref) : null,
+    fields && fields.length ? h('dl', { class: 'cm-f' }, fields.map(([f, v]) => h('div', {}, h('dt', {}, f), h('dd', {}, cmStr(v))))) : null)
+}
+function cmProposal(pr, c) {
+  const label = { accept: 'Proposal: add to the plan', answer: 'Proposed reply', decline: 'Proposal: decline' }[pr.action] || 'Proposal'
+  const changes = arr(pr.changes)
+  return h('div', { class: 'cm-prop' },
+    h('div', { class: 'cm-pl' }, label),
+    pr.text ? h('div', { class: 'cm-pt' }, String(pr.text)) : null,
+    changes.length ? h('div', { class: 'cm-changes' }, changes.map(ch => cmChange(ch, cmNote(c, ch)))) : null)
+}
+function cmActions(c, pr, loc) {
+  const st = cmState(c), id = c.id
+  const btn = (act, label, aria, onclick, cls) => h('button', { class: 'btn' + (cls ? ' ' + cls : ''), 'data-act': act, 'aria-label': aria, onclick }, label)
+  const mine = o => o && o.id === id && o.loc === loc
+  const rw = st === 'proposed' && mine(S.cm.rw) ? S.cm.rw : null
+  const out = []
+  if (mine(S.cm.del)) {
+    out.push(h('div', { class: 'cm-confirm', role: 'group', 'aria-label': 'Confirm deleting ' + id }, h('span', {}, 'Delete this comment?'),
+      btn('delete-confirm', 'Delete', 'Delete ' + id + ' for good', () => cmPost({ type: 'comment_delete', ref: id }, () => { S.cm.del = null }), 'danger'),
+      btn('delete-keep', 'Keep', 'Keep ' + id, () => { S.cm.del = null; cmRefresh(cmSel(id, loc, 'delete')) })))
+  } else {
+    const acts = []
+    // One event closes all three proposals: an accept applies its changes, an answer or a decline only closes the comment (§13.3).
+    const accept = () => cmPost({ type: 'comment_accept', ref: id, proposal: pr.rev })
+    const close = st === 'proposed' && pr && { answer: ['Mark answered', 'Mark ' + id + ' answered'], decline: ['Agree, decline', 'Agree to decline ' + id] }[pr.action]
+    if (st === 'proposed' && pr && pr.action === 'accept') acts.push(btn('accept', 'Accept', 'Accept the proposal on ' + id, accept, 'primary'))
+    else if (close) acts.push(btn('settle', close[0], close[1], accept, 'primary'))
+    if (pr && pr.action === 'answer' && pr.text) acts.push(btn('copy', 'Copy reply', 'Copy the proposed reply for ' + id, () => cmCopy(String(pr.text))))
+    if (st === 'proposed') acts.push(btn('rework', 'Rework', 'Rework the proposal on ' + id, () => {
+      if (!rw) S.cm.rw = { id, loc, text: '' }
+      cmRefresh(cmRoot(loc) + '[data-draft="cm-rw"]')
+    }))
+    acts.push(btn('delete', 'Delete', 'Delete comment ' + id, () => { S.cm.del = { id, loc }; cmRefresh(cmSel(id, loc, 'delete-keep')) }, 'danger'))
+    out.push(h('div', { class: 'cm-acts' }, acts))
+  }
+  if (rw) {
+    const inp = h('input', { class: 'field', type: 'text', maxlength: 5000, 'data-draft': 'cm-rw', placeholder: 'What should change?', 'aria-label': 'What should change in the proposal on ' + id + '?' })
+    inp.value = rw.text
+    const send = () => { const t = rw.text.trim(); cmPost({ type: 'comment_rework', ref: id, ...(t ? { text: t } : {}) }, () => { S.cm.rw = null }) }
+    const cancel = () => { S.cm.rw = null; cmRefresh(cmSel(id, loc, 'rework')) }
+    inp.addEventListener('input', () => { rw.text = inp.value })
+    inp.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); send() }
+      else if (ev.key === 'Escape') { ev.preventDefault(); cancel() }
+    })
+    out.push(h('div', { class: 'cm-rw' }, inp, btn('rework-send', 'Send', 'Send the note to rework ' + id, send, 'primary'), btn('rework-cancel', 'Cancel', 'Cancel reworking ' + id, cancel)))
+  }
+  return out
+}
+// A live comment (open, proposed) is shown in full; accepted, answered and declined are one quiet line until expanded.
+// `chip` (the "top" lists only) names where a comment is anchored: a node opens the panel, a section the PRD no longer has is just named.
+function cmCard(c, loc, chip) {
+  const st = cmState(c), quiet = cmQuiet(c), x = !!S.cm.open[c.id]
+  const pr = c.proposal && typeof c.proposal === 'object' ? c.proposal : null
+  const text = String(c.text == null ? '' : c.text)
+  const meta = [
+    h('span', { class: 'cm-au' }, c.author ? String(c.author) : 'Unknown'),
+    h('span', { class: 'cm-badge st-' + st }, h('span', { class: 'g', 'aria-hidden': 'true' }, CM_ST[st][0]), h('span', { class: 'w' }, CM_ST[st][1])),
+    c.at ? h('time', { title: c.at, datetime: c.at }, cmAgo(c.at)) : null,
+  ]
+  const n = chip && c.anchor ? node(c.anchor) : null
+  const anchor = !chip || !c.anchor ? null
+    : n ? h('button', { class: 'cm-anchor', 'data-act': 'node', title: n.label, 'aria-label': 'Open ' + c.anchor, onclick: () => selectNode(c.anchor, cmSel(c.id, loc, 'node')) }, c.anchor)
+      : h('span', { class: 'cm-anchor' }, c.anchor)
+  const tags = rvTags(c)
+  const head = quiet
+    ? h('div', { class: 'cm-head' },
+      h('button', { class: 'cm-tog', 'data-act': 'toggle', 'aria-expanded': String(x), onclick: () => { S.cm.open[c.id] = !x; cmRefresh(cmSel(c.id, loc, 'toggle')) } },
+        h('span', { class: 'cm-chev', 'aria-hidden': 'true' }, x ? '▾' : '▸'), ...meta, x ? null : h('span', { class: 'cm-sum' }, text)), ...tags, anchor)
+    : h('div', { class: 'cm-head' }, ...meta, ...tags, anchor)
+  const long = text.split('\n').length > 4 || text.length > 400
+  const more = !!S.cm.more[c.id]
+  const body = !quiet || x ? h('div', { class: 'cm-body' },
+    h('div', { class: 'cm-text' + (long && !more ? ' clamp' : '') }, text),
+    long ? h('button', { class: 'cm-more', 'data-act': 'more', 'aria-expanded': String(more), onclick: () => { S.cm.more[c.id] = !more; cmRefresh(cmSel(c.id, loc, 'more')) } }, more ? 'show less' : 'show more') : null,
+    st === 'open' ? h('div', { class: 'cm-wait' }, 'Waiting for the session…') : null,
+    pr ? cmProposal(pr, c) : null,
+    ...cmActions(c, pr, loc)) : null
+  const kids = cmKids(c)
+  return h('div', { class: 'cm' + (quiet ? ' quiet' : '') + (loc === 'prd' && S.pane.hl === c.id ? ' hl' : ''), 'data-id': c.id, 'data-state': st }, head, body, rvReply(c, loc),
+    kids.length ? h('div', { class: 'cm-thread' }, kids.map(k => cmCard(k, loc, false))) : null)
+}
+// A GitHub reply sits under its thread root (reply_to is the root's ext) when that root is in the plan and is not itself a reply; anything else stays a card of its own.
+const cmUp = c => (c.reply_to ? arr(S.plan.comments).find(x => x.ext && x.ext === c.reply_to && x !== c) : undefined)
+const cmParent = c => { const p = cmUp(c); return p && !cmUp(p) ? p : null }
+const cmKids = c => (c.ext ? arr(S.plan.comments).filter(k => cmParent(k) === c) : [])
+function cmComposer(toc) {
+  const c = S.cm
+  const field = h('textarea', { id: 'cm-text', class: 'field', 'data-draft': 'cm-compose', maxlength: 5000, rows: 4, 'aria-label': 'Comments to add', 'aria-describedby': 'cm-hint' })
+  const author = h('input', { id: 'cm-author', class: 'field', type: 'text', 'data-draft': 'cm-author', maxlength: 80, placeholder: 'Who said it (optional)', 'aria-label': 'Author of these comments', autocomplete: 'off' })
+  const secs = toc.filter(t => t.no)
+  const where = h('select', { id: 'cm-anchor', class: 'field', 'data-draft': 'cm-anchor', 'aria-label': 'Attach to' },
+    h('option', { value: '' }, 'Whole PRD'),
+    secs.length ? h('optgroup', { label: 'Sections' }, secs.map(t => h('option', { value: t.no }, t.no + ' · ' + t.text))) : null,
+    arr(S.plan.nodes).length ? h('optgroup', { label: 'Nodes' }, S.plan.nodes.map(n => h('option', { value: n.id }, n.id + ' · ' + n.label))) : null)
+  const count = h('span', { id: 'cm-count', class: 'cm-count' })
+  const send = h('button', { id: 'cm-send', class: 'btn primary' }, 'Add comments')
+  const sync = () => { send.disabled = !field.value.trim(); count.textContent = field.value.length >= 4500 ? field.value.length + ' / 5000' : '' }
+  async function submit() {
+    const text = field.value.trim()
+    if (!text) return
+    const name = c.author.trim()
+    const sent = c.text
+    const d = await post({ type: 'comment', text, ...(name ? { author: name } : {}), ...(c.anchor ? { anchor: c.anchor } : {}) })
+    if (!d) return
+    if (c.text === sent) { c.text = ''; cmDraftSave() } // not if more was typed while the send was in flight
+    renderAll()
+    const f = $('#cm-text')
+    if (f) f.focus({ preventScroll: true })
+  }
+  field.value = c.text
+  author.value = c.author
+  where.value = c.anchor
+  c.anchor = where.value // an anchor that is gone from the plan falls back to the whole PRD
+  sync()
+  field.addEventListener('input', () => { c.text = field.value; cmDraftSave(); sync() })
+  field.addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); submit() } })
+  author.addEventListener('input', () => { c.author = author.value; try { localStorage.setItem('hq.plan.author', author.value) } catch (e) { /* not remembered */ } })
+  where.addEventListener('change', () => { c.anchor = where.value; cmDraftSave() })
+  send.addEventListener('click', submit)
+  return h('div', { id: 'cm-box', class: 'cm-box' },
+    h('h2', {}, 'Comments'),
+    h('small', { id: 'cm-hint', class: 'cm-hint' }, 'Paste one comment or several; the session splits them'),
+    field,
+    h('div', { class: 'cm-row' }, author, where),
+    h('div', { class: 'cm-bar' }, count, send))
+}
+// ---------- GitHub review PR (contract §14). The page only records what the user asked for (a `review` event); the session does the gh and git work. ----------
+const RV_EVERY = 120000
+const RV_MAX = 20
+const rvHttps = u => typeof u === 'string' && u.startsWith('https://')
+const rvLink = (url, label, cls) => (rvHttps(url) ? h('a', { class: cls, href: url, target: '_blank', rel: 'noopener noreferrer' }, label) : h('span', { class: cls }, label))
+const rvReqs = () => arr(S.plan.requests).filter(r => r.type === 'review')
+const rvPend = text => rvReqs().some(r => r.text === text)
+const rvQueued = () => new Set(rvReqs().flatMap(r => (typeof r.text === 'string' && r.text.startsWith('post ') ? r.text.slice(5).split(',') : [])))
+// What the core accepts in a post (§14.3): a GitHub comment not replied to yet that has a stored answer/decline text or is accepted.
+const rvReplyable = c => !!S.plan.review_pr && c.source === 'github' && !c.posted &&
+  (cmState(c) === 'accepted' || (!!c.proposal && ['answer', 'decline'].includes(c.proposal.action) && !!c.proposal.text))
+const rvPicked = () => arr(S.plan.comments).filter(c => S.rv.picks[c.id] && rvReplyable(c)).map(c => c.id).slice(0, RV_MAX)
+// A Post binds each ref to the proposal revision the card shows, so a reply the session swapped in after the page last polled is refused, not posted.
+function rvSend(action, refs, done) {
+  const shown = {}
+  if (refs) for (const id of refs) { const c = arr(S.plan.comments).find(x => x.id === id); if (c && c.proposal && Number.isInteger(c.proposal.rev)) shown[id] = c.proposal.rev }
+  return cmPost({ type: 'review', action, ...(refs ? { refs, proposals: shown } : {}) }, done)
+}
+function rvTags(c) {
+  if (c.source !== 'github') return []
+  return [rvLink(c.url, 'GitHub', 'cm-tag'), c.edited ? h('span', { class: 'cm-tag' }, 'edited') : null, c.resolved ? h('span', { class: 'cm-tag resolved' }, 'resolved on GitHub') : null]
+}
+function rvReply(c, loc) {
+  if (c.source !== 'github') return null
+  if (c.posted && typeof c.posted === 'object') return h('div', { class: 'cm-reply' }, rvLink(c.posted.url, 'Replied on GitHub'))
+  const queued = rvQueued().has(c.id)
+  if (!queued && !rvReplyable(c)) return null
+  const on = !!S.rv.picks[c.id]
+  const box = h('input', { type: 'checkbox', 'data-act': 'reply', checked: on, disabled: !on && rvPicked().length >= RV_MAX, onchange: () => { S.rv.picks[c.id] = box.checked; cmRefresh(cmSel(c.id, loc, 'reply')) } })
+  // A queued post can be refused later (stale proposal, PR not pushed yet); a new post for the same ref replaces the old request, so the owner can send it again.
+  if (queued) return h('div', { class: 'cm-reply' }, h('span', {}, 'Reply queued: waiting for the session…'),
+    h('button', { class: 'btn', 'data-act': 'repost', 'aria-label': 'Post the reply to ' + c.id + ' again', onclick: () => rvSend('post', [c.id], () => { delete S.rv.picks[c.id] }) }, 'Post again'),
+    rvReplyable(c) ? h('label', {}, box, 'Add to the next post') : null)
+  return h('div', { class: 'cm-reply' }, h('label', {}, box, 'Reply on GitHub'),
+    h('span', { class: 'hint' }, cmState(c) === 'accepted' ? 'Reply names the pushed commit: push the new version first' : 'Posts the proposed ' + (c.proposal.action === 'decline' ? 'decline' : 'reply')))
+}
+const rvNextText = () => 'next check in ~' + Math.max(1, Math.ceil((RV_EVERY - (Date.now() - S.rv.at)) / 60000)) + 'm'
+function rvStrip() {
+  const p = S.plan, pr = p.review_pr && typeof p.review_pr === 'object' ? p.review_pr : null
+  if (!pr && !p.repo) return null // nothing to publish from
+  const btn = (id, label, onclick, cls, off) => h('button', { id, class: 'btn' + (cls ? ' ' + cls : ''), 'aria-disabled': off ? 'true' : null, onclick: off ? null : onclick }, label)
+  const act = a => () => rvSend(a)
+  const pending = rvReqs().map(r => r.text)
+  const head = h('span', { class: 'rv-h' }, 'Review PR')
+  const kids = []
+  if (!pr) {
+    const wait = rvPend('open')
+    const ask = S.rv.confirm && !wait
+      ? h('span', { id: 'rv-confirm', class: 'rv-confirm', role: 'group', 'aria-label': 'Confirm opening the pull request' }, h('span', {}, 'Open a draft pull request now?'),
+        btn('rv-yes', 'Yes, open it', () => { S.rv.confirm = false; rvSend('open') }, 'primary'),
+        btn('rv-no', 'Cancel', () => { S.rv.confirm = false; cmRefresh('#rv-open') }))
+      : btn('rv-open', 'Open review PR', () => { S.rv.confirm = true; cmRefresh('#rv-no') }, 'primary', wait)
+    kids.push(h('div', { class: 'rv-row' }, head, ask, h('small', { class: 'rv-note' }, 'Publishes the PRD to branch prd/' + String(p.slug || p.id) + ' and opens a DRAFT pull request. Needs your click.')))
+  } else {
+    const link = rvLink(pr.url, 'PR #' + pr.number, 'rv-pr')
+    link.id = 'rv-pr'
+    kids.push(h('div', { class: 'rv-row' }, head, link, h('code', { class: 'rv-branch' }, String(pr.branch)), h('span', { class: 'rv-rev' }, 'published rev ' + pr.prd_rev),
+      p.rev > pr.prd_rev ? h('span', { class: 'rv-drift' }, 'PRD changed since publish (rev ' + p.rev + ')') : null))
+    kids.push(h('div', { class: 'rv-row' }, btn('rv-push', 'Push new version', act('push'), '', rvPend('push')), btn('rv-pull', 'Pull review', act('pull'), '', rvPend('pull')),
+      h('span', { class: 'rv-pulled' }, pr.pulled_at ? 'last pulled ' + cmAgo(pr.pulled_at) : 'not pulled yet')))
+    const auto = h('input', { id: 'rv-auto', type: 'checkbox', checked: S.rv.auto, onchange: () => {
+      S.rv.auto = auto.checked
+      S.rv.at = Date.now()
+      try { localStorage.setItem('hq.plan.autopull', auto.checked ? '1' : '0') } catch (e) { /* not remembered */ }
+      cmRefresh('#rv-auto')
+    } })
+    kids.push(h('div', { class: 'rv-row rv-autorow' }, h('label', {}, auto, 'Check for new review comments every 2 min while this page is open'), S.rv.auto ? h('span', { id: 'rv-next', class: 'rv-next' }, rvNextText()) : null))
+  }
+  if (pending.length) kids.push(h('div', { id: 'rv-pending', class: 'rv-pending' }, 'Waiting for the session…: ' + pending.join('; ')))
+  return h('div', { id: 'rv', class: 'rv' }, ...kids)
+}
+// Sticky while there are ticked replies; the click is the user's say-so for exactly these comments (the core re-checks each one).
+function rvBar() {
+  const refs = rvPicked()
+  if (!refs.length) return null
+  const q = rvQueued(), off = rvPend('post ' + refs.join(',')) && !refs.some(r => q.has(r))
+  return h('div', { id: 'rv-bar', class: 'rv-bar', role: 'region', 'aria-label': 'Post replies to GitHub' }, h('span', {}, 'Replies are sent to GitHub only when you click.'),
+    h('button', { id: 'rv-post', class: 'btn primary', 'aria-disabled': off ? 'true' : null, onclick: off ? null : () => rvSend('post', refs, () => { for (const r of refs) delete S.rv.picks[r] }) }, 'Post ' + refs.length + (refs.length === 1 ? ' reply' : ' replies')))
+}
+// Auto-pull: every 10 s look, ask for a pull at most every 2 min, only with the tab visible and no pull already waiting.
+function rvTick() {
+  if (!S.plan) return
+  const next = $('#rv-next')
+  if (S.rv.auto && S.plan.review_pr && !document.hidden && !rvPend('pull') && !S.busy && Date.now() - S.rv.at >= RV_EVERY) { S.rv.at = Date.now(); rvSend('pull') }
+  if (next) next.textContent = rvNextText()
+}
 function renderPrd() {
   const root = $('#p-prd'), p = S.plan
   root.replaceChildren()
-  const { art, filled, total } = renderPrdBody(S.prd || '', S.flash.prd)
+  const { art, filled, total, toc } = renderPrdBody(S.prd || '', S.flash.prd)
   const ap = p.approved
   root.append(h('div', { class: 'prdhead' },
     h('span', {}, 'rev ', h('b', {}, String(p.rev))),
     ap ? h('span', { class: 'appr' + (p.rev > ap.rev ? ' drift' : '') }, p.rev > ap.rev ? 'Approved at rev ' + ap.rev + '; changed since (rev ' + p.rev + ')' : 'Approved at rev ' + ap.rev) : h('span', {}, 'not approved'),
-    h('span', {}, filled + ' of ' + total + ' sections filled · regenerated from plan.json')))
+    h('span', {}, filled + ' of ' + total + ' sections filled · regenerated from plan.json'),
+    h('button', { id: 'cm-jump', class: 'btn cm-jump', onclick: () => { const b = $('#cm-box'); if (b) b.scrollIntoView({ block: 'start' }); const f = $('#cm-text'); if (f) f.focus({ preventScroll: true }) } }, 'Add a comment'),
+    paneButton()))
   if (!S.prd) art.append(h('p', { class: 'why' }, 'The PRD is not rendered yet.'))
-  root.append(art, gate())
+  // Comments sit under their section; the rest (no anchor, a section the PRD lacks, a node that is gone) go in Unanchored; comments on a node get their own group and the node panel.
+  const bySec = {}, loose = [], onNodes = []
+  for (const c of arr(p.comments)) {
+    if (cmParent(c)) continue // shown inside its thread root
+    const sec = /^§\d+$/.test(c.anchor || '') && toc.some(t => t.no === c.anchor) ? c.anchor : null
+    if (sec) (bySec[sec] = bySec[sec] || []).push(c)
+    else if (c.anchor && node(c.anchor)) onNodes.push(c)
+    else loose.push(c)
+  }
+  for (const t of toc) {
+    const sec = bySec[t.no]
+    if (sec) art.querySelector('section[id="' + t.id + '"]').append(h('div', { class: 'cm-sec' }, h('h3', { class: 'cm-sh' }, 'Comments'), sec.map(c => cmCard(c, 'prd', false))))
+  }
+  const group = (id, title, list) => (list.length ? h('section', { id, class: 'cm-grp' }, h('h3', {}, title + ' (' + list.length + ')'), list.map(c => cmCard(c, 'prd', true))) : null)
+  const rv = rvStrip()
+  if (rv) root.append(rv)
+  const comments = h('div', { class: 'cm-top' }, cmComposer(toc), h('div', { class: 'cm-lists' }, group('cm-unanchored', 'Unanchored', loose), group('cm-nodes', 'On nodes', onNodes)))
+  // The outline is a jump list for the wide layout (hidden below 1100px and while the node panel is open); prdSpy marks the section being read.
+  const outline = h('nav', { class: 'prd-outline', 'aria-label': 'PRD sections' }, toc.map(t =>
+    h('a', { href: '#' + t.id, onclick: ev => { ev.preventDefault(); const s = document.getElementById(t.id); if (s) { s.scrollIntoView(); prdMark(t.id) } } }, t.no ? h('span', { class: 'no' }, t.no) : null, t.text)))
+  // The PRD comes first and the comments below it (the header's button jumps there); the reply bar and the gate share one sticky foot so the bar stacks above the gate.
+  root.append(h('div', { class: 'prd-wrap' }, art, outline), comments, h('div', { class: 'prd-foot' }, rvBar(), gate()))
+}
+// Section being read: the one under a point just below the top of the page, in the first text column (sections flow in columns on wide screens).
+function prdMark(id) {
+  for (const a of document.querySelectorAll('.prd-outline a')) a.setAttribute('aria-current', String(a.getAttribute('href') === '#' + id))
+}
+function prdSpy() {
+  const secs = [...document.querySelectorAll('.prd > section[id]')]
+  if (!secs.length || !$('#p-prd').classList.contains('on')) return
+  const atEnd = window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
+  const art = $('.prd').getBoundingClientRect()
+  const hit = document.elementFromPoint(art.left + 8, 40)
+  let cur = atEnd ? secs[secs.length - 1] : hit && hit.closest ? hit.closest('.prd > section[id]') : null
+  if (!cur && document.querySelector('.prd-outline a[aria-current=true]') && window.scrollY > 0) return // between two sections: keep the last one
+  cur = cur || secs[0]
+  prdMark(cur.id)
 }
 
 function renderBuild() {
@@ -1021,7 +1599,7 @@ function renderLog() {
   const root = $('#p-log'), p = S.plan
   root.replaceChildren()
   const wrap = h('div', { class: 'logs' })
-  const rq = requestsBlock('reqs')
+  const rq = requestsBlock('reqs', '#p-log')
   if (rq) { rq.className = ''; wrap.append(h('section', {}, h('h3', {}, 'Waiting for the session'), rq.querySelector('ul'))) }
   wrap.append(h('section', {}, h('h3', {}, 'Recent activity'),
     arr(p.recent).length ? p.recent.map(r => h('div', { class: 'le' + (S.flash.recent.has(r.rev) ? ' fresh' : '') },
@@ -1043,7 +1621,7 @@ function renderStrip() {
   $('#strip').replaceChildren(h('span', { class: 'lbl' }, 'LOG'),
     h('div', { class: 'it' }, arr(p.recent).slice(0, 3).map(r => h('span', {}, h('b', {}, 'rev ' + r.rev), ' ' + (r.summary || r.type))),
       rs.length ? h('span', { class: 'rq' }, rs.length + ' waiting for the session') : null),
-    h('span', { class: 'tip' }, 'select a node → Reopen / Park / Expand'))
+    h('span', { class: 'tip' }, 'select a node to open it'))
 }
 // ---------- board: Ideate and Research (contract §12). Plan data only ever enters through h() text nodes. ----------
 const BD_STEP = 5
@@ -1174,14 +1752,14 @@ function bdCard(p, row, ctx) {
     } }, first ? 'Cancel merge' : target ? 'Merge with ' + bd.merge : 'Merge'),
     h('button', { class: 'b-btn', 'data-act': 'research', onclick: () => bpost({ type: 'research', node: i.id }) }, 'Research this'),
     settled ? null : h('button', { class: 'b-btn primary', 'data-act': 'promote', onclick: () => { bd.promote = i.id; bd.kill = null; renderBoard() } }, 'Promote'))
-  return h('article', { class: 'b-card' + (target ? ' target' : '') + (S.flash.nodes.has(i.id) ? ' flash' : ''), 'data-id': i.id, 'data-boost': String(boost) },
+  return h('article', { class: 'b-card' + (target ? ' target' : '') + (S.sel === i.id ? ' sel' : '') + (S.flash.nodes.has(i.id) ? ' flash' : ''), 'data-id': i.id, 'data-boost': String(boost) },
     h('div', { class: 'b-top' },
       h('span', { class: 'b-id' }, i.id),
       draft ? h('span', { class: 'b-pill draft' }, 'draft') : null,
       settled ? h('span', { class: 'b-stamp done' }, 'Promoted') : null,
       boost ? h('span', { class: 'b-stars', 'aria-hidden': 'true' }, '★'.repeat(boost)) : null,
       i.tier ? h('span', { class: 'b-tier' }, i.tier) : null),
-    h('h3', {}, i.label),
+    h('h3', {}, h('button', { class: 'b-open', 'aria-pressed': String(S.sel === i.id), onclick: () => toggleNode(i.id, byId('.b-card', i.id) + ' .b-open') }, i.label)),
     i.hook ? h('p', { class: 'b-hook' }, i.hook) : null,
     arr(i.merged_from).length ? h('p', { class: 'b-hook' }, 'merged from ' + i.merged_from.join(' + ')) : null,
     i.merged_into ? h('p', { class: 'b-hook' }, 'merged into ' + i.merged_into + (arr(p.nodes).some(n => n.id === i.merged_into && n.status === 'killed') ? ' (killed)' : '')) : null,
@@ -1289,43 +1867,437 @@ function renderTabs() {
   const v = curView()
   if (v === 'board') S.view = 'board' // the board stays put when promote moves the stage on to Frame
   const board = boardOn(S.plan)
-  const tabs = [...(board ? [['board', 'Board']] : []), ['lanes', 'Lanes'], ['prd', 'PRD'], ['build', 'Build'], ['log', 'Log']]
+  const open = cmOpenCount() // comments waiting on the session or on you
+  const tabs = [...(board ? [['board', 'Board']] : []), ['lanes', 'Lanes'], ['prd', 'PRD' + (open ? ' · ' + open + ' open' : '')], ['build', 'Build'], ['log', 'Log']]
   $('#tabs').replaceChildren(...tabs.map(t => h('button', { class: 'tab', role: 'tab', 'aria-selected': String(v === t[0]), onclick: () => { S.view = t[0]; renderTabs() } }, t[1])))
   const bv = v === 'build' ? 'lanes' : v
   const bn = $('#bnav')
   bn.hidden = false
-  bn.replaceChildren(...[['now', '◉', 'Now'], ...(board ? [['board', '▦', 'Board']] : []), ['lanes', '▤', 'Map'], ['prd', '§', 'PRD'], ['log', '≡', 'Log']].map(t =>
+  bn.replaceChildren(...[['now', '◉', 'Now'], ...(board ? [['board', '▦', 'Board']] : []), ['lanes', '▤', 'Map'], ['prd', '§', 'PRD' + (open ? ' · ' + open : '')], ['log', '≡', 'Log']].map(t =>
     h('button', { role: 'tab', 'aria-selected': String(bv === t[0]), 'data-view': t[0], onclick: () => { S.view = t[0]; renderTabs(); window.scrollTo(0, 0) } }, h('i', { 'aria-hidden': 'true' }, t[1]), t[2])))
   for (const p of ['board', 'lanes', 'prd', 'build', 'log']) $('#p-' + p).classList.toggle('on', v === p)
   document.body.setAttribute('data-view', v)
+  renderPane() // after data-view: the docked pane shows on the PRD view only
+  prdSpy()
 }
 function renderAll() {
-  const keep = document.activeElement && document.activeElement.hasAttribute && document.activeElement.hasAttribute('data-draft')
-  renderHead(); renderNotice(); renderNow(); renderLanes(); renderPrd(); renderBuild(); renderLog(); renderBoard(); renderStrip(); renderTabs()
+  const ae = document.activeElement
+  const keep = ae && ae.hasAttribute && ae.hasAttribute('data-draft') ? { sel: (ae.closest('#nodepanel') ? '#nodepanel ' : '') + '[data-draft="' + ae.getAttribute('data-draft') + '"]', a: ae.selectionStart, b: ae.selectionEnd } : null
+  // A comment button keeps focus through a re-render too (drafts are covered by data-draft above).
+  const cb = ae && ae.dataset && ae.dataset.act && ae.closest && ae.closest('.cm')
+  const cmKey = cb ? cmRoot(ae.closest('#nodepanel') ? 'panel' : 'prd') + '.cm[data-id="' + CSS.escape(cb.dataset.id) + '"] [data-act="' + ae.dataset.act + '"]' : null
+  const rk = ae && ae.id && ae.closest && ae.closest('#rv, #rv-bar') ? '#' + ae.id : null // the review strip and bar keep focus too
+  renderHead(); renderNotice(); renderNow(); renderLanes(); renderPrd(); renderBuild(); renderLog(); renderBoard(); renderStrip(); renderTabs(); renderPanel()
   S.flash = { nodes: new Set(), prd: new Set(), recent: new Set() }
   if (keep || S.focusDraft) {
+    const fresh = S.focusDraft
     S.focusDraft = false
-    const f = $('[data-draft]')
-    if (f) { f.focus(); f.setSelectionRange && f.setSelectionRange(f.value.length, f.value.length) }
+    const f = fresh ? $('[data-draft]:not([data-draft="thread"]):not([data-draft^="cm-"]):not([data-draft^="pane-"])') : $(keep.sel)
+    if (f) { f.focus(fresh ? undefined : { preventScroll: true }); f.setSelectionRange && (fresh ? f.setSelectionRange(f.value.length, f.value.length) : f.setSelectionRange(keep.a, keep.b)) }
+  } else if (cmKey || rk) {
+    const f = $(cmKey || rk)
+    if (f) f.focus({ preventScroll: true })
   }
 }
 
-// Select a node from anywhere (PRD link, request, up-next row): switch to the lanes and bring it into view.
-function jumpTo(id) {
+// ---------- node panel: one column on the right (a full-screen sheet on a phone). Plan text only ever enters through h(). ----------
+// Open the panel for a node from anywhere (lane box, board card, PRD link, Up next row, request, lint finding) without leaving the view.
+// `opener` is a selector for what gets the focus back when the panel closes.
+function selectNode(id, opener) {
   const n = node(id)
   if (!n) { toast(id + ' is not in the plan.'); return }
+  if (S.form && S.form.where === 'node' && S.form.node !== id) S.form = null
   S.sel = id
-  S.view = 'lanes'
+  S.opener = opener || S.opener
   S.collapsed[laneOf(n)] = false
-  renderLanes(); renderTabs()
-  const el = document.querySelector('.node[data-id="' + CSS.escape(id) + '"]')
-  if (el) el.scrollIntoView({ block: 'center' })
+  syncHash()
+  renderNow(); renderLanes(); renderBoard(); renderPanel()
+  $('#nodepanel').focus({ preventScroll: true })
+}
+// The open node and the open PRD pane live in the hash so a reload brings them back: #node=Q7, #pane or both, #node=Q7&pane. replaceState keeps it out of the history.
+function syncHash() {
+  const parts = [...(S.sel ? ['node=' + encodeURIComponent(S.sel)] : []), ...(S.pane.open ? ['pane'] : [])]
+  if (parts.length) history.replaceState(null, '', '#' + parts.join('&'))
+  else if (/^#(node=|pane(&|$))/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search)
+}
+const hashParts = () => location.hash.slice(1).split('&')
+function hashNode() {
+  const p = hashParts().find(x => x.startsWith('node='))
+  try { return p ? decodeURIComponent(p.slice(5)) : null } catch (e) { return null }
+}
+const hashPane = () => hashParts().includes('pane')
+const toggleNode = (id, opener) => (S.sel === id ? closePanel() : selectNode(id, opener))
+function closePanel() {
+  if (!S.sel) return
+  S.sel = null
+  syncHash()
+  if (S.form && S.form.where === 'node') S.form = null
+  renderNow(); renderLanes(); renderBoard(); renderPanel()
+  const o = S.opener && document.querySelector(S.opener)
+  S.opener = null
+  if (o) o.focus({ preventScroll: true })
+}
+// The phone sheets cover the page: nothing behind them may take focus (the pane too, while the node sheet is over it).
+function syncInert() {
+  const np = !!S.sel && isPhone()
+  for (const e of [$('.app'), $('#bnav')]) e.inert = np || (paneSheet() && isPhone())
+  $('#nodepanel').setAttribute('role', np ? 'dialog' : 'complementary')
+  $('#prdpane').inert = np
+}
+const npAnswerable = n => n.kind === 'question' && n.status === 'open'
+const npFocusKey = e => e.hasAttribute('data-act') ? '[data-act="' + e.getAttribute('data-act') + '"]'
+  : e.classList.contains('opt') ? '.opt[data-key="' + e.getAttribute('data-key') + '"]'
+    : e.classList.contains('np-link') ? '.np-link[data-id="' + e.getAttribute('data-id') + '"]'
+      : e.classList.contains('np-close') ? '.np-close' : null
+
+const NP_TEXT = [['body', 'Detail'], ['context', 'Context'], ['why', 'Why'], ['evidence', 'Evidence'], ['expect', 'Expected'], ['approach', 'Approach'], ['verify', 'How to verify'], ['validate_by', 'Validate by'], ['impact', 'If this is wrong'],
+  ['independent_test', 'Independent test'], ['why_priority', 'Why this slice'], ['exit', 'Done when'], ['hook', 'Hook'], ['pitch', 'Pitch'], ['who', 'Who it is for'], ['win', 'Why it could win'], ['kill_reason', 'Why it is out']]
+// Fields the panel draws itself; every other populated field is listed as plain text so nothing the plan holds stays hidden.
+const NP_OWN = new Set(['id', 'kind', 'label', 'status', 'lane', 'depends_on', 'refs', 'fills', 'thread', 'answer', 'options', 'recommended', 'chose', 'alternatives', 'check', 'files', 'result', 'scenarios',
+  'scores', 'gates', 'checks', 'sources', 'twists', 'merged_from', 'merged_into', 'boost', 'by_default', 'priority', 'by', 'rev', ...NP_TEXT.map(t => t[0])])
+const npHas = v => v != null && v !== false && v !== '' && !(Array.isArray(v) && !v.length)
+const npCap = k => k[0].toUpperCase() + k.slice(1).replace(/_/g, ' ')
+const npVal = v => (Array.isArray(v) ? v.map(npVal).join(', ') : v === true ? 'yes' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+
+function npDetails(n) {
+  const kv = []
+  const add = (k, v) => { if (npHas(v)) kv.push(h('dt', {}, k), h('dd', {}, v)) }
+  const list = (items, code) => h('ul', {}, items.map(x => h('li', {}, code ? h('code', {}, x) : x)))
+  for (const [k, label] of NP_TEXT) add(label, npHas(n[k]) ? String(n[k]) : null)
+  if (n.priority > 0) add('Priority', 'raised')
+  const opts = arr(n.options)
+  if (opts.length && !npAnswerable(n)) {
+    add('Options', h('ul', { class: 'np-ol' }, opts.map(o => h('li', {}, h('b', {}, o.label), n.recommended === o.key ? [' ', h('span', { class: 'star', title: 'Recommended' }, '★')] : null,
+      n.answer && n.answer.choice === o.key ? ' · chosen' : null, o.why ? h('small', {}, o.why) : null))))
+  }
+  const a = n.answer
+  if (a) add('Answer', [a.choice ? optionLabel(n, a.choice) : String(a.text || ''), h('small', {}, 'answered by ' + (a.by || 'someone') + (a.source ? ' via ' + a.source : '') + (a.rev != null ? ' at rev ' + a.rev : ''))])
+  add('Chose', n.chose)
+  add('Alternatives', arr(n.alternatives).length ? list(n.alternatives) : null)
+  if (n.kind === 'task') add('Check', n.check ? h('code', {}, n.check) : 'no runnable check yet')
+  add('Files', arr(n.files).length ? list(n.files, true) : null)
+  if (n.result) add('Result', (n.result.ok ? 'passed' : 'failed') + (n.result.note ? ': ' + n.result.note : ''))
+  add('Scenarios', arr(n.scenarios).length ? list(n.scenarios) : null)
+  if (n.by_default) add('Default', 'unexamined, nobody has confirmed it')
+  if (n.kind === 'idea') {
+    const checks = n.checks || {}
+    for (const k of BD_CHECKS) if (checks[k]) add(npCap(k), checks[k].label + (checks[k].note ? ': ' + checks[k].note : ''))
+    add('Came from', arr(n.sources).join(', '))
+    add('Merged from', arr(n.merged_from).join(', '))
+    add('Merged into', n.merged_into)
+    add('Twists', arr(n.twists).length ? list(n.twists) : null)
+    if (boostOf(n)) add('Boost', '★'.repeat(boostOf(n)) + ' of 3')
+  }
+  for (const [k, v] of Object.entries(n)) if (!NP_OWN.has(k) && npHas(v)) add(npCap(k), npVal(v))
+  const out = [kv.length ? h('dl', { class: 'np-kv' }, kv) : h('p', { class: 'np-empty' }, 'Nothing more is recorded for this node.')]
+  if (n.kind === 'idea') {
+    const rs = arr(S.plan.nodes).filter(r => r.kind === 'rubric' && r.status !== 'killed')
+    const bars = [...rs.filter(r => r.group !== 'gate').map(r => bdBar(r, (n.scores || {})[r.id])), ...rs.filter(r => r.group === 'gate').map(r => bdGateBar(r, (n.gates || {})[r.id]))]
+    if (bars.length) out.push(h('div', { class: 'np-gr' }, bars))
+  }
+  return out
+}
+
+function npLink(id) {
+  const x = node(id)
+  if (!x) return h('span', { class: 'np-link gone' }, h('span', { class: 'qid' }, id), h('span', { class: 'lb' }, 'not in the plan'))
+  return h('button', { class: 'np-link', 'data-id': id, onclick: () => {
+    selectNode(id, curView() === 'lanes' ? byId('.node', id) : null)
+    const el = curView() === 'lanes' && document.querySelector(byId('.node', id))
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  } }, h('span', { class: 'qid' }, id), h('span', { class: 'lb' }, x.label), chip(display(x), false))
+}
+function npLinks(n) {
+  const by = [...dependents(n.id)].sort((a, b) => S.plan.nodes.findIndex(x => x.id === a) - S.plan.nodes.findIndex(x => x.id === b))
+  const groups = [['depends_on', 'Depends on', arr(n.depends_on)], ['dependents', 'Depended on by', by], ['refs', 'References', arr(n.refs)], ['fills', 'Fills', arr(n.fills)]].filter(g => g[2].length)
+  return groups.length ? groups.map(([key, title, ids]) => h('div', { class: 'np-grp', 'data-group': key }, h('h4', {}, title), ids.map(npLink))) : [h('p', { class: 'np-empty' }, 'Nothing links to or from this node.')]
+}
+function npHistory(n) {
+  const evs = arr(S.plan.recent).filter(r => r.node === n.id)
+  return evs.length ? h('ul', {}, evs.map(r => h('li', {}, h('span', { class: 'np-sum' }, r.summary || r.type),
+    h('span', { class: 'np-meta' }, 'by ' + r.by + ' via ' + r.source + ' · rev ' + r.rev + ' · ' + fmtAt(r.at)))))
+    : h('p', { class: 'np-empty' }, 'No events for this node in the recent activity.')
+}
+// Answer any open question here, not only the one in focus. Same events and the same choice cards as the Now card.
+function npAnswer(n) {
+  const opts = arr(n.options), rec = n.recommended || null
+  if (!S.npPick || S.npPick.q !== n.id) S.npPick = { q: n.id, key: rec }
+  const picked = S.npPick.key
+  const formOn = k => S.form && S.form.where === 'node' && S.form.kind === k && S.form.node === n.id
+  const out = []
+  if (opts.length) {
+    out.push(h('div', { class: 'opts', role: 'radiogroup', 'aria-label': 'Options' },
+      opts.map(o => h('button', { class: 'opt' + (picked === o.key ? ' pick' : ''), role: 'radio', 'aria-checked': String(picked === o.key), 'data-key': o.key, onclick: () => { S.npPick = { q: n.id, key: o.key }; renderPanel() } },
+        h('b', {}, o.label), o.key === rec ? [' ', h('span', { class: 'star', title: 'Recommended' }, '★')] : null, o.why ? h('small', {}, o.why) : null)),
+      h('button', { class: 'opt other', 'data-act': 'other', onclick: () => (formOn('other') ? (S.form = null, renderPanel()) : openForm('node', 'other', '', n.id)) }, 'Other… (type your own)')))
+    const ro = opts.find(o => o.key === rec)
+    if (ro) out.push(h('div', { class: 'reason' }, h('b', {}, '★ Recommended: ' + ro.label + '.'), ro.why ? ' ' + ro.why : ''))
+  }
+  const freeOnly = !opts.length
+  if (freeOnly || formOn('other')) {
+    const fb = formBox('node', 'other', { node: n.id, multi: true, max: 2000, placeholder: 'Your own answer', submit: 'Send answer', onSubmit: text => post({ type: 'answer', node: n.id, text }) })
+    out.push(h('div', { class: 'form' }, fb.field, h('div', { class: 'btns' }, freeOnly ? null : fb.cancel, fb.send)))
+  }
+  const accept = !picked ? h('button', { class: 'btn primary big', disabled: true }, 'Pick an option')
+    : picked === rec ? h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: n.id, choice: 'recommended' }) }, 'Accept ★')
+      : h('button', { class: 'btn primary big', 'data-act': 'accept', onclick: () => post({ type: 'answer', node: n.id, choice: picked }) }, 'Choose “' + optionLabel(n, picked) + '”')
+  out.push(h('div', { class: 'btns' }, opts.length ? accept : null, h('button', { class: 'btn', 'data-act': 'later', onclick: () => post({ type: 'park', node: n.id }) }, 'Decide later')))
+  return out
+}
+function npActions(n) {
+  const idea = n.kind === 'idea', q = npAnswerable(n)
+  const acts = h('div', { class: 'np-acts' })
+  const ev = (label, e) => acts.append(h('button', { class: 'btn', 'data-act': e.type, onclick: () => post(e) }, label))
+  const form = (label, kind) => acts.append(h('button', { class: 'btn', 'data-act': kind, onclick: () => openForm('node', kind, kind === 'edit_label' ? n.label : '', n.id) }, label))
+  if (!idea && !['open', 'todo'].includes(n.status)) ev('Reopen', { type: 'reopen', node: n.id })
+  if (!idea && n.kind !== 'task' && n.status !== 'parked' && !q) ev('Park', { type: 'park', node: n.id })
+  if (q) ev('Prioritize', { type: 'prioritize', node: n.id })
+  if (n.kind === 'assumption' && n.status !== 'killed') ev('Strike', { type: 'strike', node: n.id })
+  ev('Expand', { type: 'expand', node: n.id })
+  form('Edit label', 'edit_label')
+  acts.append(h('button', { class: 'btn', 'data-act': 'ask', onclick: () => $('#nodethread textarea').focus() }, 'Ask'))
+  form('Add note', 'note')
+  const out = [acts]
+  if (S.form && S.form.where === 'node' && S.form.node === n.id && ['edit_label', 'note'].includes(S.form.kind)) {
+    const k = S.form.kind
+    const fb = formBox('node', k, k === 'edit_label'
+      ? { node: n.id, max: 120, placeholder: 'New label', submit: 'Save', initial: n.label, onSubmit: label => post({ type: 'edit_label', node: n.id, label }) }
+      : { node: n.id, max: 2000, placeholder: 'Note on ' + n.id, submit: 'Send', onSubmit: text => post({ type: k, node: n.id, text }) })
+    out.push(h('div', { class: 'np-form' }, fb.field, fb.send, fb.cancel))
+  }
+  return out
+}
+
+// The conversation about a node: its thread (oldest first), a pending row while an ask is open, and the composer.
+// The draft lives in S.ask[node] so a live re-render keeps it; S.asking[node] (the rev we posted at) shows the pending row until the plan has caught up.
+function npThread(n) {
+  const th = arr(n.thread)
+  const waiting = S.asking[n.id] != null || arr(S.plan.requests).some(r => r.type === 'ask' && r.node === n.id)
+  const out = []
+  if (th.length || waiting) {
+    out.push(h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about ' + n.id }, th.map(m => thMsg(m)), waiting ? thWait() : null))
+  } else out.push(h('p', { class: 'np-empty' }, 'Ask anything about this node: why it is here, what it blocks, what to change.'))
+  out.push(thComposer({
+    draft: 'thread', value: S.ask[n.id] || '', placeholder: 'Ask the session about ' + n.id + '…', label: 'Ask the session about ' + n.id,
+    onInput: v => { S.ask[n.id] = v },
+    submit: async text => {
+      const d = await post({ type: 'ask', node: n.id, text })
+      if (!d) return
+      S.ask[n.id] = ''
+      if (d.rev > S.rev) S.asking[n.id] = d.rev
+      renderPanel()
+      const f = $('#nodethread textarea')
+      if (f) f.focus({ preventScroll: true })
+    },
+  }))
+  return out
+}
+// The parts of a conversation the node panel and the PRD pane share: a bubble (`extra`: what a session answer adds under its text), the pending row, the composer.
+const thMsg = (m, extra) => h('div', { class: 'th-msg ' + (m.role === 'user' ? 'user' : 'session') },
+  h('div', { class: 'th-meta' }, h('b', {}, m.role === 'user' ? 'You' : 'Session'), m.at ? h('time', { title: m.at }, fmtAt(m.at)) : null),
+  h('div', { class: 'th-text' }, String(m.text == null ? '' : m.text)), extra)
+const thWait = () => h('div', { class: 'th-wait', role: 'status' }, h('span', { class: 'dot', 'aria-hidden': 'true' }),
+  h('div', {}, 'Waiting for the session…', h('small', {}, 'It answers when it is next at its prompt.')))
+// o: draft (the data-draft key), value (the draft), onInput(value), submit(text) (does the post), placeholder, label, id.
+function thComposer(o) {
+  const field = h('textarea', { id: o.id, class: 'field', 'data-draft': o.draft, maxlength: 2000, rows: 3, placeholder: o.placeholder, 'aria-label': o.label })
+  const count = h('span', { class: 'th-count' })
+  const send = h('button', { class: 'btn primary th-send' }, 'Send')
+  const sync = () => { send.disabled = !field.value.trim(); count.textContent = field.value.length >= 1800 ? field.value.length + ' / 2000' : '' }
+  const go = () => { const text = field.value.trim(); if (text) o.submit(text) }
+  field.value = o.value
+  sync()
+  field.addEventListener('input', () => { o.onInput(field.value); sync() })
+  field.addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); go() } })
+  send.addEventListener('click', go)
+  return h('div', { class: 'th-composer' }, field, h('div', { class: 'th-bar' }, count, send))
+}
+
+// ---------- the PRD pane: the session conversation about the whole PRD (plan.thread), docked from 1800px, a sheet below ----------
+const TRUNC = ' [truncated]' // what the core appends to a comment text it cuts at 5000
+const paneDocked = () => window.matchMedia('(min-width:1800px)').matches
+const paneSheet = () => S.pane.open && !paneDocked()
+const paneShown = () => (paneDocked() ? curView() === 'prd' : S.pane.open)
+const paneThread = () => arr(S.plan.thread).filter(m => m && typeof m === 'object')
+const paneSig = () => { const m = paneThread().filter(x => x.role !== 'user').pop(); return m ? m.ref + '|' + m.at : '' }
+const paneUnread = () => S.pane.seen !== null && !paneShown() && paneSig() !== S.pane.seen
+function paneBtnSync(b) {
+  const u = paneUnread(), d = b.querySelector('.pane-dot')
+  b.setAttribute('aria-label', 'Ask about the PRD' + (u ? ', new reply' : ''))
+  if (u && !d) b.append(h('span', { class: 'pane-dot', 'aria-hidden': 'true' }))
+  else if (!u && d) d.remove()
+}
+function paneButton() {
+  const b = h('button', { id: 'pane-open', class: 'btn pane-ask', onclick: openPane }, 'Ask about the PRD')
+  paneBtnSync(b)
+  return b
+}
+function openPane() {
+  S.pane.open = true
+  syncHash(); syncInert(); renderPane()
+  $('#prdpane').focus({ preventScroll: true })
+}
+function closePane() {
+  if (!S.pane.open) return
+  S.pane.open = false
+  syncHash(); syncInert(); renderPane()
+  const b = $('#pane-open')
+  if (b) b.focus({ preventScroll: true })
+}
+// A chip is a control only for an id the plan has: a node opens its panel, a comment is shown in the PRD view; anything else is plain text.
+function paneChip(id) {
+  const n = node(id)
+  if (n) return h('button', { class: 'pane-chip', 'data-id': id, title: n.label, 'aria-label': 'Open ' + id, onclick: () => selectNode(id, byId('#prdpane .pane-chip', id)) }, id)
+  if (arr(S.plan.comments).some(c => c.id === id)) return h('button', { class: 'pane-chip', 'data-id': id, 'aria-label': 'Show comment ' + id, onclick: () => paneShowComment(id) }, id)
+  return h('span', { class: 'pane-chip gone', 'data-id': id, title: 'Not in the plan' }, id)
+}
+let hlTimer = null
+function paneShowComment(id) {
+  S.view = 'prd'
+  if (isPhone() && S.pane.open) closePane() // the full-screen sheet hides the PRD
+  renderTabs()
+  const el = document.querySelector('#p-prd .cm[data-id="' + CSS.escape(id) + '"]')
+  if (!el) return
+  document.querySelectorAll('.cm.hl').forEach(e => e.classList.remove('hl'))
+  S.pane.hl = id
+  el.classList.add('hl')
+  el.scrollIntoView({ block: 'center' })
+  clearTimeout(hlTimer)
+  hlTimer = setTimeout(() => { S.pane.hl = null; document.querySelectorAll('.cm.hl').forEach(e => e.classList.remove('hl')) }, 2400)
+}
+// Posts the answer as a comment (the session then proposes a change): anchored on the first node it links, never on a comment, cut at 5000 the way the core cuts.
+async function paneTurn(m, key, links) {
+  const cps = Array.from(String(m.text))
+  const text = cps.length > 5000 ? cps.slice(0, 5000 - TRUNC.length).join('') + TRUNC : cps.join('')
+  const anchor = links.find(id => node(id))
+  const d = await post({ type: 'comment', text, author: 'Me (pane)', ...(anchor ? { anchor } : {}) })
+  if (!d) return
+  S.pane.sent[key] = true
+  renderPane()
+  toast('Sent as a comment; the session will propose a change')
+}
+function paneAnswerExtras(m) {
+  const links = [...new Set(arr(m.links).map(String))]
+  const key = String(m.ref || m.at || '')
+  const sent = !!S.pane.sent[key]
+  return [
+    links.length ? h('div', { class: 'pane-links' }, h('span', {}, 'Refers to'), links.map(paneChip)) : null,
+    String(m.text == null ? '' : m.text).trim() ? h('div', { class: 'pane-acts' },
+      h('button', { class: 'btn pane-turn', 'data-act': 'turn', 'data-ref': key, disabled: sent, onclick: () => paneTurn(m, key, links) }, sent ? 'Sent' : 'Turn into proposal')) : null,
+  ]
+}
+const paneFocusKey = e => e.dataset.act ? '[data-act="' + e.dataset.act + '"]' + (e.dataset.ref ? '[data-ref="' + CSS.escape(e.dataset.ref) + '"]' : '')
+  : e.classList.contains('pane-chip') ? '.pane-chip[data-id="' + CSS.escape(e.dataset.id) + '"]'
+    : e.classList.contains('pane-start') ? '.pane-start[data-i="' + e.dataset.i + '"]'
+      : e.classList.contains('pane-close') ? '.pane-close' : null
+function renderPane() {
+  const el = $('#prdpane'), th = paneThread()
+  const sheet = paneSheet()
+  el.classList.toggle('open', S.pane.open)
+  document.body.classList.toggle('pane-open', sheet && isPhone())
+  document.body.classList.toggle('pane-sheet', sheet)
+  el.setAttribute('role', sheet ? 'dialog' : 'complementary')
+  const sig = paneSig()
+  if (S.pane.seen === null || paneShown()) S.pane.seen = sig
+  const b = $('#pane-open')
+  if (b) paneBtnSync(b)
+  const waiting = S.pane.asking != null || arr(S.plan.requests).some(r => r.type === 'ask' && !r.node)
+  const vis = el.getClientRects().length > 0
+  const was = el.contains(document.activeElement) && document.activeElement !== el ? document.activeElement : null
+  const caret = was && was.hasAttribute('data-draft') ? [was.selectionStart, was.selectionEnd] : null
+  const key = was && !caret ? paneFocusKey(was) : null
+  const old = el.querySelector('.th-list')
+  const follow = !old || el.dataset.vis !== '1' || old.scrollHeight - old.scrollTop - old.clientHeight < 8
+  const top = old ? old.scrollTop : 0
+  const fresh = !old || el.dataset.vis !== '1' || el.dataset.last !== sig // opened now, or a new session reply since the last render
+  el.dataset.vis = vis ? '1' : ''
+  el.dataset.last = sig
+  const ids = arr(S.plan.comments).map(c => c.id)
+  const starts = ['Which comments conflict?', 'What would change if we accept ' + (ids[0] || 'CM1') + '?', 'What is still unclear in this PRD?']
+  const fill = t => { S.pane.draft = t; renderPane(); const f = $('#pane-text'); f.focus({ preventScroll: true }); f.setSelectionRange(t.length, t.length) }
+  const main = th.length || waiting
+    ? h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about the PRD' },
+      th.map(m => thMsg(m, m.role === 'user' ? null : paneAnswerExtras(m))), waiting ? thWait() : null)
+    : h('div', { class: 'pane-empty' },
+      h('p', { class: 'np-empty' }, 'Ask anything about the whole PRD or the comments: what conflicts, what a comment would change, what is still unclear.'),
+      h('div', { class: 'pane-starts' }, starts.map((t, i) => h('button', { class: 'btn pane-start', 'data-i': String(i), onclick: () => fill(t) }, t))))
+  el.replaceChildren(
+    h('div', { class: 'pane-head' }, h('h2', {}, 'Ask about the PRD'), h('button', { class: 'btn pane-close', title: 'Close (Esc)', onclick: closePane }, 'Close')),
+    h('div', { class: 'pane-main' }, sheet && isPhone() && S.err ? h('p', { class: 'np-err', role: 'alert' }, S.err) : null, main),
+    h('div', { class: 'pane-comp' }, thComposer({
+      id: 'pane-text', draft: 'pane-ask', value: S.pane.draft, placeholder: 'Ask about the whole PRD or the comments…', label: 'Ask the session about the PRD',
+      onInput: v => { S.pane.draft = v },
+      submit: async text => {
+        const d = await post({ type: 'ask', text })
+        if (!d) return
+        S.pane.draft = ''
+        if (d.rev > S.rev) S.pane.asking = d.rev
+        renderPane()
+        const f = $('#pane-text')
+        if (f) f.focus({ preventScroll: true })
+      },
+    })))
+  const list = el.querySelector('.th-list')
+  if (list) {
+    list.scrollTop = follow ? list.scrollHeight : top
+    // A newest session reply too tall for the list opens at its start, not its end; while the reader stays on it, later renders keep their place.
+    const last = follow && fresh && th.length && th[th.length - 1].role !== 'user' ? list.querySelector('.th-msg:last-of-type') : null
+    if (last && last.offsetHeight > list.clientHeight) list.scrollTop += last.getBoundingClientRect().top - list.getBoundingClientRect().top
+  }
+  const f = caret ? $('#pane-text') : key && el.querySelector(key)
+  if (f) { f.focus({ preventScroll: true }); if (caret) f.setSelectionRange(...caret) }
+  else if (was) el.focus({ preventScroll: true })
+}
+
+function renderPanel() {
+  const el = $('#nodepanel'), n = S.sel && node(S.sel)
+  document.body.classList.toggle('np-open', !!n)
+  el.hidden = !n
+  syncInert()
+  if (!n) { el.replaceChildren(); delete el.dataset.node; return }
+  const was = el.contains(document.activeElement) && document.activeElement !== el ? document.activeElement : null
+  const key = was && !was.hasAttribute('data-draft') ? npFocusKey(was) : null
+  const old = el.querySelector('.np-body')
+  const top = old && el.dataset.node === n.id ? old.scrollTop : 0
+  const oldList = el.dataset.node === n.id && el.querySelector('.th-list')
+  const follow = !oldList || oldList.scrollHeight - oldList.scrollTop - oldList.clientHeight < 8
+  const listTop = oldList ? oldList.scrollTop : 0
+  el.dataset.node = n.id
+  const lane = LANES.find(l => l[0] === laneOf(n))
+  const sec = (title, ...kids) => h('section', { class: 'np-sec' }, h('h3', {}, title), ...kids)
+  const here = arr(S.plan.comments).filter(c => c.anchor === n.id)
+  const cms = here.filter(c => !here.includes(cmParent(c))) // a reply to a thread root on this node shows inside the root
+  const body = h('div', { class: 'np-body' },
+    isPhone() && S.err ? h('p', { class: 'np-err', role: 'alert' }, S.err) : null,
+    npAnswerable(n) ? sec('Answer', ...npAnswer(n)) : null,
+    sec('Details', ...npDetails(n)),
+    sec('Actions', ...npActions(n)),
+    sec('Linked nodes', ...npLinks(n)),
+    cms.length ? sec('Comments', h('div', { id: 'nodecomments' }, cms.map(c => cmCard(c, 'panel', false)))) : null,
+    h('section', { class: 'np-sec np-hist' }, h('h3', {}, 'History'), npHistory(n)),
+    sec('Conversation', h('div', { id: 'nodethread', 'data-node': n.id }, npThread(n))))
+  el.replaceChildren(h('div', { class: 'np-head' },
+    h('div', { class: 'np-top' }, h('span', { class: 'np-id' }, n.id), h('span', { class: 'np-kind' }, n.kind), chip(display(n), true), lane ? h('span', { class: 'np-lane' }, lane[1] + ' lane') : null,
+      h('button', { class: 'btn np-close', title: 'Close (Esc)', onclick: closePanel }, 'Close')),
+    h('h2', {}, n.label)), body)
+  body.scrollTop = top
+  const list = body.querySelector('.th-list')
+  if (list) list.scrollTop = follow ? list.scrollHeight : listTop
+  if (was && !el.contains(document.activeElement)) (key && el.querySelector(key) || el).focus({ preventScroll: true })
 }
 
 // ---------- events ----------
+// The core's refusals that mean "your list is old", in plain words. A match refreshes the list; the notice goes when the refresh shows the new state.
+const STALE = [
+  [/^ref must name an existing comment/, 'That comment changed; the list was refreshed'],
+  [/^Only an? \w+ comment can be /, 'That comment changed; the list was refreshed'],
+  [/^The proposal changed/, 'That proposal changed; the list was refreshed'],
+  [/^Proposal no longer applies/, 'The plan changed since this proposal was made; the list was refreshed. Ask for a new one with Rework.'],
+]
 async function post(ev) {
   if (S.busy) return null
   S.busy = true
+  S.errStale = false
   document.body.classList.add('busy')
   try {
     const res = await fetch('/api/plan/' + encodeURIComponent(task) + '/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ev) })
@@ -1341,7 +2313,11 @@ async function post(ev) {
       S.lint = data.lint
       S.err = 'Cannot approve yet: ' + data.lint.filter(f => f.severity === 'block').length + ' blocking finding(s). See the readiness gate on the PRD tab.'
       S.view = 'prd'
-    } else S.err = (data && data.error) || 'The server answered ' + res.status + '.'
+    } else {
+      const raw = data && data.error, stale = typeof raw === 'string' && STALE.find(([re]) => re.test(raw))
+      S.err = stale ? stale[1] : raw || (res.status === 413 ? 'That text is too long to send (the limit is about 16 KB). Shorten it and try again.' : 'The server answered ' + res.status + '.')
+      if (stale) { S.errStale = true; toast(S.err); pollNow() }
+    }
   } catch (e) {
     S.err = 'Could not reach the server: ' + e.message
   } finally {
@@ -1397,8 +2373,16 @@ function apply(data) {
   S.prdChunks = chunks
   if (!first) for (const r of arr(plan.recent)) if (r.rev > old.rev) S.flash.recent.add(r.rev)
   if (!first && old.rev !== plan.rev) S.lint = null
-  if (S.sel && !node(S.sel)) S.sel = null
-  if (S.form && S.form.where === 'node' && !S.sel) S.form = null
+  if (S.errStale) S.err = S.errStale = null // the refresh shows the state the refusal was about
+  if (first && !S.sel) {
+    const id = hashNode(), n = id && node(id)
+    if (n) { S.sel = id; S.collapsed[laneOf(n)] = false }
+  }
+  if (first && hashPane()) { S.pane.open = true; S.view = 'prd' }
+  if (S.sel && !node(S.sel)) { toast(S.sel + ' was removed by the session'); S.sel = null; syncHash() }
+  for (const id of Object.keys(S.asking)) if (plan.rev >= S.asking[id]) delete S.asking[id]
+  if (S.pane.asking != null && plan.rev >= S.pane.asking) S.pane.asking = null
+  if (S.form && S.form.where === 'node' && S.form.node !== S.sel) S.form = null
   // A draft belongs to the question it was typed for: when focus moves on, it is dropped, never rebound to the new question.
   if (S.form && S.form.where === 'now' && S.form.node !== plan.frontier.find(id => node(id))) {
     if (S.form.text.trim()) S.err = S.form.node + (['settled', 'killed'].includes((node(S.form.node) || {}).status) ? ' was answered elsewhere' : ' is no longer in focus') + '. Your draft for it was not sent.'
@@ -1407,6 +2391,7 @@ function apply(data) {
   $('#fatal').hidden = true
   $('#planui').hidden = false
   renderAll()
+  if (first && paneSheet() && !S.sel) $('#prdpane').focus({ preventScroll: true })
 }
 function showFatal(msg, bad) {
   const f = $('#fatal')
@@ -1437,8 +2422,17 @@ async function loadList() {
   }
 }
 
+setInterval(rvTick, 10000)
 document.addEventListener('visibilitychange', () => { if (S.plan || task) (document.hidden ? schedule() : poll()) })
-window.matchMedia('(max-width:640px)').addEventListener('change', () => { if (S.plan) renderTabs() })
+window.matchMedia('(max-width:640px)').addEventListener('change', () => { if (S.plan) { renderTabs(); renderPanel() } })
+window.matchMedia('(min-width:1800px)').addEventListener('change', () => { if (S.plan) { renderTabs(); renderPanel() } })
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || ev.defaultPrevented) return
+  if (S.sel) closePanel()
+  else if (paneSheet()) closePane()
+})
+let spyQueued = false
+window.addEventListener('scroll', () => { if (!spyQueued) { spyQueued = true; requestAnimationFrame(() => { spyQueued = false; prdSpy() }) } }, { passive: true })
 if (task === null) loadList()
 else if (!task) showFatal('That plan id is not valid.', true)
 else poll()

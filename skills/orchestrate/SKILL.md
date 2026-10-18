@@ -107,7 +107,8 @@ you haven't routed before runs once and gets its brief fixed before you fan out.
 | Only after sol **and** opus fell short | gpt-6-astra, with a one-line ledger justification |
 
 Haiku at `effort: high`/`xhigh` usually suffices for read-heavy or fully specified work with an
-easy-to-check output; effort buys depth, not judgment. Set it per card (`"effort"`).
+easy-to-check output; effort buys depth, not judgment. Set it per card (`"effort"`); Claude cards default to
+`"high"` (crew §2).
 
 - **1–2 cards:** Agent (`isolation: "worktree"` for writers, `run_in_background: true`) or
   `jw run` in background Bash. `isolation: "worktree"` branches off the session's cwd repo, which may

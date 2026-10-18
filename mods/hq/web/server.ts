@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // HQ web: the crew board in a browser. Run `bun ~/.claude/mods/hq/web/server.ts`, open the URL it prints.
 // Bind address is HQ_WEB_HOST (default 127.0.0.1), port HQ_WEB_PORT (default 7717); a host that is not loopback
-// needs HQ_WEB_ALLOW_REMOTE=1. Every request needs the token in ~/.config/hq-web/token.
+// needs HQ_WEB_ALLOW_REMOTE=1. Every request needs the token in ~/.config/hq-web/token, except GET /healthz (main listener only).
 // HQ_WEB_REMOTE_PORT=<port> adds a second listener, always on 127.0.0.1, for `tailscale serve` to point at: whatever arrives there is remote (it is
 // limited to REMOTE_ROUTES, gets a Secure cookie, and needs a Host from HQ_WEB_EXTRA_HOSTS=<name>[,<name>], no port). Remote-ness is the listener,
 // never a header the client sends. The main port never accepts the extra hosts. HQ_WEB_TS_LOGIN=<login> makes the remote listener also need the
@@ -209,6 +209,9 @@ export function startServer(config: AppConfig, port: number) {
     if (remote && config.tsLogin !== undefined && (req.headers.get('tailscale-user-login') ?? '').toLowerCase() !== config.tsLogin.toLowerCase()) {
       return text(403, 'not your tailscale login')
     }
+
+    // The one open route: lets `curl` tell a live HQ with the plan routes from a stale one. Nothing but these two fields; not in REMOTE_ROUTES, so remote gets 403.
+    if (!remote && req.method === 'GET' && url.pathname === '/healthz') return json(200, { service: 'hq-web', plan: config.planBin !== undefined && config.planPage !== undefined })
 
     if (req.method === 'GET' && url.pathname === '/' && url.searchParams.has('t')) {
       if (!sameToken(url.searchParams.get('t') ?? '', config.token)) return text(401, 'unauthorized')

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Handler for a clicked tmux:// link: crew-tmux-open 'tmux://claude:3'. Strips the scheme and hands only the rest to
+# `crew go`, which validates it (a strict pattern, or a task id / session name) before any tmux call. The URL is never
+# evaluated by a shell. A failure raises a desktop notification when notify-send exists, because a background launch
+# (kitty open-actions, xdg-open) has no terminal to print to.
+set -u
+CREW=${CREW_BIN:-$HOME/.claude/bin/crew}
+url=${1-}
+case "$url" in
+  tmux://*) ;;
+  *) echo "crew-tmux-open: not a tmux:// link" >&2; exit 2 ;;
+esac
+target=${url#tmux://}
+target=${target%/}   # some openers add a trailing slash
+out=$("$CREW" go "$target" 2>&1) && exit 0
+rc=$?
+echo "$out" >&2
+if command -v notify-send >/dev/null 2>&1; then notify-send -a crew "tmux link failed" "$out" || true; fi
+exit "$rc"

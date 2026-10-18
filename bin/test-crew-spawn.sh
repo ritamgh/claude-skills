@@ -129,6 +129,8 @@ claude
 lead-a/big-job
 --model
 haiku
+--effort
+high
 $(prompt_for lead-a "$id")" "$(last_tmux)"
 eq "the fake claude was started in the repo with the task in its environment" "cwd=$T/my repo
 task=$id" "$(sed -n 1,2p "$FAKE/claude.log")"
@@ -254,10 +256,31 @@ claude
 lead-r/heavy
 --model
 sonnet
+--effort
+high
 $(prompt_for lead-r "$idr")" "$(last_tmux)"
 eq "--resume: running" "running" "$(tail -n 1 "$CREW_ROOT/$idr/status" | cut -f2)"
 check "--resume wrote the pending record" test -f "$CREW_ROOT/.pending/$idr"
 eq "--resume on a task that is not queued is refused" "crew: spawn --resume: $idr is running, not queued" "$(as lead-r SID-R "$CREW" spawn --resume "$idr")"
+
+# --- model and effort: sonnet/high unless the caller says otherwise ---
+launch_opts() { last_tmux | sed -n '/^claude$/,$p' | sed -n '4,7p' | paste -sd' '; }   # what follows `claude -n NAME`, before the prompt
+reset_fake
+lead_json lead-e SID-E
+out=$(as lead-e SID-E "$CREW" spawn me-default --repo "$T/my repo" "b"); ide=$(idof "$out")
+eq "no --model/--effort: the sub-lead starts on sonnet at effort high" "--model sonnet --effort high" "$(launch_opts)"
+check "meta records the default model" meta_has "$ide" "spawn_model=sonnet"
+check "meta records the default effort" meta_has "$ide" "spawn_effort=high"
+eq "the launched line names model and effort" "running	sub-lead launched in claude:me-default (model sonnet, effort high)" "$(tail -n 1 "$CREW_ROOT/$ide/status" | cut -f2-3)"
+out=$(as lead-e SID-E "$CREW" spawn me-opus --repo "$T/my repo" --model opus "b"); ido=$(idof "$out")
+eq "--model opus alone keeps effort high" "--model opus --effort high" "$(launch_opts)"
+check "meta records opus" meta_has "$ido" "spawn_model=opus"
+out=$(as lead-e SID-E "$CREW" spawn me-med --repo "$T/my repo" --effort medium "b"); idm=$(idof "$out")
+eq "--effort medium overrides and the model stays sonnet" "--model sonnet --effort medium" "$(launch_opts)"
+check "meta records the overriding effort" meta_has "$idm" "spawn_effort=medium"
+reset_fake
+eq "a bad --effort is refused" "crew: bad --effort 'extreme' (low, medium, high, xhigh or max)" "$(as lead-e SID-E "$CREW" spawn me-bad --repo "$T/my repo" --effort extreme "b")"
+check "the refused effort made no task and launched nothing" test ! -d "$CREW_ROOT/$D-me-bad" -a ! -e "$FAKE/tmux.log"
 
 # --- names with spaces and quotes, hostile brief text ---
 reset_fake
@@ -293,6 +316,10 @@ $T/it's a \"dir\"
 claude
 -n
 it's a \"big\" lead/quoted
+--model
+sonnet
+--effort
+high
 $(prompt_for "it's a \"big\" lead" "$idq")" "$(last_tmux)"
 
 # --- the user's own auto-compact window wins; SOFT moves the default ---

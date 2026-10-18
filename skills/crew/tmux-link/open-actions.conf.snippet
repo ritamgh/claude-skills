@@ -1,0 +1,5 @@
+# Append to ~/.config/kitty/open-actions.conf (create the file if it is missing; entries are separated by blank lines).
+# A click on a tmux:// hyperlink (OSC 8), or on tmux:// text once `tmux` is in url_prefixes (see README.md), runs the
+# handler in the background. kitty expands ~ and passes $URL as ONE argv word, with no shell in between.
+protocol tmux
+action launch --type=background ~/.claude/skills/crew/tmux-link/crew-tmux-open $URL

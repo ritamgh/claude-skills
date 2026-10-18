@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=crew tmux link
+Comment=Open a tmux:// link in the matching tmux window (crew go)
+Exec=HOME_DIR/.claude/skills/crew/tmux-link/crew-tmux-open %u
+Terminal=false
+NoDisplay=true
+MimeType=x-scheme-handler/tmux;

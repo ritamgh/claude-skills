@@ -81,7 +81,24 @@ the filled doc and link it; never fill a long doc inline.
    | draft | sonnet (writing for a person) |
    | ship, small or fully specified | sonnet; haiku `effort: high` if every change is named |
    | ship, bigger feature/refactor | sonnet, or jcode: `jw run --slug crew --task <id> --repo <repo> <dir>/brief.md` in background Bash |
-   | hard design or debugging | opus; say why in one line |
+   | hard design or debugging | opus, `effort: high`; say why in one line |
+
+   **Leads** (the main session, `crew spawn` sub-leads and `--top` leads) are sonnet at
+   `effort: high`: most of a lead's time is briefing, verifying and merging. `crew spawn`
+   defaults to `--model sonnet --effort high` (it always passes `--effort`, so the result does
+   not depend on the model's entry in `modelSettings`); `--model opus` or `--effort` needs
+   the one-line why. The opus steps are not the lead: /shape, PRDs, architecture calls and
+   security passes go to an agent you dispatch with `model: "opus"`, `effort: "high"`; the
+   lead stays on sonnet.
+
+   Escalate a lead to opus at high, with a one-line reason, when the same bug has failed
+   twice, or when a review finding conflicts with the lead's own reading of the code. Rework
+   signal: if a sonnet lead's work needs more rework than before (workers re-dispatched, `jw
+   review` finding more real bugs), move that lead back to opus. `jw review` stays mandatory
+   for anything over ~30 changed lines or risky logic; it is what makes sonnet leads safe.
+
+   Workers get `effort: "high"` on the table's models; scouting and search stay with a haiku
+   Explore agent or `jw ask`.
 
    Claude worker: Agent with the prompt `Read and follow your brief: <dir>/brief.md`. Agents
    run in the background and notify you when done.
@@ -287,14 +304,16 @@ never auto-joined. `crew whoami` shows your parent (live or gone) and your subs.
 - **Spawning a sub-lead** (leads only, never workers). Spawn when a part needs its own
   conversation with the user or a long loop (orchestrate §0); small or single-step work stays
   a worker.
-  `crew spawn <slug> [--repo DIR] [--model M] "brief" | --brief FILE` makes the task, writes
+  `crew spawn <slug> [--repo DIR] [--model M] [--effort E] "brief" | --brief FILE` (default sonnet/high: §2) makes the task, writes
   the brief, opens a tmux window running `claude -n <you>/<slug>` and joins it to you on its
   first `crew whoami`; it runs `/orchestrate` and reports up by milestones. Max 3 live
   sub-leads per lead, nested at most 2 deep (refused with the reason). Low RAM queues it:
   `crew next` then says `crew spawn --resume <id>`. It shows in `crew ls` (`[claude:<window>]`)
   and `crew subs`. Its "done" is a claim like any worker's: verify before relaying. Nothing
-  closes its window; the user can open it any time (`tmux select-window -t claude:<window>`).
-  `crew spawn --top SLUG --repo DIR [--model M] "msg"` starts a top-level lead with no chain link
+  closes its window; the user can open it any time (`tmux select-window -t claude:<window>`, or `crew go <id>`).
+  When you point the user at a sub-lead, give `tmux://<id>` next to any claude.ai link: a click runs `crew go <id>`
+  and lands in its window (setup for kitty: `skills/crew/tmux-link/README.md`).
+  `crew spawn --top SLUG --repo DIR [--model M] [--effort E] "msg"` starts a top-level lead with no chain link
   (max 5 live, repo must be a git repo or under ~/Developer). It is for the user and HQ's New lead
   button; leads never use it: spawn sub-leads instead.
 - **Feature owners** (a feature that changes repeatedly; a one-off is a worker, orchestrate §0).
@@ -422,7 +441,10 @@ top-level lead (no live parent) sends the completion alert (`<lead>: <task>`, th
 `crew hold` / `crew ask` send the decision (`<lead>: D<n>`, the question). A sub-lead's summary sends
 nothing (it reports to its lead); re-saving the same summary text never alerts twice. `crew log` state
 changes and the `crew-watch` timer (stalled task, RAM freed) are silent unless `CREW_NOTIFY_WATCH=1`.
-Don't send your own. `crew-notify --test` checks the phone path. A long worker should still log a
+Don't send your own. `crew-notify --test` checks the phone path. Separately, the `notify-question.sh` hook
+(PreToolUse `AskUserQuestion|ExitPlanMode`, Notification `permission_prompt`) alerts for any session that waits on a
+question, plan approval or permission prompt (`<session name>: question|plan|permission`; once per session and body
+within 30 s; `CREW_NOTIFY_QUESTIONS=0` turns it off). A long worker should still log a
 progress line (`crew log <id> running "part 2/4"`) at least every ~20 min so it doesn't look stalled.
 
 **Auto-park.** When you suggest a fix, follow-up or cleanup and the user doesn't act on it

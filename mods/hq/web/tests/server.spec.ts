@@ -45,7 +45,7 @@ const COMPOSER = ['● Done. All tests pass.', '', '─────────�
 
 // A scratch HOME-less world: fake crew, tmux-map, tmux and gh scripts that read their answers from files in `dir` and
 // log every argv (one line per call, arguments joined by \x1f).
-function world(opts: { map?: string; pane?: string; ls?: string; extraHosts?: string[]; tsLogin?: string } = {}) {
+function world(opts: { map?: string; pane?: string; ls?: string; extraHosts?: string[]; tsLogin?: string; planBin?: string; planPage?: string } = {}) {
   const dir = mkdtempSync(`${tmpdir()}/hqweb-`)
   dirs.push(dir)
   const bin = `${dir}/bin`
@@ -122,7 +122,7 @@ exit 0`,
   writeFileSync(`${dir}/display.txt`, '500\tclaude\n')
   const env = { PATH: `${bin}:${process.env.PATH}`, HOME: dir }
   const server = startServer(
-    { host: '127.0.0.1', token: TOKEN, page: PAGE, crewBin: `${bin}/crew`, crewRoot: crew, tmuxMapBin: `${bin}/tmux-map`, tmuxBin: 'tmux', ghBin: `${bin}/gh`, env, now: () => NOW, cacheMs: 0, procRoot, settleMs: 300, ...(opts.extraHosts ? { extraHosts: opts.extraHosts, remotePort: 0 } : {}), ...(opts.tsLogin ? { tsLogin: opts.tsLogin } : {}) },
+    { host: '127.0.0.1', token: TOKEN, page: PAGE, crewBin: `${bin}/crew`, crewRoot: crew, tmuxMapBin: `${bin}/tmux-map`, tmuxBin: 'tmux', ghBin: `${bin}/gh`, env, now: () => NOW, cacheMs: 0, procRoot, settleMs: 300, ...(opts.extraHosts ? { extraHosts: opts.extraHosts, remotePort: 0 } : {}), ...(opts.tsLogin ? { tsLogin: opts.tsLogin } : {}), ...(opts.planBin ? { planBin: opts.planBin } : {}), ...(opts.planPage ? { planPage: opts.planPage } : {}) },
     0,
   )
   servers.push(server)
@@ -223,6 +223,66 @@ describe('token and headers', () => {
     const res = await fetch(`${w.base}/api/send`, { method: 'POST', headers: { ...w.auth, 'Content-Type': 'text/plain' }, body: 'target=claude:1.0&text=hi' })
     expect(res.status).toBe(415)
     expect(w.sends()).toEqual([])
+  })
+})
+
+describe('healthz', () => {
+  const PLAN = { planBin: '/nonexistent/plan', planPage: PAGE }
+
+  test('healthz answers 200 without any token and says the plan routes exist; a gate moved below authed() would make this 401', async () => {
+    const w = world(PLAN)
+    const res = await fetch(`${w.base}/healthz`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/json; charset=utf-8')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(await res.json()).toEqual({ service: 'hq-web', plan: true })
+  })
+
+  test('healthz leaks nothing: the body keys are exactly service and plan, with tasks and a board in play', async () => {
+    const w = world(PLAN)
+    const body = (await (await fetch(`${w.base}/healthz`)).json()) as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(['plan', 'service'])
+    expect(JSON.stringify(body)).not.toContain('1017')
+  })
+
+  test('plan is false when planBin or planPage is missing, so a stale HQ without the plan routes is told apart from a live one', async () => {
+    for (const opts of [{}, { planBin: '/nonexistent/plan' }, { planPage: PAGE }]) {
+      const w = world(opts)
+      const res = await fetch(`${w.base}/healthz`)
+      expect([opts, res.status, await res.json()]).toEqual([opts, 200, { service: 'hq-web', plan: false }])
+    }
+  })
+
+  test('an unknown Host is still 403 on healthz (DNS rebinding check stays in front)', async () => {
+    const w = world(PLAN)
+    const res = await fetch(`${w.base}/healthz`, { headers: { Host: 'evil.example:80' } })
+    expect(res.status).toBe(403)
+    expect(await res.text()).toBe('unknown host')
+  })
+
+  test('healthz is not a remote route: 403 with the token and never 200 without it on the remote listener', async () => {
+    const w = world({ ...PLAN, extraHosts: [TS] })
+    const withToken = await fetch(`${w.remoteBase}/healthz`, { headers: { Host: TS, Authorization: `Bearer ${TOKEN}` } })
+    expect(withToken.status).toBe(403)
+    expect(await withToken.json()).toEqual({ error: 'not available from a remote host' })
+    expect((await fetch(`${w.remoteBase}/healthz`, { headers: { Host: TS } })).status).toBe(401)
+  })
+
+  test('only GET: other methods on healthz keep the old answer (401 without a token)', async () => {
+    const w = world(PLAN)
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      expect([method, (await fetch(`${w.base}/healthz`, { method })).status]).toEqual([method, 401])
+    }
+    expect((await fetch(`${w.base}/healthz/`)).status).toBe(401)
+  })
+
+  test('everything else still needs the token, plan routes included', async () => {
+    const w = world(PLAN)
+    for (const path of ['/', '/api/board', '/api/plans', '/plan', '/plan/1017-x', '/api/plan/1017-x']) {
+      expect([path, (await fetch(`${w.base}${path}`)).status]).toEqual([path, 401])
+    }
+    expect((await fetch(`${w.base}/api/plans`, { headers: w.auth })).status).not.toBe(401)
   })
 })
 

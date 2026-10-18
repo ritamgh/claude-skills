@@ -60,7 +60,10 @@ Smart-skip: when the user's request already answers a seed ("for me, by Friday")
 `--by user --source terminal` and `text` quoting their words, write the nodes, and tell them which seeds you skipped
 and why, so they can reopen one.
 
-## 4. AskUserQuestion mapping
+## 4. Terminal fallback (page not live): AskUserQuestion mapping
+
+Only when `plan page <task>` exits non-zero. While the page is live, questions are asked on the page (SKILL.md §1
+step 4): upsert the tailored question, end the reply with the link and status line, and stop.
 
 - One call holds up to 4 frontier questions; ask fewer when one answer could change another's options.
 - `header`: the question id and a 1–2 word topic ("Q3 appetite"). `question`: the label plus the why on one line.
@@ -73,8 +76,9 @@ and why, so they can reopen one.
 
 ## 5. Playback questions
 
-A playback question settles your drafts with one user answer, and works the same from the page. **Any** answer to
-it (any option, or free text) settles every `fills` node, so it has exactly one option, the yes:
+A playback question settles your drafts with one user answer, and is page-first like every question: the playback
+is a question node with `fills`, answered on the page. **Any** answer to it (any option, or free text) settles every
+`fills` node, so it has exactly one option, the yes:
 
 ```json
 {"type":"upsert","node":{"kind":"question","lane":"slices","stage":"shape","class":"user","blocking":true,
@@ -87,7 +91,7 @@ it (any option, or free text) settles every `fills` node, so it has exactly one 
 Before asking, print the playback (≤ 10 lines): each draft by id, one line each, marking `(your words)` vs
 `(my guess)`. Tasks cannot be in `fills` (they are rendered at any status); list them in the playback anyway.
 
-- **Terminal**: AskUserQuestion needs two options: "Yes, they hold (Recommended)" and "Change something". Yes →
+- **Terminal fallback**: AskUserQuestion needs two options: "Yes, they hold (Recommended)" and "Change something". Yes →
   `answer` with `choice: "recommended"`. "Change something" or Other text → do **not** send an answer: record their
   words as `{"type":"note","node":"<the draft they named>","text":"…"}` (`--by user --source terminal`), edit the
   drafts, `resolve` the note, play back what changed and ask again (the question is still open).

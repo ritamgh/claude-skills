@@ -22,6 +22,7 @@ LANES = ("ideas", "why", "who", "scope", "decisions", "risks", "slices", "tasks"
 STATUSES = ("open", "settled", "parked", "killed")
 TASK_STATUSES = ("todo", "doing", "done", "failed")
 TOP_KEYS = set("schema id slug title owner size stage rev created updated repo published approved tldr frontier progress requests recent nodes".split())
+OPTIONAL_TOP_KEYS = {"comments", "thread", "comment_seq", "review_pr", "ext_dropped"}  # contract 13, 14; absent = empty
 COMMON = {"id": "", "kind": "", "label": "", "body": "", "status": "open",
           "depends_on": [], "refs": [], "rev": 0, "by": "session", "by_default": False}
 # kind: (prefix, number width, extra field defaults)
@@ -60,14 +61,25 @@ EVENT_FIELDS = {
     "set": ("field", "value"), "resolve": ("ref",), "task_status": ("node", "status", "ok", "note"),
     "boost": ("node", "value"), "kill": ("node", "text"), "restore": ("node",), "merge": ("node", "other"),
     "twist": ("node", "text"), "promote": ("node",), "weight": ("node", "value"), "weights_reset": (),
-    "research": ("node", "text"),
+    "research": ("node", "text"), "reply": ("ref", "text", "links"),
+    "comment": ("text", "author", "anchor"), "comment_accept": ("ref", "proposal"), "comment_rework": ("ref", "text"),
+    "comment_delete": ("ref",), "comment_split": ("ref", "parts"),
+    "comment_triage": ("ref", "action", "text", "changes", "anchor"),
+    "comment_import": ("items",), "comment_posted": ("ref", "url", "ext"), "review": ("action", "refs", "proposals"),
+    "review_set": ("value",),
     "score": ("node", "rubric", "value", "pass", "label", "rationale", "sources", "basis"),
     "research_status": ("node", "state", "note", "report", "run"),
 }
 BOARD_EVENTS = ("boost", "kill", "restore", "merge", "twist", "promote", "weight", "weights_reset", "research",
                 "score", "research_status")
-SESSION_EVENTS = ("upsert", "remove", "set", "resolve", "task_status", "score", "research_status")
-REQUEST_TYPES = ("note", "ask", "expand", "merge", "twist", "promote", "research")
+SESSION_EVENTS = ("upsert", "remove", "set", "resolve", "reply", "task_status", "score", "research_status",
+                  "comment_split", "comment_triage", "comment_import", "comment_posted", "review_set")
+COMMENT_EVENTS = ("comment", "comment_accept", "comment_rework", "comment_delete", "comment_split", "comment_triage")
+REVIEW_EVENTS = ("comment_import", "comment_posted", "review", "review_set")  # contract 14
+# a session may not accept its own proposal or authorise its own outward review action
+USER_ONLY_EVENTS = ("comment_accept", "comment_rework", "comment_delete", "review")
+PAGE_ONLY_EVENTS = ("comment_accept", "review")  # also need source page: a speed bump, the owner's deny rule is the guard (contract 14)
+REQUEST_TYPES = ("note", "ask", "expand", "merge", "twist", "promote", "research", "comment", "review")
 VERDICTS = ("ok", "warn", "bad", "na")
 BASES = ("research", "session")
 GROUPS = ("weighted", "lens", "gate")
@@ -75,6 +87,29 @@ SCOPES = ("idea", "question", "shortlist")
 VEHICLES = ("inline", "worker", "workflow", "sublead")
 RESEARCH_STATES = ("queued", "running", "done", "failed")
 MAX_PLAN_BYTES = 2 * 1024 * 1024
+THREAD_LIMIT = 40
+COMMENT_LIMIT = 100
+COMMENT_TEXT_LIMIT = 5000
+IMPORT_LIMIT = 50
+EXT_DROPPED_LIMIT = 1000  # deleted or split GitHub comments an import must not bring back; the oldest go first
+REVIEW_REF_LIMIT = 20
+REVIEW_ACTIONS = ("open", "push", "pull", "post")
+TRUNCATED = " [truncated]"
+COMMENT_KEYS = {"id", "author", "text", "anchor", "at", "state", "source", "proposal"}
+COMMENT_REVIEW_KEYS = {"ext", "url", "reply_to", "resolved", "edited", "posted"}  # optional per record (contract 14.1)
+PR_KEYS = {"repo", "number", "url", "branch", "head_sha", "prd_rev", "opened_at", "pulled_at"}
+PR_FIXED = ("repo", "number", "url", "branch", "opened_at")  # review_set may change only head_sha, prd_rev, pulled_at while a PR is recorded
+IMPORT_KEYS = {"ext", "author", "text", "anchor", "reply_to", "url", "resolved", "path", "line"}
+COMMENT_STATES = ("open", "proposed", "accepted", "declined", "answered")
+PROPOSAL_ACTIONS = ("accept", "answer", "decline")
+PROPOSAL_STATES = {"accept": "accepted", "answer": "answered", "decline": "declined"}
+LINK_LIMIT = 10
+# Kinds a comment proposal may touch, with the fields beyond id/kind/label/body a proposal may set (contract 13.4).
+PROPOSAL_FIELDS = {
+    "requirement": {"nfr"}, "risk": {"approach"}, "edge": {"expect"}, "assumption": {"validate_by", "impact"},
+    "constraint": {"tag"}, "nongoal": {"why"}, "note": {"lane"},
+    "question": {"lane", "why", "options", "recommended"}, "goal": set(), "story": set(),
+}
 MULTILINE_FIELDS = {"body", "tldr", "text", "why", "evidence", "scenarios",
                     "pitch", "who", "win", "rationale", "note", "question", "kill_reason"}
 
@@ -225,14 +260,126 @@ def validate_idea(node, rev):
             check_evidence(nid, key, entry, gate, rev)
 
 
+def add_thread(node, role, entry_text, at, ref):
+    """Append to a node's conversation thread (optional key, absent = empty), keeping the last THREAD_LIMIT entries."""
+    node["thread"] = (node.get("thread", []) + [{"role": role, "text": entry_text, "at": at, "ref": ref}])[-THREAD_LIMIT:]
+
+
+def validate_thread(nid, thread, links=False):
+    need(isinstance(thread, list) and len(thread) <= THREAD_LIMIT, f"{nid}.thread must be a list of at most {THREAD_LIMIT}")
+    for entry in thread:
+        need(isinstance(entry, dict) and set(entry) == {"role", "text", "at", "ref"} | ({"links"} if links else set()),
+             f"{nid}.thread: invalid entry fields")
+        need(entry["role"] in ("user", "session") and isinstance(entry["ref"], str), f"{nid}.thread: invalid role/ref")
+        text(entry["text"], f"{nid}.thread.text", 2000)
+        need(timestamp(entry["at"]), f"{nid}.thread: invalid timestamp")
+        if links:
+            need(str_list(entry["links"]) and len(entry["links"]) <= LINK_LIMIT, f"{nid}.thread: invalid links")
+            need(entry["role"] == "session" or not entry["links"], f"{nid}.thread: a user entry has no links")
+
+
+def add_plan_thread(plan, role, entry_text, at, ref, links=()):
+    """Append to the plan-level conversation (optional key, absent = empty), keeping the last THREAD_LIMIT entries."""
+    entry = {"role": role, "text": entry_text, "at": at, "ref": ref, "links": list(links)}
+    plan["thread"] = (plan.get("thread", []) + [entry])[-THREAD_LIMIT:]
+
+
+def anchor_valid(anchor, byid):
+    return anchor is None or (isinstance(anchor, str) and (anchor in byid or re.fullmatch(r"§(?:1[0-8]|[0-9])", anchor) is not None))
+
+
+def ext_valid(value):
+    return isinstance(value, str) and re.fullmatch(r"(?:rc|rv|ic):\d{1,20}", value) is not None
+
+
+def https_url(value):
+    return isinstance(value, str) and len(value) <= 2000 and re.fullmatch(r"https://[^\s\x00-\x1f\x7f]+", value) is not None
+
+
+def github_url(value):
+    """The page labels these links GitHub: any other https site would send the owner somewhere else."""
+    return https_url(value) and value.startswith("https://github.com/")
+
+
+def repo_name_valid(value):
+    """owner/name for gh: no path segments ('.', '..') that would turn into a different API URL."""
+    return (isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9._-]{1,100}", value) is not None
+            and value.split("/")[1] not in (".", ".."))
+
+
+def validate_review_pr(plan):
+    pr = plan.get("review_pr")
+    if pr is None:
+        return
+    need(isinstance(pr, dict) and set(pr) == PR_KEYS, "Invalid review_pr fields")
+    need(repo_name_valid(pr["repo"]), "review_pr.repo must be owner/name")
+    need(is_int(pr["number"]) and pr["number"] > 0, "review_pr.number must be a positive integer")
+    need(pr["url"] == f"https://github.com/{pr['repo']}/pull/{pr['number']}", "review_pr.url must be https://github.com/<repo>/pull/<number>")
+    need(isinstance(pr["branch"], str) and re.fullmatch(r"[A-Za-z0-9._/][A-Za-z0-9._/-]{0,199}", pr["branch"])
+         and ".." not in pr["branch"], "Invalid review_pr.branch")
+    need(isinstance(pr["head_sha"], str) and re.fullmatch(r"[0-9a-f]{40}", pr["head_sha"]), "review_pr.head_sha must be 40 hex digits")
+    need(is_int(pr["prd_rev"]) and 0 <= pr["prd_rev"] <= plan["rev"], "Invalid review_pr.prd_rev")
+    need(timestamp(pr["opened_at"]) and (pr["pulled_at"] is None or timestamp(pr["pulled_at"])), "Invalid review_pr timestamps")
+
+
+def validate_comments(plan, byid):
+    comments = plan.get("comments", [])
+    need(isinstance(comments, list) and len(comments) <= COMMENT_LIMIT, f"comments must be a list of at most {COMMENT_LIMIT}")
+    numbers, exts = set(), set()
+    for comment in comments:
+        need(isinstance(comment, dict) and COMMENT_KEYS <= set(comment) <= COMMENT_KEYS | COMMENT_REVIEW_KEYS,
+             "Invalid comment fields")
+        cid = comment["id"]
+        need(isinstance(cid, str) and re.fullmatch(r"CM[1-9]\d*", cid) and cid not in numbers, "Invalid comment id")
+        numbers.add(cid)
+        text(comment["author"], f"{cid}.author", 80, empty=True, line=True)
+        text(comment["text"], f"{cid}.text", COMMENT_TEXT_LIMIT)
+        need(anchor_valid(comment["anchor"], byid), f"{cid}: invalid anchor")
+        need(timestamp(comment["at"]) and comment["state"] in COMMENT_STATES and comment["source"] in ("paste", "github"),
+             f"{cid}: invalid timestamp/state/source")
+        ext, posted = comment.get("ext"), comment.get("posted")
+        need((ext is None or ext_valid(ext)) and (comment["source"] == "github") == (ext is not None) and (ext is None or ext not in exts),
+             f"{cid}: invalid or duplicate ext")
+        exts.add(ext)
+        need(comment.get("url", "") == "" or https_url(comment["url"]), f"{cid}: url must be an https link")
+        need(comment.get("reply_to") is None or ext_valid(comment["reply_to"]), f"{cid}: invalid reply_to")
+        need(all(type(comment.get(flag, False)) is bool for flag in ("resolved", "edited")), f"{cid}: resolved/edited must be booleans")
+        need(posted is None or (isinstance(posted, dict) and set(posted) == {"at", "url", "ext"} and timestamp(posted["at"])
+                                and https_url(posted["url"]) and ext_valid(posted["ext"])), f"{cid}: invalid posted")
+        proposal = comment["proposal"]
+        if comment["state"] == "open":
+            need(proposal is None, f"{cid}: an open comment has no proposal")
+            continue
+        need(isinstance(proposal, dict) and set(proposal) == {"action", "text", "rev", "changes", "at"}, f"{cid}: invalid proposal fields")
+        need(proposal["action"] in PROPOSAL_ACTIONS and timestamp(proposal["at"]), f"{cid}: invalid proposal action/time")
+        need(comment["state"] == "proposed" or PROPOSAL_STATES[proposal["action"]] == comment["state"], f"{cid}: state does not match the proposal")
+        text(proposal["text"], f"{cid}.proposal.text", 2000, empty=True)
+        need(is_int(proposal["rev"]) and 0 <= proposal["rev"] <= plan["rev"], f"{cid}: invalid proposal rev")
+        changes = proposal["changes"]
+        need(isinstance(changes, list) and len(changes) <= 5 and all(isinstance(c, dict) and isinstance(c.get("type"), str) for c in changes),
+             f"{cid}: invalid proposal changes")
+        need((proposal["action"] == "accept") == bool(changes), f"{cid}: only an accept proposal carries changes")
+    seq = plan.get("comment_seq")
+    if "comment_seq" in plan:
+        need(is_int(seq) and seq >= max((int(c[2:]) for c in numbers), default=0), "Invalid comment_seq")
+    if "ext_dropped" in plan:
+        dropped = plan["ext_dropped"]
+        need(isinstance(dropped, list) and len(dropped) <= EXT_DROPPED_LIMIT and all(ext_valid(e) for e in dropped)
+             and len(set(dropped)) == len(dropped), "Invalid ext_dropped")
+    if "thread" in plan:
+        validate_thread("plan", plan["thread"], links=True)
+
+
 def validate_node(node, rev):
     need(isinstance(node, dict), "Node must be an object")
     kind = node.get("kind")
     need(isinstance(kind, str) and kind in KINDS, "Unknown node kind")
     prefix, width, extra = KINDS[kind]
     defaults = dict(COMMON, **extra)
-    need(set(node) == set(defaults), f"Invalid fields for {kind}")
+    need(set(node) - {"thread"} == set(defaults), f"Invalid fields for {kind}")
     nid = node["id"]
+    if "thread" in node:
+        validate_thread(nid, node["thread"])
     need(isinstance(nid, str) and re.fullmatch(re.escape(prefix) + r"\d{" + str(width) + r",}", nid), "Invalid node id")
     text(node["label"], "label", 120, line=True)
     need(isinstance(node["body"], str) and len(node["body"]) <= 4000, f"{nid}: invalid body")
@@ -303,7 +450,7 @@ def validate_node(node, rev):
 
 def validate(plan, strict=False):
     """strict also rejects control/format characters anywhere in the plan; used for every write, not for display of a plan already on disk."""
-    need(isinstance(plan, dict) and set(plan) == TOP_KEYS, "Invalid top-level keys in plan")
+    need(isinstance(plan, dict) and TOP_KEYS <= set(plan) <= TOP_KEYS | OPTIONAL_TOP_KEYS, "Invalid top-level keys in plan")
     need(type(plan["schema"]) is int and plan["schema"] == 1, "Unknown schema")
     need(task_id_valid(plan["id"]), "Invalid plan id")
     need(plan["slug"] == re.sub(r"^\d{4}-", "", plan["id"]), "Invalid slug")
@@ -364,6 +511,8 @@ def validate(plan, strict=False):
     progress = plan["progress"]
     need(isinstance(progress, dict) and set(progress) == {"settled", "total"}, "Invalid progress")
     need(all(is_int(v) and v >= 0 for v in progress.values()), "Invalid progress counts")
+    validate_comments(plan, byid)
+    validate_review_pr(plan)
     need(isinstance(plan["requests"], list) and isinstance(plan["recent"], list), "Invalid requests/recent")
     for request in plan["requests"]:
         need(isinstance(request, dict) and set(request) == {"ref", "type", "node", "lane", "text", "at"}, "Invalid request fields")
@@ -541,11 +690,316 @@ def board_event(plan, event, byid, node):
     return summary, touched
 
 
+def comment_anchor(value, byid):
+    need(anchor_valid(value, byid), "anchor must be null, an existing node id or §0 to §18")
+    return value
+
+
+def comment_request(plan, comment, request_text, at, byid):
+    plan["requests"].append({"ref": comment["id"], "type": "comment", "node": comment["anchor"] if comment["anchor"] in byid else None,
+                             "lane": None, "text": request_text, "at": at})
+
+
+def add_comment(plan, body, author, anchor, at, byid, **extra):
+    seq = plan.get("comment_seq", max((int(c["id"][2:]) for c in plan.get("comments", [])), default=0)) + 1
+    comment = {"id": f"CM{seq}", "author": author, "text": body, "anchor": anchor, "at": at, "state": "open",
+               "source": "paste", "proposal": None, **extra}
+    plan["comment_seq"] = seq
+    plan.setdefault("comments", []).append(comment)
+    comment_request(plan, comment, body, at, byid)
+    return comment
+
+
+def drop_comment_request(plan, cid):
+    plan["requests"] = [r for r in plan["requests"] if not (r["type"] == "comment" and r["ref"] == cid)]
+
+
+def capped_strings(value, field):
+    """A proposal carries free text of any shape (options, ...): cap every string in it."""
+    if isinstance(value, str):
+        need(len(value) <= 4000, f"{field} is too long")
+    elif isinstance(value, list):
+        for item in value:
+            capped_strings(item, field)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            capped_strings(key, field)
+            capped_strings(item, field)
+    return value
+
+
+def clean_change(change, byid):
+    """One change of a comment proposal, normalised, or PlanError when it is outside the allow-list (contract 13.4)."""
+    need(isinstance(change, dict) and isinstance(change.get("type"), str), "A change must be an event object")
+    kind = change["type"]
+    if kind == "upsert":
+        need(set(change) == {"type", "node"} and isinstance(change["node"], dict), "upsert takes only a node object")
+        patch = change["node"]
+        if "id" in patch:
+            need(isinstance(patch["id"], str) and patch["id"] in byid, "upsert must name an existing node")
+            node_kind = byid[patch["id"]]["kind"]
+            need(patch.get("kind", node_kind) == node_kind, "Cannot change node kind")
+        else:
+            node_kind = patch.get("kind")
+        need(isinstance(node_kind, str) and node_kind in PROPOSAL_FIELDS, f"A proposal cannot change a {node_kind} node")
+        extra = set(patch) - {"id", "kind", "label", "body"} - PROPOSAL_FIELDS[node_kind]
+        need(not extra, f"A proposal cannot set {', '.join(sorted(map(str, extra)))} on a {node_kind}")
+        clean = {}
+        for key, value in patch.items():
+            if key == "label":
+                value = text(value, "label", 120, line=True)
+            elif isinstance(value, str):
+                value = value.strip() if key in ("id", "kind") else text(value, key, 4000, empty=True)
+            clean[key] = copy.deepcopy(capped_strings(value, key))
+        return {"type": "upsert", "node": clean}
+    if kind in ("reopen", "edit_label"):
+        need(set(change) == {"type", "node"} | ({"label"} if kind == "edit_label" else set()), f"{kind} takes only its own fields")
+        nid = change["node"]
+        need(isinstance(nid, str) and nid in byid, f"{kind} must name an existing node")
+        need(byid[nid]["kind"] in PROPOSAL_FIELDS, f"A proposal cannot change a {byid[nid]['kind']} node")
+        clean = {"type": kind, "node": nid}
+        if kind == "edit_label":
+            clean["label"] = text(change["label"], "label", 120, line=True)
+        return clean
+    need(kind == "set" and set(change) == {"type", "field", "value"} and change["field"] in ("title", "tldr"),
+         "A proposal may only upsert, reopen, edit_label or set title/tldr")
+    return {"type": "set", "field": change["field"],
+            "value": text(change["value"], change["field"], 4000, empty=change["field"] == "tldr", line=True)}
+
+
+def apply_changes(plan, changes, event):
+    """Run cleaned proposal changes on plan as the user at this event's rev/at. Returns them with assigned ids."""
+    applied = []
+    for change in changes:
+        step = dict(copy.deepcopy(change), id=event["id"], at=event["at"], by="user", source=event["source"], rev=event["rev"])
+        _change(plan, step)
+        applied.append({key: step[key] for key in change})
+    return applied
+
+
+def check_sender(event):
+    kind = event["type"]
+    need(kind not in USER_ONLY_EVENTS or event["by"] == "user", f"{kind} requires --by user")
+    need(kind not in PAGE_ONLY_EVENTS or event["source"] == "page", f"{kind} is accepted only from the plan page (--source page)")
+
+
+def find_comment(plan, ref, state, what):
+    comment = next((c for c in plan.get("comments", []) if c["id"] == ref), None)
+    need(comment is not None, "ref must name an existing comment")
+    need(state is None or comment["state"] == state, f"Only {'an' if state == 'open' else 'a'} {state} comment can be {what}")
+    return comment
+
+
+def forget_ext(plan, comment):
+    """A deleted or split GitHub comment is never imported again: remember its ext (contract 14.1)."""
+    for ext in (comment.get("ext"), (comment.get("posted") or {}).get("ext")):  # the owner's own reply goes with it
+        if ext is not None and ext not in plan.get("ext_dropped", []):
+            plan["ext_dropped"] = (plan.get("ext_dropped", []) + [ext])[-EXT_DROPPED_LIMIT:]
+
+
+def comment_event(plan, event, byid):
+    """Comment events (contract 13). Returns the summary; mutates plan and the applied event."""
+    kind = event["type"]
+    check_sender(event)
+    comments = plan.get("comments", [])
+    if kind == "comment":
+        need(len(comments) < COMMENT_LIMIT, "Too many comments: delete closed comments")
+        need("text" in event, "comment requires text")
+        author = text(event.get("author", ""), "author", 80, empty=True, line=True)
+        anchor = comment_anchor(event.get("anchor"), byid)
+        event.update(author=author, anchor=anchor)
+        comment = add_comment(plan, event["text"], author, anchor, event["at"], byid)
+        event["comment"] = comment["id"]
+        return f"comment {comment['id']} added"
+    ref = event.get("ref")
+    if kind == "comment_split":
+        comment = find_comment(plan, ref, "open", "split")
+        parts = event.get("parts")
+        need(isinstance(parts, list) and 2 <= len(parts) <= 10, "parts must be 2 to 10 comments")
+        need(len(comments) - 1 + len(parts) <= COMMENT_LIMIT, "Too many comments: delete closed comments")
+        clean = []
+        for part in parts:
+            need(isinstance(part, dict) and "text" in part and set(part) <= {"text", "author", "anchor"}, "Invalid comment part")
+            clean.append({"text": text(part["text"], "part text", COMMENT_TEXT_LIMIT),
+                          "author": text(part["author"], "author", 80, empty=True, line=True) if "author" in part else comment["author"],
+                          "anchor": comment_anchor(part["anchor"], byid) if "anchor" in part else comment["anchor"]})
+        comments.remove(comment)
+        forget_ext(plan, comment)
+        drop_comment_request(plan, ref)
+        for part in clean:
+            add_comment(plan, part["text"], part["author"], part["anchor"], event["at"], byid)
+        event["parts"] = clean
+        return f"split {ref} into {len(clean)}"
+    if kind == "comment_triage":
+        comment = find_comment(plan, ref, "open", "triaged")
+        action, changes = event.get("action"), event.get("changes")
+        need(action in PROPOSAL_ACTIONS, "action must be accept, answer or decline")
+        reason = event.get("text", "")
+        if action == "accept":
+            need(isinstance(changes, list) and 1 <= len(changes) <= 5, "accept needs 1 to 5 changes")
+            changes = [clean_change(change, byid) for change in changes]
+            dry = copy.deepcopy(plan)  # the changes must apply today, else the failure would wait for the user's click
+            apply_changes(dry, changes, event)
+            dry["rev"] = event["rev"]
+            validate(dry, strict=True)
+        else:
+            need(reason, f"{action} needs text")
+            need(not changes, f"{action} takes no changes")
+            changes = []
+        if "anchor" in event:
+            comment["anchor"] = comment_anchor(event["anchor"], byid)
+        comment.update(state="proposed", proposal={"action": action, "text": reason, "rev": event["rev"],
+                                                   "changes": changes, "at": event["at"]})
+        drop_comment_request(plan, ref)
+        event["changes"] = changes
+        return f"proposal on {ref}: {action}"
+    if kind == "comment_accept":
+        comment = find_comment(plan, ref, "proposed", "accepted")
+        proposal = comment["proposal"]
+        need(is_int(event.get("proposal")) and event["proposal"] == proposal["rev"], "The proposal changed; reload the page")
+        try:
+            changes = [clean_change(change, byid) for change in proposal["changes"]]
+            for change in changes:
+                target = byid.get(change.get("node", {}).get("id") if change["type"] == "upsert" else change.get("node"))
+                need(target is None or target["rev"] <= proposal["rev"], "node changed since the proposal")
+            event["changes"] = apply_changes(plan, changes, event)
+        except PlanError as exc:
+            raise PlanError(f"Proposal no longer applies: {exc}") from exc
+        comment["state"] = PROPOSAL_STATES[proposal["action"]]
+        return f"{comment['state']} {ref}"
+    if kind == "comment_rework":
+        comment = find_comment(plan, ref, "proposed", "reworked")
+        comment.update(state="open", proposal=None)
+        comment_request(plan, comment, event.get("text") or comment["text"], event["at"], byid)
+        return f"reworked {ref}"
+    comment = find_comment(plan, ref, None, "deleted")  # comment_delete: any state
+    comments.remove(comment)
+    forget_ext(plan, comment)
+    drop_comment_request(plan, ref)
+    return f"deleted {ref}"
+
+
+def import_text(value):
+    """GitHub text as comment text: CR/CRLF become newlines, control and format characters (a ZWJ in an emoji too) are dropped."""
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    return "".join(c for c in value if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cf", "Zl", "Zp")).strip()
+
+
+def clean_import_item(item, byid):
+    """One comment_import item: structural faults refuse the import; bad content (anchor, url, length) degrades."""
+    need(isinstance(item, dict) and {"ext", "author", "text"} <= set(item) <= IMPORT_KEYS, "Invalid import item")
+    need(ext_valid(item["ext"]) and (item.get("reply_to") is None or ext_valid(item["reply_to"])), "Invalid import ext/reply_to")
+    need(isinstance(item["author"], str) and isinstance(item["text"], str) and isinstance(item.get("url", ""), str),
+         "Invalid import author/text/url")
+    need(type(item.get("resolved", False)) is bool, "Invalid import resolved")
+    need(item.get("path") is None or isinstance(item["path"], str), "Invalid import path")
+    need(item.get("line") is None or is_int(item["line"]), "Invalid import line")
+    body = import_text(item["text"])
+    if len(body) > COMMENT_TEXT_LIMIT:
+        body = body[:COMMENT_TEXT_LIMIT - len(TRUNCATED)] + TRUNCATED
+    anchor = item.get("anchor")
+    url = item.get("url", "")
+    return {"ext": item["ext"], "author": " ".join(import_text(item["author"]).split())[:80], "text": body,
+            "anchor": anchor if anchor_valid(anchor, byid) else None, "reply_to": item.get("reply_to"),
+            "url": url if github_url(url) else "", "resolved": item.get("resolved", False)}
+
+
+def review_event(plan, event, byid):
+    """GitHub review events (contract 14). Returns the summary; mutates plan and the applied event."""
+    kind = event["type"]
+    check_sender(event)
+    if kind == "review_set":
+        need("value" in event and (event["value"] is None or isinstance(event["value"], dict)), "review_set value must be null or a record")
+        if event["value"] is None:  # validate() checks the record on the candidate plan
+            plan.pop("review_pr", None)
+            plan["requests"] = [r for r in plan["requests"] if r["type"] != "review"]  # a click made for the old PR must not post to the next
+            return "review PR cleared"
+        need(event["value"].get("branch") == "prd/" + plan["slug"], f"review_pr.branch must be prd/{plan['slug']}")
+        old = plan.get("review_pr")
+        need(old is None or all(event["value"].get(key) == old[key] for key in PR_FIXED),
+             "review_pr repo, number, url, branch and opened_at cannot change: clear it with review_set null first")
+        plan["review_pr"] = copy.deepcopy(event["value"])
+        return "review PR set"
+    if kind == "comment_posted":
+        comment = find_comment(plan, event.get("ref"), None, "marked posted")
+        need(comment.get("posted") is None, "Comment is posted already")
+        need(github_url(event.get("url")) and ext_valid(event.get("ext")) and event["ext"][:2] in ("rc", "ic"),
+             "comment_posted needs a github.com url and an rc:/ic: ext")
+        comment["posted"] = {"at": event["at"], "url": event["url"], "ext": event["ext"]}
+        return f"posted reply on {comment['id']}"
+    if kind == "review":
+        action, refs, pr = event.get("action"), event.get("refs"), plan.get("review_pr")
+        need(action in REVIEW_ACTIONS, "action must be open, push, pull or post")
+        if action == "open":
+            need(pr is None, "A review PR is open already")
+            need(plan["repo"] is not None, "Set the plan's repo before opening a review PR")
+        else:
+            need(pr is not None, "No review PR: open one first")
+        if action == "post":
+            need(isinstance(refs, list) and 1 <= len(refs) <= REVIEW_REF_LIMIT and all(isinstance(r, str) for r in refs)
+                 and len(set(refs)) == len(refs), f"post needs 1 to {REVIEW_REF_LIMIT} distinct comment ids")
+            shown = event.get("proposals")  # the proposal rev the page displayed on each card: a click posts only that text
+            need(isinstance(shown, dict) and set(shown) == set(refs), "post needs the proposal rev shown for each comment id")
+            for ref in refs:
+                comment = find_comment(plan, ref, None, "posted")
+                proposal = comment["proposal"]
+                need(comment["source"] == "github" and comment.get("posted") is None
+                     and (comment["state"] == "accepted" or (proposal is not None and proposal["action"] in ("answer", "decline")
+                                                              and proposal["text"])),
+                     f"{ref} has no GitHub reply to post")
+                need(is_int(shown[ref]) and shown[ref] == proposal["rev"], "The proposal changed; reload the page")
+            line = "post " + ",".join(refs)
+        else:
+            need(refs is None and event.get("proposals") is None, "refs and proposals apply only to post")
+            line = action
+        if action == "post":  # a new click replaces every open post request naming one of these comments, so a refused post can be re-clicked
+            plan["requests"] = [r for r in plan["requests"] if not (r["type"] == "review" and r["text"].startswith("post ")
+                                                                   and set(r["text"][5:].split(",")) & set(refs))]
+        if not any(r["type"] == "review" and r["text"] == line for r in plan["requests"]):
+            plan["requests"].append({"ref": event["id"], "type": "review", "node": None, "lane": None, "text": line, "at": event["at"]})
+        return f"review requested: {line}"
+    items = event.get("items")  # comment_import
+    need(isinstance(items, list) and 1 <= len(items) <= IMPORT_LIMIT, f"items must be 1 to {IMPORT_LIMIT} comments")
+    items = event["items"] = [clean_import_item(item, byid) for item in items]
+    comments = plan.get("comments", [])
+    known = {c["ext"]: c for c in comments if c.get("ext")}
+    skipped = {c["posted"]["ext"] for c in comments if c.get("posted")} | set(plan.get("ext_dropped", []))  # our replies; deleted or split comments
+    imported = created = 0
+    for item in items:
+        if item["ext"] in skipped or not item["text"]:
+            continue
+        imported += 1
+        comment = known.get(item["ext"])
+        if comment is None:
+            need(len(plan.get("comments", [])) < COMMENT_LIMIT, "Too many comments: delete closed comments")
+            known[item["ext"]] = add_comment(plan, item["text"], item["author"], item["anchor"], event["at"], byid, source="github",
+                                             ext=item["ext"], url=item["url"], reply_to=item["reply_to"], resolved=item["resolved"],
+                                             edited=False, posted=None)
+            created += 1
+            continue
+        if comment["text"] != item["text"]:
+            comment.update(text=item["text"], edited=True)
+            if comment["state"] == "proposed":
+                comment.update(state="open", proposal=None)
+                comment_request(plan, comment, item["text"], event["at"], byid)
+            elif comment["state"] == "open":
+                for request in plan["requests"]:
+                    if request["type"] == "comment" and request["ref"] == comment["id"]:
+                        request["text"] = item["text"]
+        if comment.get("resolved", False) != item["resolved"]:
+            comment["resolved"] = item["resolved"]
+    return f"imported {imported} comments ({created} new)"
+
+
 def _change(plan, event):
     kind = event["type"]
     byid = {n["id"]: n for n in plan["nodes"]}
+    if kind in COMMENT_EVENTS:
+        return comment_event(plan, event, byid)[:240]
+    if kind in REVIEW_EVENTS:
+        return review_event(plan, event, byid)[:240]
     node = None
-    if kind not in ("upsert", "set", "resolve", "approve_prd", "weights_reset"):
+    if kind not in ("upsert", "set", "resolve", "reply", "approve_prd", "weights_reset"):
         nid = event.get("node")
         if kind not in ("note", "ask", "research") or nid is not None:
             need(isinstance(nid, str) and nid in byid, "node must name an existing node")
@@ -601,6 +1055,11 @@ def _change(plan, event):
         need(lane is None or lane in LANES, "Invalid request lane")
         plan["requests"].append({"ref": event["id"], "type": kind, "node": event.get("node"), "lane": lane,
                                  "text": event.get("text", ""), "at": event["at"]})
+        if kind == "ask":
+            if node is not None:
+                add_thread(node, "user", event["text"], event["at"], event["id"])
+            else:
+                add_plan_thread(plan, "user", event["text"], event["at"], event["id"])
         where = event.get("node") or lane or "plan"
         summary = {"note": f"note on {where}", "ask": f"asked about {where}", "expand": f"expand {where}"}[kind]
     elif kind == "approve_prd":
@@ -615,6 +1074,7 @@ def _change(plan, event):
         patch = event.get("node")
         need(isinstance(patch, dict), "upsert node must be an object")
         need("answer" not in patch, "Only answer/reopen may set a question answer")
+        need("thread" not in patch, "A thread is written only by ask/reply events")
         nid = patch.get("id")
         need(nid is None or isinstance(nid, str), "Invalid node id")
         old = byid.get(nid)
@@ -659,7 +1119,14 @@ def _change(plan, event):
                 touched.append(other)
         for request in plan["requests"]:
             if request["node"] == nid:
+                if request["type"] == "ask":  # the node's thread goes with it: keep the user's question where a reply can land
+                    add_plan_thread(plan, "user", request["text"], request["at"], request["ref"])
                 request["node"] = None
+        for comment in plan.get("comments", []):
+            if comment["anchor"] == nid:
+                comment["anchor"] = None
+        for entry in plan.get("thread", []):
+            entry["links"] = [ref for ref in entry["links"] if ref != nid]
         summary = f"removed {nid}"
     elif kind == "set":
         field = event.get("field")
@@ -681,8 +1148,27 @@ def _change(plan, event):
     elif kind == "resolve":
         ref = event.get("ref")
         need(isinstance(ref, str) and any(r["ref"] == ref for r in plan["requests"]), "Unknown request ref")
+        need(all(r["type"] != "comment" for r in plan["requests"] if r["ref"] == ref),
+             "A comment is triaged, split or deleted, not resolved")
         plan["requests"] = [r for r in plan["requests"] if r["ref"] != ref]
         summary = f"resolved {ref}"
+    elif kind == "reply":
+        ref = event.get("ref")
+        request = next((r for r in plan["requests"] if r["ref"] == ref), None)
+        need(request is not None and request["type"] == "ask", "ref must name an open ask request")
+        need(isinstance(event.get("text"), str) and event["text"].strip(), "reply requires text")
+        if request["node"] is None:  # a plan-level ask, or one whose node was removed: the plan thread holds the conversation
+            links = event.get("links", [])
+            need(str_list(links) and len(links) <= LINK_LIMIT, f"links must be a list of at most {LINK_LIMIT} node or comment ids")
+            known = byid.keys() | {c["id"] for c in plan.get("comments", [])}
+            need(all(link in known for link in links), "links must name existing nodes or comments")
+            add_plan_thread(plan, "session", event["text"], event["at"], ref, links)
+            summary = "replied on plan"
+        else:
+            need("links" not in event, "links apply only to a plan-level reply")
+            add_thread(byid[request["node"]], "session", event["text"], event["at"], ref)
+            summary = f"replied on {request['node']}"
+        plan["requests"].remove(request)
     else:  # task_status
         need(node["kind"] == "task" and event.get("status") in TASK_STATUSES, "Invalid task/status")
         node["status"] = event["status"]
@@ -713,7 +1199,8 @@ def apply_event(plan: dict, event: dict) -> str:
     need(kind not in SESSION_EVENTS or by == "session", "Session event requires --by session")
     for field in ("text", "label", "note"):
         if field in applied:
-            applied[field] = text(applied[field], field, 120 if field == "label" else 2000, line=field == "label")
+            applied[field] = text(applied[field], field, 120 if field == "label" else COMMENT_TEXT_LIMIT if kind == "comment" else 2000,
+                                  empty=kind in ("comment_triage", "comment_rework"), line=field == "label")
     applied.update(v=1, id="e-" + secrets.token_hex(6), at=utcnow(), by=by, source=source, rev=plan["rev"] + 1)
     candidate = copy.deepcopy(plan)
     summary = _change(candidate, applied)
@@ -783,6 +1270,25 @@ def mirror_dir(plan):
     return mirror
 
 
+def public_plan(plan):
+    """The plan as the published mirror shows it: no comments, plan thread or review PR, no comment or review requests (contract 1, 13, 14)."""
+    shown = {key: value for key, value in plan.items() if key not in OPTIONAL_TOP_KEYS}
+    shown["requests"] = [r for r in plan["requests"] if r["type"] not in ("comment", "review")]
+    return shown
+
+
+def review_plan(plan):
+    """What the review PR shows: public_plan minus what is private to this machine or this owner (contract 14.4).
+    No repo or published path, owner, requests or chat threads, and the trail names a private field without its value."""
+    shown = public_plan(plan)
+    for key in ("repo", "published", "owner", "requests"):
+        del shown[key]
+    shown["nodes"] = [{key: value for key, value in node.items() if key != "thread"} for node in shown["nodes"]]
+    shown["recent"] = [dict(entry, summary=re.sub(r"^(set (?:repo|published|owner)) to .*$", r"\1", entry["summary"], flags=re.S))
+                       for entry in shown["recent"]]
+    return shown
+
+
 def write_projection(directory, plan, rendered=None):
     """Caller holds the task lock. Every temp file is written before any is renamed, so a failed write changes nothing; working plan.json is renamed last."""
     rendered = prd.render(plan) if rendered is None else rendered
@@ -790,7 +1296,7 @@ def write_projection(directory, plan, rendered=None):
     files = [(directory / "PRD.md", rendered)]
     mirror = mirror_dir(plan)
     if mirror is not None and mirror.resolve() != directory.resolve():  # a mirror in the plan dir itself is the working copy
-        files += [(mirror / "PRD.md", rendered), (mirror / "plan.json", encoded)]
+        files += [(mirror / "PRD.md", rendered), (mirror / "plan.json", json_text(public_plan(plan)))]
     files.append((directory / "plan.json", encoded))
     staged = []
     try:

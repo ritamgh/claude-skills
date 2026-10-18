@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """The plan CLI. JSON is the stable machine interface, text is for the terminal."""
 import argparse
+import http.client
 import json
+import os
 import sys
 import unicodedata
+import urllib.error
+import urllib.request
 
 import export as exporter
 import plan_core as core
+import review
 
 
 def parser():
@@ -38,10 +43,17 @@ def parser():
         sub.add_argument("task")
         if name == "publish":
             sub.add_argument("--to", required=True)
+    page = commands.add_parser("page")
+    page.add_argument("task")
+    page.add_argument("--json", action="store_true")
     export = commands.add_parser("export")
     export.add_argument("task")
     export.add_argument("--to", required=True, choices=("crew", "orchestrate"))
     export.add_argument("--markdown", action="store_true")
+    reviewing = commands.add_parser("review")
+    reviewing.add_argument("action", choices=core.REVIEW_ACTIONS)
+    reviewing.add_argument("task")
+    reviewing.add_argument("--json", action="store_true")
     return root
 
 
@@ -71,6 +83,39 @@ def question_text(question):
     return f"{question['id']}: {question['label']}{suffix}"
 
 
+def page_status(plan):
+    nodes = {n["id"]: n for n in plan["nodes"]}
+    if plan["frontier"]:
+        first = nodes[plan["frontier"][0]]
+        who = f"your answer on {first['id']}: {first['label'][:60]}"
+    else:
+        who = "the session" if plan["requests"] else "nothing"
+    progress = plan["progress"]
+    return f"{plan['stage']} \u00b7 {progress['settled']}/{progress['total']} settled \u00b7 waiting for {who}"
+
+
+def hq_reason(base):
+    """Why the plan page is not served at base, or None when HQ is live with the plan routes."""
+    try:
+        with urllib.request.urlopen(base + "/healthz", timeout=2) as response:
+            body = response.read(4096)
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 404):
+            return "HQ has no /healthz: it predates the plan page, restart it"
+        return f"HQ /healthz answered HTTP {exc.code}"
+    except OSError:
+        return "unreachable"
+    except http.client.HTTPException:
+        return "not hq-web"
+    try:
+        health = json.loads(body)
+    except ValueError:
+        health = None
+    if not isinstance(health, dict) or health.get("service") != "hq-web":
+        return "not hq-web"
+    return None if health.get("plan") is True else "HQ is running without the plan routes: restart it"
+
+
 def run(args):
     command = args.command
     if command == "init":
@@ -90,6 +135,12 @@ def run(args):
                                     "by": "session", "source": "terminal"})
         print(args.to + "/PRD.md")
         print(args.to + "/plan.json")
+    elif command == "review":
+        summary, result = review.run(args.task, args.action)
+        if args.json:
+            emit(result)
+        else:
+            say(summary)
     elif command == "list":
         rows = []
         directory = core.crew_root()
@@ -112,6 +163,12 @@ def run(args):
                 if event["type"] == "merge" and "merged_from" in event:
                     say(f"rev {event['rev']} merge {' + '.join(event['merged_from'])} \u2192 draft {event['node']}")
                     continue
+                if event["type"] == "comment":
+                    say(f"rev {event['rev']} comment {event['comment']} by {event['author'] or 'unknown'} on {event['anchor'] or 'plan'}: {event['text']}")
+                    continue
+                if event["type"].startswith("comment_"):
+                    say(f"rev {event['rev']} {event['type']} {event.get('ref', '')} {event.get('action', '')}".rstrip())
+                    continue
                 details = event.get("text") or event.get("label") or event.get("choice") or event.get("state") or ""
                 say(f"rev {event['rev']} {event['type']} {event.get('node') or ''} {details}".rstrip())
     elif command == "render":
@@ -121,6 +178,17 @@ def run(args):
         plan = core.load(args.task)
         if command == "path":
             print(core.plan_dir(args.task))
+        elif command == "page":
+            base = (os.environ.get("HQ_WEB_URL") or f"http://127.0.0.1:{os.environ.get('HQ_WEB_PORT') or 7717}").rstrip("/")
+            url, status, reason = f"{base}/plan/{args.task}", page_status(plan), hq_reason(base)
+            if args.json:
+                emit({"url": url, "live": reason is None, "reason": reason, "status": status})
+            else:
+                say(url)
+                say(status)
+            if reason:
+                print(reason, file=sys.stderr)
+            return 1 if reason else 0
         elif command == "export":
             core.need(plan["stage"] in ("ready", "building"), f"Plan is at stage {plan['stage']}; export needs ready or building")
             core.need(args.to == "orchestrate" or not args.markdown, "--markdown works only with --to orchestrate")
@@ -140,8 +208,13 @@ def run(args):
                 for question in ranked(plan, 3):
                     say(question_text(question))
                 say("Open requests:")
+                comments = {c["id"]: c for c in plan.get("comments", [])}
                 for request in plan["requests"]:
-                    say(f"{request['ref']} {request['type']} {request['node'] or request['lane'] or 'plan'}: {request['text']}")
+                    if request["type"] == "comment":
+                        comment = comments[request["ref"]]
+                        say(f"{request['ref']} comment {comment['anchor'] or 'plan'} by {comment['author'] or 'unknown'}: {request['text']}")
+                    else:
+                        say(f"{request['ref']} {request['type']} {request['node'] or request['lane'] or 'plan'}: {request['text']}")
         elif command == "frontier":
             questions = ranked(plan, args.n)
             if args.json:

@@ -40,16 +40,17 @@ Usage:
                                  Idempotent; new/whoami/digest/ls also do it once per session.
   crew meta-migrate [--apply]    give open tasks with only lead=/sub= names a lead_sid/sub_sid when the name
                                  is one live session (dry run unless --apply)
-  crew spawn SLUG [--repo DIR] [--model M] [--shape ship|scout] "brief" | --brief FILE
+  crew spawn SLUG [--repo DIR] [--model M] [--effort E] [--shape ship|scout] "brief" | --brief FILE
                                  a lead starts a sub-lead for a complex task in its own tmux window (session
-                                 $CREW_SPAWN_TMUX, default claude): makes the task, writes the brief, launches
+                                 $CREW_SPAWN_TMUX, default claude): defaults to --model sonnet --effort high; makes the task, writes the brief, launches
                                  `claude -n <you>/<slug>`, and joins the new session to you when it first runs crew.
                                  Lead sessions only; at most 3 live sub-leads per lead, nesting at most 2 deep;
                                  low RAM queues it instead (crew next, then crew spawn --resume ID).
   crew spawn --resume ID         launch a spawn that was queued for RAM (from the lead that made it)
-  crew spawn --top SLUG --repo DIR [--model M] "first message" | --brief FILE
+  crew spawn --top SLUG --repo DIR [--model M] [--effort E] "first message" | --brief FILE
                                  start a top-level lead (no chain link; reports to the user via HQ). For the user and
                                  HQ, not for leads. From any context; window claude:<slug>, `claude -n <slug>`;
+                                 same sonnet/high default;
                                  at most 5 live ones; DIR must be a git repo or under ~/Developer, not ~/.claude.
   crew log ID STATE ["note"]     STATE: queued running waiting held answered review done landed failed dropped
   crew meta ID key=value ...     record worker, agent id, branch, worktree, check...
@@ -153,6 +154,12 @@ Usage:
                                  lines -> <task>/check.log; records check=pass|fail|timeout|none + check_at=; prints
                                  `check: pass (3.2s)`. Exit 0 pass, 1 fail/timeout, 2 usage, 3 no .crew/check.
                                  `crew log ID review "note"` then appends [check: <value>]; `crew show` prints it.
+  crew go TARGET                 select a tmux window (the target of a tmux://TARGET link) and, when your attached
+                                 client is on another session, switch it there. TARGET: SESSION:INDEX or
+                                 SESSION:INDEX.PANE (a target as HQ prints it), a task id (its spawned window), or a
+                                 live session name. Anything else is refused before tmux runs (exit 2). Sends no keys.
+                                 Exit 1 + a one-line reason when tmux is not running or the window is gone.
+                                 CREW_TMUX_SOCKET=NAME uses `tmux -L NAME` (tests); unset = the default server.
   crew gc [REPO]                 LIST git worktrees of REPO (default cwd): merged / dirty / unpushed / size,
                                  plus the `git worktree remove` commands for merged+clean ones. Deletes nothing.
   crew diff ID [--focus] [--print]
@@ -1011,13 +1018,13 @@ spawn_trust_prompt() {
   done
 }
 
-# Open the window for task dir $1 (meta: spawn_slug, spawn_model, repo) for lead $2 (sid $3), under the spawn lock.
+# Open the window for task dir $1 (meta: spawn_slug, spawn_model, spawn_effort, repo) for lead $2 (sid $3), under the spawn lock.
 # The reservation (.pending/<task>: parent, token, window id, pane pid) is written once the window exists; nothing
 # can consume it before, because consuming takes the same lock. A launch that fails, or a window that is gone right
 # after, marks the task failed.
 spawn_launch() {
-  local d=$1 lname=$2 lsid=$3 id slug model repo sess win n=1 names child prompt pf token out wid ppid top resume kind=sub-lead dash=()
-  id=$(basename "$d"); slug=$(meta_get "$d" spawn_slug); model=$(meta_get "$d" spawn_model); repo=$(meta_get "$d" repo); top=$(meta_get "$d" top)
+  local d=$1 lname=$2 lsid=$3 id slug model effort repo sess win n=1 names child prompt pf token out wid ppid top resume kind=sub-lead dash=()
+  id=$(basename "$d"); slug=$(meta_get "$d" spawn_slug); model=$(meta_get "$d" spawn_model); effort=$(meta_get "$d" spawn_effort); repo=$(meta_get "$d" repo); top=$(meta_get "$d" top)
   resume=$(meta_get "$d" resume_sid)
   sess=${CREW_SPAWN_TMUX:-claude}
   mkdir -p "$CREW_ROOT/.pending"
@@ -1043,6 +1050,7 @@ spawn_launch() {
   [ -z "$resume" ] || cl=(claude --resume "$resume" -n "$child")   # a woken owner
   local argv=(tmux new-window -d -P -F '#{window_id} #{pane_pid}' -t "$sess:" -n "$win" -e "CREW_SPAWN_TASK=$id" -e "CREW_SPAWN_TOKEN=$token" "${acw[@]}" -- env -C "$repo" "${cl[@]}")
   [ -z "$model" ] || argv+=(--model "$model")
+  [ -z "$effort" ] || argv+=(--effort "$effort")
   argv+=("${dash[@]}" "$prompt")
   # 8: the spawn lock, which a tmux server started from here must not inherit
   out=$("${argv[@]}" 8>&-) || spawn_fail "$id" "tmux could not open the window"
@@ -1055,19 +1063,20 @@ spawn_launch() {
     spawn_fail "$id" "the sub-lead window closed right after launch (does \`claude\` start in $repo?)"
   fi
   meta_add "$d" "window=$sess:$win" "window_id=$wid"
-  cmd_log "$id" running "$kind launched in $sess:$win"
+  cmd_log "$id" running "$kind launched in $sess:$win${model:+ (model $model${effort:+, effort $effort})}"
   printf 'id=%s\nwindow=%s:%s\nchild=%s\n' "$id" "$sess" "$win" "$child"
   local trust; trust=$(spawn_trust_prompt "$id" "$wid" "$sess:$win")
   [ -z "$trust" ] || printf 'note=trust prompt open in %s:%s (%s): accept it there\n' "$sess" "$win" "$trust"
 }
 
 cmd_spawn() {
-  local slug="" brief="" bfile="" repo="" model="" shape=ship resume="" have_brief=0 top=0
+  local slug="" brief="" bfile="" repo="" model="" effort="" shape=ship resume="" have_brief=0 top=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --top) top=1; shift ;;
       --repo) repo=${2:-}; shift 2 ;;
       --model) model=${2:-}; shift 2 ;;
+      --effort) effort=${2:-}; shift 2 ;;
       --shape) shape=${2:-}; shift 2 ;;
       --brief) bfile=${2:-}; shift 2 ;;
       --resume) resume=${2:-}; shift 2 ;;
@@ -1112,6 +1121,11 @@ cmd_spawn() {
   case "$shape" in ship | scout) ;; *) die "--shape must be ship or scout" ;; esac
   if [ -n "$bfile" ]; then [ -f "$bfile" ] || die "brief file not found: $bfile"; fi
   if [ -n "$model" ]; then [[ "$model" =~ ^[A-Za-z0-9][][A-Za-z0-9._:-]*$ ]] || die "bad --model '$model'"; fi
+  case "$effort" in "" | low | medium | high | xhigh | max) ;; *) die "bad --effort '$effort' (low, medium, high, xhigh or max)" ;; esac
+  # Default sonnet at high effort. --effort is always passed: settings.json modelSettings sets a per-model effortLevel
+  # (sonnet-5-5 high, sonnet-5 medium, opus high), so an explicit flag keeps the result independent of that table and
+  # of how the alias resolves. A lone --model keeps the high default.
+  : "${model:=sonnet}" "${effort:=high}"
   local intent
   if [ -n "$bfile" ]; then intent=$(first_line "$bfile"); else intent=$(first_line <(printf '%s\n' "$brief")); fi
   [ -n "$intent" ] || die "the brief is empty"
@@ -1132,7 +1146,7 @@ cmd_spawn() {
   [ -d "$d" ] || die "spawn: could not make the task"
   id=$(basename "$d")
   if [ -n "$bfile" ]; then cp -- "$bfile" "$d/brief.md"; else printf '%s\n' "$brief" >"$d/brief.md"; fi
-  meta_add "$d" "spawned=1" "spawn_slug=$slug" ${model:+"spawn_model=$model"}
+  meta_add "$d" "spawned=1" "spawn_slug=$slug" "spawn_model=$model" "spawn_effort=$effort"
   [ $top = 0 ] || meta_add "$d" "top=1"
   if [ $ram = 0 ]; then
     cmd_log "$id" queued "spawn waiting for RAM"
@@ -1140,6 +1154,57 @@ cmd_spawn() {
     return 0
   fi
   spawn_launch "$d" "$lname" "$lsid"
+}
+
+# --- go: select the tmux window a tmux:// link names. TARGET comes from link text, so it is matched against a strict
+# pattern (or an existing task id / live session name) before any tmux call; tmux only ever sees it as one argv word
+# (a leading "=" makes the session part an exact match; nothing validated can start with "-", so "--" has no job here).
+tmux_go() { if [ -n "${CREW_TMUX_SOCKET:-}" ]; then tmux -L "$CREW_TMUX_SOCKET" "$@"; else tmux "$@"; fi; }
+go_fail() { echo "crew: go: $*" >&2; exit 1; }
+cmd_go() {
+  [ $# -eq 1 ] || die "go takes one target (SESSION:INDEX[.PANE], a task id or a session name)"
+  local t=$1 LC_ALL=C sess="" idx="" pane="" wid="" what="" win d row out line act cname csess
+  [ -z "${CREW_TMUX_SOCKET:-}" ] || [[ "$CREW_TMUX_SOCKET" =~ ^[A-Za-z0-9._-]+$ ]] || die "CREW_TMUX_SOCKET must be plain characters"
+  if [[ "$t" =~ ^([A-Za-z0-9_][A-Za-z0-9._-]*):([0-9]+)(\.([0-9]+))?$ ]]; then
+    sess=${BASH_REMATCH[1]} idx=${BASH_REMATCH[2]} pane=${BASH_REMATCH[4]}
+  elif [[ "$t" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*$ ]]; then
+    d="$CREW_ROOT/$t"
+    if [ -d "$d" ]; then   # a task: the window `crew spawn` recorded
+      wid=$(meta_get "$d" window_id)
+      [[ "$wid" =~ ^@[0-9]+$ ]] || go_fail "task $t has no tmux window"
+      what="task $t"
+    else   # a live claude session name
+      tmap_load
+      row=$(pane_target "$t" "")
+      [[ "$row" =~ ^([A-Za-z0-9_][A-Za-z0-9._-]*):([0-9]+)\.([0-9]+)$ ]] || go_fail "no task or single live tmux session named $t"
+      sess=${BASH_REMATCH[1]} idx=${BASH_REMATCH[2]} pane=${BASH_REMATCH[3]}
+    fi
+  else
+    die "refusing target (want SESSION:INDEX[.PANE], a task id or a session name)"
+  fi
+  command -v tmux >/dev/null 2>&1 || go_fail "tmux not found"
+  tmux_go list-sessions >/dev/null 2>&1 || go_fail "tmux is not running"
+  if [ -n "$wid" ]; then
+    win=$wid
+    sess=$(tmux_go list-windows -a -F '#{window_id} #{session_name}' 2>/dev/null | awk -v w="$wid" '$1 == w {sub(/^[^ ]+ /, ""); print; exit}')
+    [ -n "$sess" ] || go_fail "the window of $what ($wid) is gone"
+  else
+    win="=$sess:$idx"; what="$sess:$idx${pane:+.$pane}"
+  fi
+  if [ -n "$pane" ]; then   # check the pane first: a missing pane must leave the selection alone
+    out=$(tmux_go list-panes -t "$win" -F '#{pane_index}' 2>&1) || go_fail "no window $what (${out%%$'\n'*})"
+    grep -qxF "$pane" <<<"$out" || go_fail "no pane $what"
+  fi
+  out=$(tmux_go select-window -t "$win" 2>&1) || go_fail "no window $what (${out%%$'\n'*})"
+  if [ -n "$pane" ]; then tmux_go select-pane -t "=$sess:$idx.$pane" >/dev/null 2>&1 || go_fail "no pane $what"; fi
+  # the most recently active attached client; none = nothing to move, the window stays selected for when one attaches
+  line=$(tmux_go list-clients -F '#{client_activity} #{client_name} #{client_session}' 2>/dev/null | sort -rn | head -n 1 || true)
+  if [ -z "$line" ]; then echo "go: selected $what (no tmux client attached)"; return 0; fi
+  read -r act cname csess <<<"$line"
+  if [ "$csess" != "$sess" ]; then
+    out=$(tmux_go switch-client -c "$cname" -t "=$sess" 2>&1) || go_fail "could not switch the client to $sess (${out%%$'\n'*})"
+  fi
+  echo "go: $what"
 }
 
 cmd_new() {
@@ -1968,6 +2033,7 @@ case "${1:-}" in
   relink) shift; cmd_relink "$@" ;;
   meta-migrate) shift; cmd_meta_migrate "$@" ;;
   spawn) shift; cmd_spawn "$@" ;;
+  go) shift; cmd_go "$@" ;;
   log) shift; cmd_log "$@" ;;
   meta) shift; cmd_meta "$@" ;;
   hold) shift; cmd_hold "$@" ;;

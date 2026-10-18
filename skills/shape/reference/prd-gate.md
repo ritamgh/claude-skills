@@ -49,13 +49,16 @@ Then the order, for every size:
 1. Ask the playback question (`reference/questions.md` §5) **alone**. Record its answer; a yes is what settles the
    drafts, so lint is usually not clean until then.
 2. Re-run `plan lint <task>`. Blocking findings: fix, play back what changed, go to 1.
-3. Only at exit 0, a **separate** AskUserQuestion: "Approve the PRD?" with "Approve (Recommended)" and "Change
-   something". Never put it in the same call as the playback or any other question. On Approve:
-   `~/.claude/bin/plan event <task> --by user --source terminal --json '{"type":"approve_prd"}'`. Exit 4 means lint
-   found a blocking problem after all (stdout lists it): fix, play back what changed, ask again.
+3. Only at exit 0, approval, **separately** from the playback or any other question. Page-first (`plan page <task>`
+   exits 0): the page's Approve button is the ask; say the PRD is ready, end with the link and status line, and stop.
+   It sends `approve_prd`; you see it as an `approve_prd` line in `plan news`; continue with §4. Exit 4 on that
+   event means lint found a blocking problem after all (stdout lists it): fix, play back what changed, ask again.
+   Terminal fallback (page not live): a **separate** AskUserQuestion "Approve the PRD?" with "Approve (Recommended)"
+   and "Change something". On Approve:
+   `~/.claude/bin/plan event <task> --by user --source terminal --json '{"type":"approve_prd"}'`.
 
-The page's Approve button sends the same event; you see it as an `approve_prd` line in `plan news`. Treat it exactly
-like the terminal yes and continue with §4.
+The playback question in step 1 is a question node with `fills`, answered on the page (questions.md §5); the
+AskUserQuestion form is the fallback only.
 
 ## 4. Commit
 

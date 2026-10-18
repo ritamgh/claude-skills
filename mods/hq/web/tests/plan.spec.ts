@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 
+import { createPlanRoutes } from '../plan'
 import { startServer } from '../server'
 
 const TOKEN = 'test-token-0123456789'
@@ -33,7 +34,7 @@ const PLAN_JSON = { v: 1, rev: 15, title: 'Offline sync', stage: 'shape', nodes:
 // A scratch world like server.spec.ts's: fake crew, tmux-map, tmux and plan scripts that read their answers from files
 // in `dir` and log every argv (one line per call, arguments joined by \x1f). The fake plan CLI answers `event` with
 // event.out / event.err and the exit code in event.code, and `list` with list.out.
-function world(opts: { map?: string; planBin?: boolean; planPage?: boolean; extraHosts?: string[] } = {}) {
+function world(opts: { map?: string; planBin?: boolean; planPage?: boolean; extraHosts?: string[]; nudgeMs?: number; retry?: { ms: number; windowMs: number } } = {}) {
   const dir = mkdtempSync(`${tmpdir()}/hqplan-`)
   dirs.push(dir)
   const bin = `${dir}/bin`
@@ -51,14 +52,14 @@ function world(opts: { map?: string; planBin?: boolean; planPage?: boolean; extr
     chmodSync(`${bin}/${name}`, 0o755)
   }
   const log = (file: string) => `{ for a in "$@"; do printf '%s\\x1f' "$a"; done; printf '\\n'; } >> ${dir}/${file}`
-  script('crew', `case "$1" in ls) cat ${dir}/ls.txt;; esac`)
+  script('crew', `${log('crew.log')}\ncase "$1" in ls) cat ${dir}/ls.txt;; esac`)
   script('tmux-map', `cat ${dir}/map.tsv`)
   script(
     'tmux',
     `${log('tmux.log')}
 case "$1" in
   capture-pane)
-    if [ ! -f ${dir}/typed.txt ]; then cat ${dir}/pane.txt
+    if [ ! -f ${dir}/typed.txt ] || [ -f ${dir}/noecho ]; then cat ${dir}/pane.txt
     else T="$(cat ${dir}/typed.txt)" awk '/^❯/ { print "❯ " ENVIRON["T"]; next } { print }' ${dir}/pane.txt; fi;;
   send-keys) if [ "$4" = -l ]; then printf '%s' "$6" > ${dir}/typed.txt; fi;;
   display-message) cat ${dir}/display.txt;;
@@ -111,7 +112,8 @@ esac`,
       settleMs: 300,
       ...(opts.planBin === false ? {} : { planBin: `${bin}/plan` }),
       ...(opts.planPage === false ? {} : { planPage: PLAN_PAGE }),
-      planNudgeMs: NUDGE_MS,
+      planNudgeMs: opts.nudgeMs ?? NUDGE_MS,
+      ...(opts.retry ? { planRetryMs: opts.retry.ms, planRetryWindowMs: opts.retry.windowMs } : {}),
       ...(opts.extraHosts ? { extraHosts: opts.extraHosts, remotePort: 0 } : {}),
     },
     0,
@@ -132,11 +134,13 @@ esac`,
   const event = (id: string, body: unknown, headers: Record<string, string> = {}) => post(`/api/plan/${id}/event`, body, headers)
   const sends = () => lines('tmux.log').filter(c => c[0] === 'send-keys')
   const planCalls = () => lines('plan.log')
+  const captures = () => lines('tmux.log').filter(c => c[0] === 'capture-pane').length
+  const crewCalls = () => lines('crew.log').length
   const set = (name: string, text: string) => writeFileSync(`${dir}/${name}`, text)
 
   const remoteBase = `http://127.0.0.1:${server.remotePort}`
 
-  return { dir, base, remoteBase, get, post, event, sends, planCalls, set, crew, stop: () => server.stop(true) }
+  return { dir, base, remoteBase, get, post, event, sends, planCalls, captures, crewCalls, set, crew, stop: () => server.stop(true) }
 }
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -367,7 +371,8 @@ describe('POST /api/plan/<task>/event', () => {
     }
     const unknown = await w.event('1017-run', { type: 'nope' })
     expect(await unknown.json()).toEqual({
-      error: 'type must be one of: answer, park, reopen, strike, prioritize, edit_label, note, ask, expand, approve_prd, boost, kill, restore, merge, twist, promote, weight, weights_reset, research',
+      error:
+        'type must be one of: answer, park, reopen, strike, prioritize, edit_label, note, ask, expand, approve_prd, boost, kill, restore, merge, twist, promote, weight, weights_reset, research, comment, comment_accept, comment_rework, comment_delete, review',
     })
     expect((await w.event('1017-run', { node: 'Q7' })).status).toBe(400)
     expect((await w.event('1017-run', { type: 7 })).status).toBe(400)
@@ -389,6 +394,223 @@ describe('POST /api/plan/<task>/event', () => {
     expect((await w.event('1017-run', { type: 'note', text: 'x'.repeat(2000) })).status).toBe(200)
     expect((await w.event('1017-run', { type: 'edit_label', node: 'Q1', label: 'y'.repeat(120) })).status).toBe(200)
     expect(w.planCalls()).toHaveLength(2)
+  })
+
+  // Break caught: a USER_EVENTS table without the comment types (400), or a FIELD_ORDER without ref/proposal/author/anchor (keys silently dropped).
+  test('each teammate-comment event reaches the CLI with exactly its fields, in a stable order, and a pane ask has no node', async () => {
+    const w = world()
+    const cases: [Record<string, unknown>, string][] = [
+      [{ type: 'comment', text: 'tighten the retry rule' }, '{"type":"comment","text":"tighten the retry rule"}'],
+      [{ anchor: '§4', author: 'Priya N', text: 'why 3 retries?', type: 'comment' }, '{"type":"comment","text":"why 3 retries?","author":"Priya N","anchor":"§4"}'],
+      [{ type: 'comment', text: 'x', anchor: 'R12' }, '{"type":"comment","text":"x","anchor":"R12"}'],
+      [{ proposal: 14, ref: 'CM3', type: 'comment_accept' }, '{"type":"comment_accept","ref":"CM3","proposal":14}'],
+      [{ type: 'comment_rework', ref: 'CM3' }, '{"type":"comment_rework","ref":"CM3"}'],
+      [{ text: 'shorter please', ref: 'CM3', type: 'comment_rework' }, '{"type":"comment_rework","ref":"CM3","text":"shorter please"}'],
+      [{ type: 'comment_delete', ref: 'CM3' }, '{"type":"comment_delete","ref":"CM3"}'],
+      [{ type: 'ask', text: 'what is still open?' }, '{"type":"ask","text":"what is still open?"}'],
+      [{ type: 'ask', text: 'why Q4?', node: 'Q4' }, '{"type":"ask","node":"Q4","text":"why Q4?"}'],
+    ]
+    for (const [body] of cases) expect([body, (await w.event('1017-run', body)).status]).toEqual([body, 200])
+    expect(w.planCalls()).toEqual(cases.map(([, json]) => ANSWER_ARGV('1017-run', json)))
+  })
+
+  // Break caught: forwarding every key regardless of type (a ref on a comment, a proposal on a delete, an author on a rework).
+  test('a field that is not listed for a comment event type is not forwarded', async () => {
+    const w = world()
+    await w.event('1017-run', { type: 'comment', text: 'x', ref: 'CM1', proposal: 5, node: 'Q1', parts: [] })
+    await w.event('1017-run', { type: 'comment_accept', ref: 'CM1', proposal: 5, text: 'x', author: 'a', anchor: 'Q1', changes: [{ type: 'upsert' }] })
+    await w.event('1017-run', { type: 'comment_rework', ref: 'CM1', proposal: 5, author: 'a', anchor: 'Q1' })
+    await w.event('1017-run', { type: 'comment_delete', ref: 'CM1', text: 'x', proposal: 5 })
+    expect(w.planCalls()).toEqual([
+      ANSWER_ARGV('1017-run', '{"type":"comment","text":"x"}'),
+      ANSWER_ARGV('1017-run', '{"type":"comment_accept","ref":"CM1","proposal":5}'),
+      ANSWER_ARGV('1017-run', '{"type":"comment_rework","ref":"CM1"}'),
+      ANSWER_ARGV('1017-run', '{"type":"comment_delete","ref":"CM1"}'),
+    ])
+  })
+
+  // Break caught: comment_split, comment_triage and reply put into USER_EVENTS: the page could then triage its own comments.
+  test('comment_split, comment_triage and reply are session-only: 400 and the CLI is not run', async () => {
+    const w = world()
+    for (const type of ['comment_split', 'comment_triage', 'reply']) {
+      const res = await w.event('1017-run', { type, ref: 'CM1', text: 'x', parts: [{ text: 'a' }, { text: 'b' }], action: 'accept' })
+      expect([type, res.status]).toEqual([type, 400])
+    }
+    expect(w.planCalls()).toEqual([])
+  })
+
+  // Break caught: comment_accept's ref, or any comment field, accepted as a non-string.
+  test('ref, author and anchor must be strings', async () => {
+    const w = world()
+    for (const [body, key] of [
+      [{ type: 'comment_accept', ref: 3, proposal: 7 }, 'ref'],
+      [{ type: 'comment', text: 'x', author: ['a'] }, 'author'],
+      [{ type: 'comment', text: 'x', anchor: 4 }, 'anchor'],
+    ] as const) {
+      const res = await w.event('1017-run', body)
+      expect([key, res.status, await res.json()]).toEqual([key, 400, { error: `${key} must be a string` }])
+    }
+    expect(w.planCalls()).toEqual([])
+  })
+
+  // Break caught: the proposal id left a string (the page now sends proposal.rev, an integer) or let through as a float, a string or a boolean.
+  test('the comment_accept proposal must be an integer', async () => {
+    const w = world()
+    for (const proposal of ['7', 7.5, true, [7], { rev: 7 }, 2 ** 60]) {
+      const res = await w.event('1017-run', { type: 'comment_accept', ref: 'CM1', proposal })
+      expect([proposal, res.status, await res.json()]).toEqual([proposal, 400, { error: 'proposal must be an integer' }])
+    }
+    expect(w.planCalls()).toEqual([])
+  })
+
+  // Break caught: the one 2000 cap applied to a comment (a 5000-character paste refused), or the 5000 cap leaking to every event.
+  test('a comment may carry 5000 characters of text, every other event keeps the 2000 cap', async () => {
+    const w = world()
+    expect((await w.event('1017-run', { type: 'comment', text: 'x'.repeat(5001) })).status).toBe(413)
+    expect((await w.event('1017-run', { type: 'comment', text: '€'.repeat(5001) })).status).toBe(413)
+    for (const body of [
+      { type: 'comment_rework', ref: 'CM1', text: 'x'.repeat(2001) },
+      { type: 'ask', text: 'x'.repeat(2001) },
+      { type: 'note', text: 'x'.repeat(2001) },
+      { type: 'answer', node: 'Q1', text: 'x'.repeat(2001) },
+    ]) {
+      expect([body.type, (await w.event('1017-run', body)).status]).toEqual([body.type, 413])
+    }
+    expect(w.planCalls()).toEqual([])
+    expect((await w.event('1017-run', { type: 'comment', text: 'x'.repeat(5000) })).status).toBe(200)
+    expect((await w.event('1017-run', { type: 'comment', text: '€'.repeat(5000) })).status).toBe(200)
+    expect((await w.event('1017-run', { type: 'comment_rework', ref: 'CM1', text: 'x'.repeat(2000) })).status).toBe(200)
+    expect(w.planCalls()).toHaveLength(3)
+    expect(JSON.parse(w.planCalls()[0]![7]!).text).toHaveLength(5000)
+  })
+
+  // Break caught: no author/anchor limit (a name of any length or a paragraph in the anchor reaches the plan CLI), or a line break let through.
+  test('an author over 80 characters or on two lines, an anchor over 16 or on two lines, is 400; at the limit it passes', async () => {
+    const w = world()
+    for (const [key, value] of [
+      ['author', 'a'.repeat(81)],
+      ['author', 'Priya\nN'],
+      ['author', 'Priya\rN'],
+      ['author', 'Priya N'],
+      ['anchor', 'Q'.repeat(17)],
+      ['anchor', 'Q1\nQ2'],
+    ] as const) {
+      const res = await w.event('1017-run', { type: 'comment', text: 'x', [key]: value })
+      expect([key, value, res.status]).toEqual([key, value, 400])
+      expect(((await res.json()) as { error: string }).error).toContain(key)
+    }
+    expect(w.planCalls()).toEqual([])
+    expect((await w.event('1017-run', { type: 'comment', text: 'x', author: 'a'.repeat(80), anchor: 'Q'.repeat(16) })).status).toBe(200)
+    expect((await w.event('1017-run', { type: 'comment', text: 'x', author: '€'.repeat(80) })).status).toBe(200)
+    expect(w.planCalls()).toHaveLength(2)
+  })
+
+  // Break caught: no `review` in USER_EVENTS (400), refs flattened to a string or dropped by FIELD_ORDER, or action/refs reordered before existing keys.
+  test('a review event reaches the CLI with action and refs as a JSON array', async () => {
+    const w = world()
+    const cases: [Record<string, unknown>, string][] = [
+      [{ type: 'review', action: 'open' }, '{"type":"review","action":"open"}'],
+      [{ action: 'post', refs: ['CM12', 'CM3'], type: 'review' }, '{"type":"review","action":"post","refs":["CM12","CM3"]}'],
+      [{ type: 'review', action: 'pull', node: 'Q1', text: 'x', ref: 'CM1' }, '{"type":"review","action":"pull"}'],
+      [{ type: 'review', action: 'post', refs: [] }, '{"type":"review","action":"post","refs":[]}'],
+      [{ proposals: { CM12: 31, CM3: 4 }, refs: ['CM12', 'CM3'], action: 'post', type: 'review' }, '{"type":"review","action":"post","refs":["CM12","CM3"],"proposals":{"CM12":31,"CM3":4}}'],
+    ]
+    for (const [body] of cases) expect([body, (await w.event('1017-run', body)).status]).toEqual([body, 200])
+    expect(w.planCalls()).toEqual(cases.map(([, json]) => ANSWER_ARGV('1017-run', json)))
+  })
+
+  // Break caught: refs accepted as a string/object, a list too long or with a long/multi-line/control entry, or a non-string action.
+  test('refs must be a list of at most 20 one-line strings of at most 16 characters; action must be a string', async () => {
+    const w = world()
+    const bad: [Record<string, unknown>, string][] = [
+      [{ type: 'review', action: 'post', refs: 'CM1' }, 'refs'],
+      [{ type: 'review', action: 'post', refs: { 0: 'CM1' } }, 'refs'],
+      [{ type: 'review', action: 'post', refs: 7 }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM1', 2] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: [['CM1']] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: [null] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: Array.from({ length: 21 }, (_, i) => `CM${i}`) }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['C'.repeat(17)] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM1\nCM2'] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM1\r'] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM\u20281'] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM\u00001'] }, 'refs'],
+      [{ type: 'review', action: 'post', refs: ['CM\u001b[31m'] }, 'refs'],
+      [{ type: 'review', action: 4 }, 'action'],
+      [{ type: 'review', action: ['open'] }, 'action'],
+    ]
+    for (const [body, key] of bad) {
+      const res = await w.event('1017-run', body)
+      expect([body, res.status, ((await res.json()) as { error: string }).error]).toEqual([body, 400, expect.stringContaining(key)])
+    }
+    expect(w.planCalls()).toEqual([])
+    const twenty = Array.from({ length: 20 }, (_, i) => `CM${i}`)
+    expect((await w.event('1017-run', { type: 'review', action: 'post', refs: [...twenty.slice(0, 19), 'C'.repeat(16)] })).status).toBe(200)
+    expect((await w.event('1017-run', { type: 'review', action: 'post', refs: twenty })).status).toBe(200)
+    expect(w.planCalls()).toHaveLength(2)
+  })
+
+  // Break caught: proposals dropped or reshaped by the allow-list (the core would then refuse every Post), or accepted as a string, a list, a float or a long or multi-line key.
+  test('proposals must be an object of at most 20 one-line refs of at most 16 characters to integers', async () => {
+    const w = world()
+    const bad: Record<string, unknown>[] = [
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: 'CM1' },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: [4] },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: 4 },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { CM1: '4' } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { CM1: 4.5 } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { CM1: null } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { CM1: [4] } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { ['C'.repeat(17)]: 4 } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: { 'CM1\nCM2': 4 } },
+      { type: 'review', action: 'post', refs: ['CM1'], proposals: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`CM${i}`, i])) },
+    ]
+    for (const body of bad) {
+      const res = await w.event('1017-run', body)
+      expect([body.proposals, res.status, ((await res.json()) as { error: string }).error]).toEqual([body.proposals, 400, expect.stringContaining('proposals')])
+    }
+    expect(w.planCalls()).toEqual([])
+    const twenty = Array.from({ length: 20 }, (_, i) => `CM${i}`)
+    const all = Object.fromEntries(twenty.map((ref, i) => [ref, i]))
+    expect((await w.event('1017-run', { type: 'review', action: 'post', refs: twenty, proposals: all })).status).toBe(200)
+    expect(w.planCalls()).toHaveLength(1)
+  })
+
+  // Break caught: proposals accepted on another event type (it would reach the CLI, which refuses it for a non-post review).
+  test('proposals on any other event type is 400', async () => {
+    const w = world()
+    for (const body of [
+      { type: 'note', text: 'x', proposals: { CM1: 4 } },
+      { type: 'comment_accept', ref: 'CM1', proposal: 4, proposals: { CM1: 4 } },
+      { type: 'approve_prd', proposals: {} },
+    ]) {
+      const res = await w.event('1017-run', body)
+      expect([body.type, res.status, ((await res.json()) as { error: string }).error]).toEqual([body.type, 400, expect.stringContaining('proposals')])
+    }
+    expect(w.planCalls()).toEqual([])
+  })
+
+  // Break caught: refs accepted on another event type (it would reach the CLI), or a list let through where every other field must be a string.
+  test('refs on any other event type is 400, and no other field accepts a list', async () => {
+    const w = world()
+    for (const body of [
+      { type: 'note', text: 'x', refs: ['CM1'] },
+      { type: 'comment', text: 'x', refs: ['CM1'] },
+      { type: 'approve_prd', refs: [] },
+      { type: 'answer', node: 'Q1', choice: 'recommended', refs: 'CM1' },
+    ]) {
+      const res = await w.event('1017-run', body)
+      expect([body.type, res.status, ((await res.json()) as { error: string }).error]).toEqual([body.type, 400, expect.stringContaining('refs')])
+    }
+    for (const [body, key] of [
+      [{ type: 'note', text: ['a'] }, 'text'],
+      [{ type: 'note', text: 'x', node: ['Q1'] }, 'node'],
+      [{ type: 'ask', text: 'x', node: ['Q1'] }, 'node'],
+    ] as const) {
+      const res = await w.event('1017-run', body)
+      expect([key, res.status, await res.json()]).toEqual([key, 400, { error: `${key} must be a string` }])
+    }
+    expect(w.planCalls()).toEqual([])
   })
 
   test('a bad task id is 400, a body that is not JSON is 415, a bad JSON body is 400', async () => {
@@ -457,27 +679,80 @@ describe('the session nudge', () => {
     expect(w.sends()[2]![5]).toBe('From Plan (user): 1 change(s) on 1017-run: reopened Q9. Run: plan news 1017-run')
   })
 
-  test('a long burst is cut to 2000 characters and keeps the plan news hint', async () => {
+  // Break caught: a nudge built from the posted event (author, comment text) instead of the CLI summary, leaking a teammate's name or words into the lead's prompt.
+  test('a comment from a named teammate nudges the lead with the CLI summary only: no name, no text', async () => {
     const w = world()
-    w.set('event.out', JSON.stringify({ ok: true, rev: 20, event: {}, summary: `noted ${'z'.repeat(900)}` }))
-    for (let i = 0; i < 4; i++) await w.event('1017-run', { type: 'note', text: `n${i}` })
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"comment CM3 added"}')
+    const res = await w.event('1017-run', { type: 'comment', text: 'Zebulon says: drop the Kafka dependency', author: 'Zebulon Quirke', anchor: 'Q4' })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, rev: 16, summary: 'comment CM3 added', nudge: 'scheduled' })
     await until(() => w.sends().length >= 2)
-    const typed = w.sends()[0]![5]!
-    expect(Array.from(typed).length).toBeLessThanOrEqual(2000)
-    expect(typed.startsWith('From Plan (user): 4 change(s) on 1017-run: noted zzz')).toBe(true)
-    expect(typed.endsWith('…. Run: plan news 1017-run')).toBe(true)
+    expect(w.sends()[0]![5]).toBe('From Plan (user): 1 change(s) on 1017-run: comment CM3 added. Run: plan news 1017-run')
+    const typed = w.sends().map(c => c.join(' ')).join('\n')
+    for (const leak of ['Zebulon', 'Quirke', 'Kafka', 'drop the']) expect(typed).not.toContain(leak)
   })
 
-  test('a summary is one line, at most 2000 characters, free of escapes, and still ends with the plan news hint', async () => {
+  // Break caught: a nudge built from the posted event (the refs) instead of the CLI summary.
+  test('a review post nudges the lead with the CLI summary only: no refs', async () => {
     const w = world()
-    w.set('event.out', JSON.stringify({ ok: true, rev: 16, event: {}, summary: `noted line one\nline two \u001b[31mred\u001b[0m ${'q'.repeat(3000)}` }))
+    w.set('event.out', '{"ok":true,"rev":17,"event":{},"summary":"review post requested"}')
+    const res = await w.event('1017-run', { type: 'review', action: 'post', refs: ['CM41', 'CM77'] })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, rev: 17, summary: 'review post requested', nudge: 'scheduled' })
+    await until(() => w.sends().length >= 2)
+    expect(w.sends()[0]![5]).toBe('From Plan (user): 1 change(s) on 1017-run: review post requested. Run: plan news 1017-run')
+    const typed = w.sends().map(c => c.join(' ')).join('\n')
+    for (const leak of ['CM41', 'CM77', 'refs']) expect(typed).not.toContain(leak)
+  })
+
+  // Break caught: summaries inlined until the line fills the composer (QA4 F1: 330 characters wrapped over rows and lost its Enter).
+  test('five long summaries make one short line that keeps the task id and the plan news hint', async () => {
+    const w = world()
+    w.set('event.out', JSON.stringify({ ok: true, rev: 20, event: {}, summary: `answered Q2: ${'z'.repeat(90)}` }))
+    for (let i = 0; i < 5; i++) await w.event('1017-run', { type: 'note', text: `n${i}` })
+    await until(() => w.sends().length >= 2)
+    expect(w.sends()[0]![5]).toBe('From Plan (user): 5 change(s) on 1017-run. Run: plan news 1017-run')
+  })
+
+  // Break caught: the short form repeating a long task id (170 characters for a 60-character id) and so passing the composer line it was meant to fit.
+  test('a 60-character task id still gets a nudge of at most 160 characters that ends with the plan news hint', async () => {
+    const w = world()
+    const id = `1017-${'x'.repeat(55)}`
+    mkdirSync(`${w.crew}/${id}/plan`, { recursive: true })
+    writeFileSync(`${w.crew}/${id}/meta`, 'lead=acme-gateway-lead\nrepo=/home/x/acme-gateway\n')
+    writeFileSync(`${w.crew}/${id}/status`, '2026-10-16T11:57:00Z\trunning\n')
+    writeFileSync(`${w.crew}/${id}/plan/plan.json`, JSON.stringify(PLAN_JSON))
+    w.set('ls.txt', ['RUNNING', `  ${id}   running  2m  ship  acme-gateway  working`, ''].join('\n'))
+    w.set('event.out', JSON.stringify({ ok: true, rev: 20, event: {}, summary: `answered Q2: ${'z'.repeat(90)}` }))
+    expect((await w.event(id, ANSWER)).status).toBe(200)
+    await until(() => w.sends().length >= 2)
+    expect(w.sends()[0]![5]).toBe(`From Plan (user): 1 change(s). Run: plan news ${id}`)
+    expect(w.sends()[0]![5]!.length).toBeLessThanOrEqual(160)
+  })
+
+  // Break caught: the short form losing the bound (a summary of 160 characters or more typed as it is) or applying it too early.
+  test('summaries that fit in 160 characters stay in the line; one character more and they do not', async () => {
+    const w = world({ nudgeMs: 50 })
+    const fits = 160 - 'From Plan (user): 1 change(s) on 1017-run: '.length - '. Run: plan news 1017-run'.length
+    w.set('event.out', JSON.stringify({ ok: true, rev: 20, event: {}, summary: 'a'.repeat(fits) }))
+    await w.event('1017-run', ANSWER)
+    await until(() => w.sends().length >= 2)
+    expect(w.sends()[0]![5]!.length).toBe(160)
+    expect(w.sends()[0]![5]).toContain('aaa')
+    w.set('event.out', JSON.stringify({ ok: true, rev: 21, event: {}, summary: 'a'.repeat(fits + 1) }))
+    await w.event('1017-run', ANSWER)
+    await until(() => w.sends().length >= 4)
+    expect(w.sends()[2]![5]).toBe('From Plan (user): 1 change(s) on 1017-run. Run: plan news 1017-run')
+  })
+
+  test('a summary is one line, free of escapes, and still ends with the plan news hint', async () => {
+    const w = world()
+    w.set('event.out', JSON.stringify({ ok: true, rev: 16, event: {}, summary: 'noted line one\nline two \u001b[31mred\u001b[0m' }))
     expect((await w.event('1017-run', { type: 'note', text: 'x' })).status).toBe(200)
     await until(() => w.sends().length >= 2)
     const typed = w.sends()[0]![5]!
     expect(typed).not.toMatch(/[\u0000-\u001f]/)
-    expect(Array.from(typed).length).toBeLessThanOrEqual(2000)
-    expect(typed.startsWith('From Plan (user): 1 change(s) on 1017-run: noted line one line two [31mred[0m qqq')).toBe(true)
-    expect(typed.endsWith('…. Run: plan news 1017-run')).toBe(true)
+    expect(typed).toBe('From Plan (user): 1 change(s) on 1017-run: noted line one line two [31mred[0m. Run: plan news 1017-run')
   })
 
   test('bidi overrides, zero-width and tag characters are stripped from a summary', async () => {
@@ -523,7 +798,7 @@ describe('the session nudge', () => {
   })
 
   test('a lone session of the project that no task records as its lead is a guess, and gets nothing', async () => {
-    const w = world()
+    const w = world({ retry: { ms: 20, windowMs: 400 } })
     const logged: string[] = []
     const original = console.error
     console.error = (...args: unknown[]) => void logged.push(args.join(' '))
@@ -554,6 +829,331 @@ describe('the session nudge', () => {
     expect((await w.event('1017-run', ANSWER)).status).toBe(400)
     await wait(NUDGE_MS * 4)
     expect(w.sends()).toEqual([])
+  })
+})
+
+// A nudge the pane refuses is not lost: it is retried until it is typed or the window runs out.
+describe('the session nudge, retried', () => {
+  const DIALOG = ['Edit file?', '❯ 1. Yes', '  2. No', 'Esc to cancel'].join('\n')
+  const RETRY = { ms: 40, windowMs: 3000 }
+  const logs = () => {
+    const logged: string[] = []
+    const original = console.error
+    console.error = (...args: unknown[]) => void logged.push(args.join(' '))
+
+    return { logged, restore: () => (console.error = original) }
+  }
+  const LINE = (n: number, list: string) => `From Plan (user): ${n} change(s) on 1017-run: ${list}. Run: plan news 1017-run`
+
+  // Break caught: a refused send (dialog open in the pane) only logged and dropped, so the session never hears of the page answer.
+  test('a send refused by an open dialog is retried and typed once the pane is free: one line in total', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    w.set('pane.txt', DIALOG)
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"answered Q7: Last-write-wins"}')
+    expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+    await until(() => w.captures() >= 2)
+    expect(w.sends()).toEqual([])
+
+    w.set('pane.txt', COMPOSER)
+    await until(() => w.sends().length >= 2)
+    await wait(RETRY.ms * 4)
+    expect(w.sends()).toEqual([
+      ['send-keys', '-t', 'claude:1.0', '-l', '--', LINE(1, 'answered Q7: Last-write-wins')],
+      ['send-keys', '-t', 'claude:1.0', 'Enter'],
+    ])
+  })
+
+  // Break caught: the retry replaying only the first burst, or one line per event, once more events arrive while the pane is blocked.
+  test('events that arrive while the nudge is being retried join it: still one line, with every summary', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    w.set('pane.txt', DIALOG)
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"answered Q7: Last-write-wins"}')
+    await w.event('1017-run', ANSWER)
+    await until(() => w.captures() >= 1)
+    w.set('event.out', '{"ok":true,"rev":17,"event":{},"summary":"parked Q9"}')
+    await w.event('1017-run', { type: 'park', node: 'Q9' })
+    await until(() => w.captures() >= 3)
+
+    w.set('pane.txt', COMPOSER)
+    await until(() => w.sends().length >= 2)
+    await wait(RETRY.ms * 4 + 200)
+    expect(w.sends()).toEqual([
+      ['send-keys', '-t', 'claude:1.0', '-l', '--', LINE(2, 'answered Q7: Last-write-wins; parked Q9')],
+      ['send-keys', '-t', 'claude:1.0', 'Enter'],
+    ])
+  })
+
+  // Break caught: a task that is not on the board retried for the whole window (a retry storm), or logged on every attempt.
+  test('a task that is not on the board is not retried: one error line, no further board reads', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    mkdirSync(`${w.crew}/ghost/plan`, { recursive: true })
+    writeFileSync(`${w.crew}/ghost/plan/plan.json`, JSON.stringify(PLAN_JSON))
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('ghost', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      const reads = w.crewCalls()
+      await wait(RETRY.ms * 6)
+      expect(w.crewCalls()).toBe(reads)
+    } finally {
+      restore()
+    }
+    expect(logged).toEqual(['hq-web: plan nudge for ghost not sent: the task is not on the board'])
+    expect(w.sends()).toEqual([])
+  })
+
+  // Break caught: no cap on the retries (a blocked pane retried forever), or one error line per failed attempt.
+  test('when the window runs out the retries stop, with the error logged once', async () => {
+    const w = world({ nudgeMs: 50, retry: { ms: 20, windowMs: 400 } })
+    w.set('pane.txt', DIALOG)
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      await wait(100)
+      const attempts = w.captures()
+      expect(attempts).toBeGreaterThanOrEqual(2)
+      await wait(300)
+      expect(w.captures()).toBe(attempts)
+    } finally {
+      restore()
+    }
+    expect(logged).toEqual(['hq-web: plan nudge for 1017-run not sent: a prompt is open in the pane: answer it in tmux (❯ 1. Yes)'])
+    expect(w.sends()).toEqual([])
+  })
+
+  // Break caught: a failure after `send-keys -l` retried like a refusal, typing the whole nudge into the pane again on every attempt.
+  test('a failure after the text was typed is not retried: one send-keys -l, the error logged once', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    w.set('pane.txt', '● Done.\n')
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      await wait(RETRY.ms * 6)
+    } finally {
+      restore()
+    }
+    expect(w.sends().map(c => c[3])).toEqual(['-l'])
+    expect(logged).toEqual(['hq-web: plan nudge for 1017-run not sent: the text did not show up in the composer: Enter was not pressed, and the text may still be there'])
+  })
+
+  // Break caught: a `send-keys -l` that itself fails (tmux may have taken some keys, the 10 s timeout too) not marked typed, so the retry types the nudge again.
+  test('a send-keys -l that fails is not retried: one -l call, the error logged once', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    const tmux = `${w.dir}/bin/tmux`
+    writeFileSync(tmux, readFileSync(tmux, 'utf8').replace('case "$1" in\n', 'if [ "$1" = send-keys ] && [ "$4" = -l ]; then echo boom >&2; exit 1; fi\ncase "$1" in\n'))
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      await wait(RETRY.ms * 6)
+    } finally {
+      restore()
+    }
+    expect(w.sends().map(c => c[3])).toEqual(['-l'])
+    expect(logged).toEqual(['hq-web: plan nudge for 1017-run not sent: tmux send-keys failed: boom'])
+  })
+
+  // The fake pane draws the composer the way Claude Code does on a narrow screen: the first 60 characters on the `❯` row, then the
+  // rest on a row indented by two spaces (the break eats the space), which `capture-pane -J` does not join. `noecho` hides the typed text.
+  const wrapComposer = (w: ReturnType<typeof world>) => {
+    const tmux = `${w.dir}/bin/tmux`
+    const wrapped = `{ t = ENVIRON["T"]; n = match(substr(t, 1, 60), / [^ ]*$/); if (n > 0) { print "❯ " substr(t, 1, n - 1); print "  " substr(t, n + 1) } else print "❯ " t; next }`
+    writeFileSync(tmux, readFileSync(tmux, 'utf8').replace('{ print "❯ " ENVIRON["T"]; next }', wrapped))
+  }
+
+  // Break caught: the composer check reading only the `❯` row, so a nudge that wraps onto a second row never gets its Enter (QA4 F1).
+  test('a nudge that wraps over two composer rows still gets its Enter', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    wrapComposer(w)
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"answered Q7: Last-write-wins"}')
+    expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+    await until(() => w.sends().length >= 2)
+    expect(w.sends()).toEqual([
+      ['send-keys', '-t', 'claude:1.0', '-l', '--', LINE(1, 'answered Q7: Last-write-wins')],
+      ['send-keys', '-t', 'claude:1.0', 'Enter'],
+    ])
+  })
+
+  // Break caught: a retry that types the nudge again, or presses Enter without the text being there, once the first attempt could not confirm it.
+  test('a nudge typed but not seen in the composer: the retry presses Enter once, and types nothing', async () => {
+    const w = world({ nudgeMs: 50, retry: { ms: 200, windowMs: 3000 } })
+    wrapComposer(w)
+    w.set('noecho', '')
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      rmSync(`${w.dir}/noecho`)
+      await until(() => w.sends().length >= 2)
+      await wait(600)
+    } finally {
+      restore()
+    }
+    expect(w.sends().map(c => c[3] ?? c[4])).toEqual(['-l', 'Enter'])
+  })
+
+  // Break caught: the retry pressing Enter over whatever the composer holds, submitting words the user typed (or the nudge with the user's words around it).
+  test('a nudge not seen in the composer is not submitted when the composer then holds something else', async () => {
+    const w = world({ nudgeMs: 50, retry: { ms: 200, windowMs: 3000 } })
+    wrapComposer(w)
+    w.set('noecho', '')
+    w.set('pane.txt', COMPOSER.replace('❯\u00a0', '❯ my own half-written question'))
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      await wait(800)
+    } finally {
+      restore()
+    }
+    expect(w.sends().map(c => c[3] ?? c[4])).toEqual(['-l'])
+    expect(logged.length).toBe(1)
+  })
+
+  // Break caught: the retry accepting any leading rows of the composer, so a nudge followed by a line the user then typed gets submitted with it.
+  test('a nudge not seen in the composer is not submitted when the user typed more under it', async () => {
+    const w = world({ nudgeMs: 50, retry: { ms: 200, windowMs: 3000 } })
+    w.set('noecho', '')
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"answered Q7: Last-write-wins"}')
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      w.set('pane.txt', COMPOSER.replace('❯ ', `❯ ${LINE(1, 'answered Q7: Last-write-wins')}\n  and my own second line`))
+      await wait(800)
+    } finally {
+      restore()
+    }
+    expect(w.sends().map(c => c[3] ?? c[4])).toEqual(['-l'])
+  })
+
+  // A composer the way Claude Code draws it: the rows given under the `❯` mark, between two rules (or none below, with `ruled` false).
+  const composerOf = (rows: string[], ruled = true) =>
+    ['● Done. All tests pass.', '', '────────────────', ...rows, ...(ruled ? ['────────────────', '  ⏵⏵ auto mode on (shift+tab to cycle)'] : [])].join('\n')
+  const NUDGED = LINE(1, 'answered Q7: Last-write-wins')
+
+  // Runs one nudge that is typed but never seen in the composer (`noecho`), then shows `pane` and gives the retry time to act.
+  // Returns the keys sent.
+  const lateScreen = async (pane: string, enterExpected: boolean) => {
+    const w = world({ nudgeMs: 50, retry: { ms: 200, windowMs: 3000 } })
+    w.set('noecho', '')
+    w.set('event.out', '{"ok":true,"rev":16,"event":{},"summary":"answered Q7: Last-write-wins"}')
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await until(() => logged.length >= 1)
+      w.set('pane.txt', pane)
+      if (enterExpected) await until(() => w.sends().length >= 2)
+      await wait(600)
+    } finally {
+      restore()
+    }
+
+    return w.sends().map(c => c[3] ?? c[4])
+  }
+
+  // Break caught: the composer ending at the first blank row, so a nudge followed by a blank line and instructions the user typed under it
+  // (Shift+Enter twice) reads as the nudge alone and the late Enter submits the owner's unfinished text.
+  test('a nudge not seen in the composer is not submitted when the user typed after a blank row under it', async () => {
+    const keys = await lateScreen(composerOf([`❯\u00a0${NUDGED}`, '', '  user instructions']), false)
+    expect(keys).toEqual(['-l'])
+  })
+
+  // Break caught: the whole-composer check refusing a composer that holds the nudge and only an empty row before the rule.
+  test('a nudge not seen in the composer still gets its Enter when only an empty row follows it', async () => {
+    const keys = await lateScreen(composerOf([`❯\u00a0${NUDGED}`, '']), true)
+    expect(keys).toEqual(['-l', 'Enter'])
+  })
+
+  // Break caught: any row starting with a box-drawing dash closing the composer, so user text typed under the nudge that begins with `─`
+  // reads as the rule and the late Enter submits it.
+  test('a nudge not seen in the composer gets no Enter when the user typed a row starting with a dash character under it', async () => {
+    const keys = await lateScreen(composerOf([`❯\u00a0${NUDGED}`, '', '  ─ user instructions: do not send yet']), false)
+    expect(keys).toEqual(['-l'])
+  })
+
+  // Break caught: the whole-composer check accepting a composer with no rule below it, where the rows after the nudge cannot be told apart from the user's.
+  test('a nudge not seen in the composer gets no Enter when no rule shows under the composer', async () => {
+    const keys = await lateScreen(composerOf([`❯\u00a0${NUDGED}`], false), false)
+    expect(keys).toEqual(['-l'])
+  })
+
+  // Break caught: a failing attempt that started later overwriting the retry burst's start (`newer.since = since`), so the retry window moves
+  // later and the retries run past it. Every pane read takes 700 ms, and sends to one pane queue: attempt A (start 0) fails at 700 and arms
+  // a retry for 1700; attempt B (start ~450, queued behind A) fails at 1400 into that retry burst; the retry fails at 2400. Measured from
+  // 0, the window of 3150 ms allows no further retry (2400 + 1000 > 3150); measured from B's 450 it would allow a fourth attempt.
+  test('two attempts that both fail do not move the retry window later', async () => {
+    const w = world({ nudgeMs: 50, retry: { ms: 1000, windowMs: 3150 } })
+    const tmux = `${w.dir}/bin/tmux`
+    writeFileSync(tmux, readFileSync(tmux, 'utf8').replace('  capture-pane)\n', '  capture-pane)\n    sleep 0.7\n'))
+    w.set('pane.txt', DIALOG)
+    const { logged, restore } = logs()
+    try {
+      expect((await w.event('1017-run', ANSWER)).status).toBe(200)
+      await wait(500)
+      expect((await w.event('1017-run', { type: 'park', node: 'Q9' })).status).toBe(200)
+      await wait(4200)
+    } finally {
+      restore()
+    }
+    expect(w.captures()).toBe(3)
+    expect(logged.length).toBe(1)
+  }, 10_000)
+
+  // Break caught: schedule() arming a timer after dispose(), so a request still in flight at shutdown types into the pane.
+  test('an event that is accepted after dispose() arms no nudge', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    let reads = 0
+    const routes = createPlanRoutes({
+      config: { crewRoot: w.crew, env: {}, planBin: `${w.dir}/bin/plan`, planNudgeMs: 50 } as never,
+      source: { snapshot: async () => (reads++, { board: null }) } as never,
+      json: (status, body) => Response.json(body, { status }),
+      text: (status, body) => new Response(body, { status }),
+      body: async req => (await req.json()) as Record<string, unknown>,
+      page: html => new Response(html),
+      leadFor: () => ({ lead: null, reason: 'unused' }),
+    })
+    routes.dispose()
+    const req = new Request('http://x/api/plan/1017-run/event', { method: 'POST', body: JSON.stringify({ type: 'park', node: 'Q9' }) })
+    expect((await routes(req, new URL(req.url)))!.status).toBe(200)
+    await wait(300)
+    expect(reads).toBe(0)
+  })
+
+  // Break caught: an unbounded summaries list during the five minute window; the head must still count every change.
+  test('a thousand events for one task keep the burst bounded: the line is the short one and counts all of them', async () => {
+    const w = world({ nudgeMs: 8000 })
+    w.set('event.out', JSON.stringify({ ok: true, rev: 20, event: {}, summary: `noted ${'y'.repeat(100)}` }))
+    for (let i = 0; i < 1000; i += 50) {
+      const batch = await Promise.all(Array.from({ length: 50 }, () => w.event('1017-run', { type: 'note', text: 'n' })))
+      expect(batch.every(r => r.status === 200)).toBe(true)
+    }
+    for (let waited = 0; w.sends().length < 2 && waited < 10_000; waited += 50) await wait(50)
+    const typed = w.sends()[0]![5]!
+    expect(typed).toBe('From Plan (user): 1000 change(s) on 1017-run. Run: plan news 1017-run')
+  }, 30_000)
+
+  // Break caught: dispose() (server stop) leaving a retry timer that later types into the pane.
+  test('stopping the server cancels a retry that is waiting', async () => {
+    const w = world({ nudgeMs: 50, retry: RETRY })
+    w.set('pane.txt', DIALOG)
+    const { logged, restore } = logs()
+    try {
+      await w.event('1017-run', ANSWER)
+      await until(() => w.captures() >= 1)
+      w.stop()
+      await wait(RETRY.ms)
+      const attempts = w.captures()
+      w.set('pane.txt', COMPOSER)
+      await wait(RETRY.ms * 5)
+      expect(w.captures()).toBe(attempts)
+    } finally {
+      restore()
+    }
+    expect(w.sends()).toEqual([])
+    expect(logged).toEqual([])
   })
 })
 
