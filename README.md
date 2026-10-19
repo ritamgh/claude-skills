@@ -1,6 +1,6 @@
 # Claude skills
 
-A composable Claude Code setup for planning, background workers, local code exploration and evidence-driven delivery. It includes twelve skills plus their command-line helpers, hooks, five orchestration agents, the HQ mod and an idea-research workflow. It is a standalone checkout, not a copy of anyone's home directory, settings, credentials or git history.
+A composable Claude Code setup for planning, background workers, local code exploration and evidence-driven delivery. It includes thirteen skills plus their command-line helpers, hooks, five orchestration agents, the HQ mod and an idea-research workflow. It is a standalone checkout, not a copy of anyone's home directory, settings, credentials or git history.
 
 ## Requirements
 
@@ -53,6 +53,8 @@ Keep the checkout at that location: installation creates symlinks, not copies. S
 **lens** turns a file, feature, flow, diff or architecture into a single-page interactive explainer with real code traces, checkpoints and experiments. Dependencies: Python for lesson building and serving, optionally `claude -p` for Q&A and a browser opener. Screenshots and UI checks use Node, Playwright and Chromium. graphify and jcode can assist exploration but are not required for building a lesson.
 
 **orchestrate** decomposes multi-worker work into cards and waves, routes tasks to Claude agents and jcode workers, and runs verification/fix loops. Dependencies: git, bash, Python, the included five agent definitions and card helpers, plus `crew`, `jw`/jcode and `plan` for their respective execution paths. Saved wave/chain workflows require the Workflow tool and an explicit `args.home` pointing at the user's home directory.
+
+**prd-review** reviews a teammate's PRD on a GitHub pull request and posts the review as one structured PR review, so the PRD owner's plan page imports it as anchored comments. Read-only on the branch; it never approves, merges or requests changes. Dependencies: authenticated `gh` and the `shape` skill's review conventions.
 
 **project-context** maintains a concise, trustworthy root `PROJECT_CONTEXT.md` so future sessions can find the architecture, commands and conventions without rediscovering the whole repository. Dependencies: git and repository read/write tools.
 
