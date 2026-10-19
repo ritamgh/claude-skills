@@ -559,7 +559,10 @@ older plans stay valid); `PRD.md` never renders them; the published mirror omits
   "state": "open"|"proposed"|"accepted"|"declined"|"answered", "source": "paste", "proposal": null | {"action":
   "accept"|"answer"|"decline", "text": str ≤ 2000, "rev": int, "changes": [change, …], "at": iso}}`. `open` has no
   proposal; every other state has one (accepted/answered/declined keep it for display); `accepted`/`answered`/`declined`
-  match `proposal.action`.
+  match `proposal.action`. Optional key `gist` (absent on older plans and on comments the session never read, so they
+  load unchanged): str ≤ 300, single line, no control characters, never empty: the session's one plain sentence of what
+  the comment says. Set only by `comment_triage` and `comment_split` parts (a later triage replaces it, a rework keeps it); the page shows it above the verbatim `text`, marked as the
+  session's reading. It is a reading, never an instruction or a source of truth.
 - `comment_seq`: int, the counter for comment ids: `CM<comment_seq + 1>` is the next id, so an id is never reused.
   Absent = the highest existing number.
 - `thread`: the plan-level conversation (the PRD pane), at most 40 entries (the last 40 kept), oldest first:
@@ -582,8 +585,8 @@ older plans stay valid); `PRD.md` never renders them; the published mirror omits
 
 | type | fields | effect | invalid when |
 |---|---|---|---|
-| `comment_split` | `ref`, `parts` (2–10 of `{text, author?, anchor?}`) | the `open` comment and its request are removed; each part becomes a new `open` comment with its own request (`author` and `anchor` default to the raw comment's). Parts are always local `paste` comments: if the raw comment was imported from GitHub, its `ext` is appended to `ext_dropped` (§14.1) so the next `pull` does not import it again, and the owner replies on GitHub by hand. Summary `split CM3 into 3` | comment not `open`; fewer than 2 or more than 10 parts; the 100 cap would be exceeded |
-| `comment_triage` | `ref`, `action` (`accept`\|`answer`\|`decline`), `text`, `changes`, optional `anchor` | `open` → `proposed` with `proposal` = `{action, text, rev, changes, at}` (`rev` = the triage event's rev); `anchor` (if sent, null clears) replaces the comment's; its `comment` request is removed. Summary `proposal on CM3: accept` | comment not `open`; `accept` without 1–5 `changes`; `answer`/`decline` with `changes` or without `text`; a change outside the allow-list below or one that fails when dry-run on a copy of the plan |
+| `comment_split` | `ref`, `parts` (2–10 of `{text, author?, anchor?, gist?}`) | the `open` comment and its request are removed; each part becomes a new `open` comment with its own request (`author` and `anchor` default to the raw comment's). Parts are always local `paste` comments: if the raw comment was imported from GitHub, its `ext` is appended to `ext_dropped` (§14.1) so the next `pull` does not import it again, and the owner replies on GitHub by hand. Summary `split CM3 into 3` | comment not `open`; fewer than 2 or more than 10 parts; the 100 cap would be exceeded |
+| `comment_triage` | `ref`, `action` (`accept`\|`answer`\|`decline`), `text`, `changes`, optional `anchor`, optional `gist` (§13.1) | `open` → `proposed` with `proposal` = `{action, text, rev, changes, at}` (`rev` = the triage event's rev); `anchor` (if sent, null clears) replaces the comment's; its `comment` request is removed. Summary `proposal on CM3: accept` | comment not `open`; `accept` without 1–5 `changes`; `answer`/`decline` with `changes` or without `text`; a change outside the allow-list below or one that fails when dry-run on a copy of the plan |
 | `reply` | `ref`, `text`, optional `links` | §4.2. On a node-less ask: appends a `session` entry to the plan `thread` with `links`, removes the request. Summary `replied on plan` | `links` over 10, not a list of existing node/comment ids, or sent with a reply to a node thread |
 
 `resolve` refuses a `comment` request.

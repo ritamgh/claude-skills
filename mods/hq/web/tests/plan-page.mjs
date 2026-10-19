@@ -2,7 +2,7 @@
 // Serves plan.html from a tiny Bun server that fakes the three plan API routes over the shape fixtures
 // (same CSP header and a real nonce as server.ts), then drives it with Playwright.
 // Prints "ok <name>" per check, "FAIL <name>: why" otherwise; exit 1 on any failure; prints "skip: ..." and exits 0 when Playwright or its chromium is missing.
-// Set PLAN_SHOTS=<dir> to save desktop.png, desktop-prd.png, phone.png, board-desktop.png, board-400.png and the 2560 / 1440 / phone node-panel and PRD shots (lanes-2560*.png, prd-2560*.png, board-2560-panel.png, lanes-1440-panel.png, prd-1440.png, phone-panel.png, conversation-2560.png, conversation-1440.png, conversation-phone.png, ideate-2560-panel-on-now.png, prd-2560-taskmap.png, comments-{2560,1440,1024,phone}[-section|-full].png, comments-{2560,1440,1024}-panel.png, prd-pane-{2560,1440}.png, prd-pane-{2560,1440,1024}-thread.png, prd-pane-2560-panel.png, prd-pane-phone.png, review-pr-{2560,1440,phone}.png) there; PLAN_HTML=<file> to test another page.
+// Set PLAN_SHOTS=<dir> to save desktop.png, desktop-prd.png, phone.png, board-desktop.png, board-400.png and the 2560 / 1440 / phone node-panel and PRD shots (lanes-2560*.png, prd-2560*.png, board-2560-panel.png, lanes-1440-panel.png, prd-1440.png, phone-panel.png, conversation-2560.png, conversation-1440.png, conversation-phone.png, ideate-2560-panel-on-now.png, prd-2560-taskmap.png, comments-{2560,1440,1024,phone}[-section|-full].png, comments-{2560,1440,1024}-panel.png, prd-pane-{2560,1440}.png, prd-pane-{2560,1440,1024}-thread.png, prd-pane-2560-panel.png, prd-pane-phone.png, review-pr-{2560,1440,phone}.png, pane-{open,collapsed}-{2560,1440,390}.png, pane-rail-badge-2560.png, thread-new-marker-1280.png, pending-1280.png, lanes-badges-{2560,1440,390}.png) there; PLAN_HTML=<file> to test another page.
 import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { randomBytes } from 'node:crypto'
@@ -115,8 +115,9 @@ const SHOTS = process.env.PLAN_SHOTS
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 
 // expectHttp: the check forces 4xx answers, whose "Failed to load resource" console lines are not page errors.
-async function open(path, vp, fn, expectHttp = false, pre = null) {
-  const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1, colorScheme: 'light' })
+// ctxOpts: more context options (hasTouch and isMobile for a tap check).
+async function open(path, vp, fn, expectHttp = false, pre = null, ctxOpts = null) {
+  const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 1, colorScheme: 'light', ...(ctxOpts || {}) })
   const page = await ctx.newPage()
   page.setDefaultTimeout(6000)
   const dialogs = []
@@ -1111,25 +1112,31 @@ await check('conversation: entry text with markup stays inert text (no element, 
   })
 })
 
-// Breaks if the empty line is gone, Send is enabled with nothing typed, plain Enter sends instead of adding a line, or Ctrl+Enter does not send.
-await check('conversation: empty state line, Send disabled when empty, Enter is a newline, Ctrl+Enter sends the ask event', async () => {
+// Breaks if the empty line is gone, Send is enabled with nothing typed, Shift+Enter sends instead of adding a line, or Enter and Ctrl+Enter do not send the ask event.
+await check('conversation: empty state line and starters, Send disabled when empty, Shift+Enter is a newline, Enter and Ctrl+Enter send the ask event', async () => {
   await open('/plan/' + STD, DESK, async page => {
     await page.click('.node[data-id=AS-1]')
     await page.waitForSelector(TH + ' textarea')
     if (!(await page.textContent(TH)).includes('Ask anything about this node: why it is here, what it blocks, what to change.')) throw new Error('empty line missing')
+    eq(await page.locator(TH + ' .th-start').allTextContents(), ['Why is AS-1 in the plan?', 'What depends on AS-1?', 'What is still unclear about AS-1?'], 'starters')
     eq(await page.getAttribute(TH + ' textarea', 'placeholder'), 'Ask the session about AS-1…', 'placeholder')
     eq(await page.isDisabled(TH + ' .th-send'), true, 'Send disabled when empty')
     await page.fill(TH + ' textarea', '   ')
     eq(await page.isDisabled(TH + ' .th-send'), true, 'Send disabled for whitespace')
     await page.fill(TH + ' textarea', 'first')
     eq(await page.isDisabled(TH + ' .th-send'), false, 'Send enabled')
-    await page.press(TH + ' textarea', 'Enter')
+    await page.press(TH + ' textarea', 'Shift+Enter')
     await page.keyboard.type('second')
-    eq(await page.inputValue(TH + ' textarea'), 'first\nsecond', 'Enter adds a line')
-    eq(state.posts.length, 0, 'nothing sent by Enter')
-    await page.press(TH + ' textarea', 'Control+Enter')
+    eq(await page.inputValue(TH + ' textarea'), 'first\nsecond', 'Shift+Enter adds a line')
+    eq(state.posts.length, 0, 'nothing sent by Shift+Enter')
+    await page.press(TH + ' textarea', 'Enter')
     await waitPost(1)
-    eq(JSON.stringify(lastPost()), '{"type":"ask","node":"AS-1","text":"first\\nsecond"}', 'ask event')
+    eq(JSON.stringify(lastPost()), '{"type":"ask","node":"AS-1","text":"first\\nsecond"}', 'ask event from Enter')
+    await page.waitForSelector(TH + ' .th-wait')
+    await page.fill(TH + ' textarea', 'third')
+    await page.press(TH + ' textarea', 'Control+Enter')
+    await waitPost(2)
+    eq(JSON.stringify(lastPost()), '{"type":"ask","node":"AS-1","text":"third"}', 'ask event from Ctrl+Enter')
   })
 })
 
@@ -1225,13 +1232,13 @@ await check('conversation: the thread scrolls to a new reply only when it was al
     eq(await atBottom(page), true, 'starts at the bottom')
     sessionReply(std(), 'AS-1', 'reply one')
     await forcePoll(page)
-    await page.waitForFunction(() => document.querySelectorAll('#nodethread .th-msg').length === 11)
+    await page.waitForFunction(() => document.querySelector('#nodethread .th-list').textContent.includes('reply one'))
     eq(await atBottom(page), true, 'followed the new reply from the bottom')
     await page.$eval(TH + ' .th-list', e => { e.scrollTop = 0 })
     std().requests.push({ ref: 'e-th11', type: 'ask', node: 'AS-1', lane: null, text: 'q', at: T0 })
     sessionReply(std(), 'AS-1', 'reply two')
     await forcePoll(page)
-    await page.waitForFunction(() => document.querySelectorAll('#nodethread .th-msg').length === 12)
+    await page.waitForFunction(() => document.querySelector('#nodethread .th-list').textContent.includes('reply two'))
     eq(await page.$eval(TH + ' .th-list', e => e.scrollTop), 0, 'stays where the reader was')
   })
 })
@@ -1249,8 +1256,8 @@ await check('conversation: the Ask action focuses the composer instead of openin
 // Breaks if a long thread (40 entries, an unbreakable 300-char word) overflows the page sideways, the thread has no scroll of its own, or the panel stops scrolling.
 await check('conversation: a long thread has no horizontal scroll at 390/1440/2560, its own scroll, and the panel still scrolls', async () => {
   const th = mkThread(40)
-  th[5].text = 'u'.repeat(300)
-  th[6].text = 'https://example.com/' + 'a/'.repeat(120)
+  th[37].text = 'u'.repeat(300) // the last five rows are the open ones
+  th[38].text = 'https://example.com/' + 'a/'.repeat(120)
   nodeOf('AS-1').thread = th
   std().requests.push({ ref: 'e-th39', type: 'ask', node: 'AS-1', lane: null, text: 'q', at: T0 })
   for (const vp of [PHONE, { width: 1440, height: 900 }, WIDE]) {
@@ -3068,6 +3075,709 @@ await check('layout: PRD body within 300px of its header at 2560 and 1440, comme
       }
     })
   }
+})
+
+// ---------- plan ids in free text: chips with a hover card, and the session's one plain-words line (gist) ----------
+// The sentence is the kind of note a teammate pastes; the ids are the fixture plan's (DEC-2, T-004, T-003, FR-003), T-3 is T-003 without its padding.
+const IDS_SENT = "a Payments PR from us would overlap with #107. DEC-2's premise holds for the gateway's main only, so T-004's approach needs a decision ... AcmeClient.post takes no headers argument, so T-004 can't send Request-Id ... it matters for FR-003 before T-003 relies on it. Padded T-3 counts; T-017, t-004 and CM2 are no node."
+const IDS_CHIPS = [['DEC-2', 'DEC-2'], ['T-004', 'T-004'], ['T-004', 'T-004'], ['FR-003', 'FR-003'], ['T-003', 'T-003'], ['T-003', 'T-3']]
+const idsSeed = extra => {
+  nodeOf('T-003').body = 'Pushes the queue, then pulls remote operations.\nA second line.'
+  seedComments([mkCm('CM10', { author: 'Priya', text: IDS_SENT }), ...(extra || [])])
+}
+const IDC = '.cm[data-id=CM10] .cm-text .idc'
+const idShown = page => page.waitForSelector('#idcard:not([hidden])')
+const idGone = page => page.waitForSelector('#idcard', { state: 'hidden' })
+const chipsOf = (page, sel) => page.$$eval(sel, c => c.map(e => [e.dataset.nid, e.textContent]))
+// The card must lie wholly inside the viewport (the page itself never scrolls sideways).
+async function idInside(page) {
+  const r = await page.$eval('#idcard', e => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, vw: document.documentElement.clientWidth, vh: innerHeight } })
+  if (r.l < 0 || r.t < 0 || r.r > r.vw || r.b > r.vh) throw new Error('the card is outside the viewport: ' + JSON.stringify(r))
+}
+async function tabTo(page, nid, within) {
+  for (let i = 0; i < 250; i++) {
+    await page.keyboard.press('Tab')
+    if (await page.evaluate(([n, w]) => { const a = document.activeElement; return a.classList.contains('idc') && a.dataset.nid === n && (!w || !!a.closest(w)) }, [nid, within || null])) return
+  }
+  throw new Error('Tab never reached the chip ' + nid)
+}
+
+// Breaks if a token is turned into a chip without asking the plan (T-017, CM2 or #107 become chips), if the match ignores case or token edges, if a padded form (T-3 for T-003)
+// is missed, or if the label is put into the text (copying the comment would then copy more than the teammate wrote).
+await check('ids: ids of this plan become chips (padded forms too); other ids, lower case, comment ids and #107 stay text; the text is unchanged', async () => {
+  idsSeed()
+  await open('/plan/' + STD, DESK, async (page, ctx) => {
+    await cmGoPrd(page)
+    await page.waitForSelector(IDC)
+    eq(await chipsOf(page, IDC), IDS_CHIPS, 'chips: node id, written token')
+    eq(await page.textContent('.cm[data-id=CM10] .cm-text'), IDS_SENT, 'the text as written')
+    eq(await page.$eval(IDC + '[data-nid="T-003"]', e => getComputedStyle(e, '::after').content), '"Manual sync action"', 'the label next to the id')
+    eq(await page.$eval(IDC + '[data-nid="T-003"]', e => { const s = getComputedStyle(e, '::after'); return s.textOverflow + ' ' + s.overflow }), 'ellipsis hidden', 'a long label is cut with an ellipsis')
+    eq(await page.$eval(IDC + '[data-nid="T-003"]', e => e.getAttribute('aria-label')), 'T-003, Manual sync action', 'accessible name')
+    eq(ctx.errs, [], 'console errors')
+  })
+})
+
+// Breaks if the card lacks its parts (kind, label, status, what it waits on and blocks, a body line), does not open on hover, stays after the pointer leaves,
+// or the click on a chip does not open the node in the side panel.
+await check('ids: hover opens the card (kind, label, status, waits on, blocks, body line); leaving closes it; a click opens the node panel', async () => {
+  idsSeed()
+  await open('/plan/' + STD, DESK, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(IDC)
+    await page.hover(IDC + '[data-nid="T-003"]')
+    await idShown(page)
+    eq(await page.textContent('#idcard .ic-id'), 'T-003', 'id')
+    eq(await page.textContent('#idcard .ic-kind'), 'task', 'kind')
+    eq(await page.textContent('#idcard .ic-label'), 'Manual sync action', 'label')
+    eq((await page.textContent('#idcard .chip')).includes('blocked'), true, 'status')
+    eq(await page.$$eval('#idcard .ic-row', r => r.map(x => x.textContent)), ['Waits onOffline edit queue (T-002)', 'BlocksSync worker (T-004)'], 'waits on and blocks')
+    eq(await page.textContent('#idcard .ic-body'), 'Pushes the queue, then pulls remote operations.', 'one line of the body')
+    eq(await page.textContent('#idcard .ic-hint'), 'Click to open', 'hint')
+    await idInside(page)
+    await page.mouse.move(2, 2)
+    await idGone(page)
+    // Breaks if an absent body line is written into the card as the word "null" (replaceChildren stringifies null).
+    await page.hover(IDC + '[data-nid="FR-003"]')
+    await idShown(page)
+    eq((await page.textContent('#idcard')).includes('null'), false, 'a node without a body has no "null" line')
+    eq(await page.locator('#idcard .ic-body').count(), 0, 'no body line when there is no body')
+    await page.mouse.move(2, 2)
+    await idGone(page)
+    await page.hover(IDC + '[data-nid="T-004"]')
+    await idShown(page)
+    eq(await page.$$eval('#idcard .ic-row', r => r.map(x => x.textContent)), ['Waits onManual sync action (T-003)', 'Blocksnothing'], 'a node that blocks nothing says so')
+    await page.mouse.move(2, 2)
+    await idGone(page)
+    await page.click(IDC + '[data-nid="T-003"]')
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'T-003', 'the node panel opened')
+    eq(await page.evaluate(() => document.getElementById('idcard').hidden), true, 'the card closed with the click')
+  })
+})
+
+// Breaks if focus does not open the card, Escape closes the panel instead of the card (or does not close the card), Tab gets stuck in the card, a re-render drops the focus,
+// or Enter does not open the node.
+await check('ids: keyboard focus opens the card, Escape closes the card before the panel, Tab moves on, a re-render keeps the focus, Enter opens the node', async () => {
+  idsSeed([mkCm('CM11', { anchor: 'T-003', text: 'Blocked by T-002 and FR-003.' })])
+  await open('/plan/' + STD, DESK, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(IDC)
+    await tabTo(page, 'DEC-2', '#p-prd')
+    await idShown(page)
+    eq(await page.textContent('#idcard .ic-id'), 'DEC-2', 'the card of the focused chip')
+    eq(await page.$eval(IDC + '[data-nid="DEC-2"]', e => e.getAttribute('aria-describedby')), 'idcard', 'described by the card')
+    await page.evaluate(() => renderAll())
+    eq(await page.evaluate(() => document.activeElement.dataset.nid), 'DEC-2', 'the focus survives a render')
+    await page.keyboard.press('Escape')
+    await idGone(page)
+    eq(await page.evaluate(() => document.activeElement.dataset.nid), 'DEC-2', 'Escape leaves the focus where it was')
+    await page.keyboard.press('Tab')
+    eq(await page.evaluate(() => !document.activeElement.closest('#idcard') && !(document.activeElement.dataset && document.activeElement.dataset.nid === 'DEC-2')), true, 'Tab moves on')
+    await page.keyboard.press('Shift+Tab')
+    await page.keyboard.press('Enter')
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'DEC-2', 'Enter opens the node')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector(NP, { state: 'hidden' })
+    // with the panel open, the card goes first
+    await page.evaluate(() => selectNode('T-003'))
+    await page.waitForSelector(NP + ' .cm[data-id=CM11]')
+    await tabTo(page, 'T-002', NP)
+    await idShown(page)
+    await page.keyboard.press('Escape')
+    await idGone(page)
+    eq(await page.evaluate(() => document.getElementById('nodepanel').hidden), false, 'the panel stays after the first Escape')
+    await page.keyboard.press('Escape')
+    await page.waitForSelector(NP, { state: 'hidden' })
+  })
+})
+
+// Breaks if a tap opens the node at once (the card is never read), if the card overflows the 390 px screen, or if a tap elsewhere leaves it open.
+await check('ids: on a phone the first tap opens the card inside the screen, the second tap the node, a tap elsewhere closes the card', async () => {
+  idsSeed()
+  await open('/plan/' + STD, PHONE, async (page, ctx) => {
+    await cmGoPrd(page, true)
+    await page.waitForSelector(IDC)
+    const n = await page.locator(IDC).count()
+    eq(n, IDS_CHIPS.length, 'chips on the phone')
+    for (let i = 0; i < n; i++) {
+      await page.locator(IDC).nth(i).tap()
+      await idShown(page)
+      await idInside(page)
+      eq(await page.evaluate(() => document.getElementById('nodepanel').hidden), true, 'the first tap opens no panel (chip ' + i + ')')
+      await page.locator('.cm[data-id=CM10] .cm-au').tap()
+      await idGone(page)
+    }
+    const chip = page.locator(IDC).nth(1)
+    await chip.tap()
+    await idShown(page)
+    eq(await page.textContent('#idcard .ic-hint'), 'Tap again to open', 'touch hint')
+    await chip.tap()
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'T-004', 'the second tap opens the node')
+    eq(await page.evaluate(() => document.getElementById('idcard').hidden), true, 'the card closed')
+    eq(ctx.errs, [], 'console errors')
+  }, false, null, { hasTouch: true, isMobile: true })
+})
+
+// Breaks if the card can leave the screen (right edge, bottom edge) at 2560, 1440 or 390 px, hides behind the open node panel, or the page scrolls sideways.
+for (const [name, vp, file] of [['2560', WIDE, 'id-chips-2560'], ['1440', MID, 'id-chips-1440'], ['390', PHONE, 'id-chips-390']]) {
+  await check(`ids: the card stays inside the screen at ${name} px for every chip, above the node panel; shot`, async () => {
+    idsSeed()
+    await open('/plan/' + STD, vp, async page => {
+      await cmGoPrd(page, vp === PHONE)
+      await page.waitForSelector(IDC)
+      const n = await page.locator(IDC).count()
+      for (let i = 0; i < n; i++) {
+        await page.mouse.move(1, 1)
+        await idGone(page)
+        await page.locator(IDC).nth(i).hover()
+        await idShown(page)
+        await idInside(page)
+      }
+      eq(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, 'no sideways scroll')
+      await page.mouse.move(1, 1)
+      await idGone(page)
+      await page.locator(IDC + '[data-nid="FR-003"]').hover()
+      await idShown(page)
+      if (SHOTS) await page.screenshot({ path: join(SHOTS, file + '.png') })
+      if (vp !== PHONE) {
+        await page.mouse.move(1, 1)
+        await idGone(page)
+        await page.evaluate(() => selectNode('T-003'))
+        await page.waitForSelector(NP + ':not([hidden])')
+        await page.locator(IDC + '[data-nid="DEC-2"]').hover()
+        await idShown(page)
+        await idInside(page)
+        eq(await page.evaluate(() => { const c = document.getElementById('idcard').getBoundingClientRect(); const t = document.elementFromPoint(c.left + c.width / 2, c.top + 8); return !!t && !!t.closest('#idcard') }), true, 'the card is on top')
+        if (SHOTS) await page.screenshot({ path: join(SHOTS, file + '-panel.png') })
+      }
+    })
+  })
+}
+
+// Breaks if an id inside hostile text is wrapped by string replacement (innerHTML): the <img>, <a> and <b> would become elements and fire onerror or run script; a label with markup must stay text too.
+await check('ids: an id inside hostile text builds no markup; a hostile label stays text in the chip and the card', async () => {
+  const bad = '<img src=x onerror=alert(1) alt="FR-003"> <a href="javascript:alert(2)">T-004</a> <b>DEC-2</b>'
+  const label = '<img src=x onerror=alert(3)>'
+  nodeOf('T-002').label = label
+  seedComments([mkCm('CM8', { text: bad }), mkCm('CM9', { text: 'see T-002' })])
+  await open('/plan/' + STD, DESK, async (page, ctx) => {
+    await cmGoPrd(page)
+    await page.waitForSelector('.cm[data-id=CM9] .idc')
+    await page.waitForTimeout(300)
+    eq(await page.locator('#p-prd .cm img, #p-prd .cm a, #p-prd .cm b').count(), 0, 'no element from comment text')
+    eq(await page.textContent('.cm[data-id=CM8] .cm-text'), bad, 'the text as written')
+    eq(await chipsOf(page, '.cm[data-id=CM8] .cm-text .idc'), [['FR-003', 'FR-003'], ['T-004', 'T-004'], ['DEC-2', 'DEC-2']], 'the ids are still chips')
+    eq(await page.$eval('.cm[data-id=CM9] .idc', e => e.dataset.label), label, 'the label is an attribute value')
+    await page.hover('.cm[data-id=CM9] .idc')
+    await idShown(page)
+    eq(await page.textContent('#idcard .ic-label'), label, 'the label is text in the card')
+    eq(await page.locator('#idcard img, .idc img, .idc *').count(), 0, 'no element from the label')
+    eq(ctx.dialogs, [], 'no dialog')
+    eq(ctx.errs, [], 'console errors')
+  })
+})
+
+// Breaks if a gist is not shown, is shown below the original (the user reads the hard text first), is not marked as the session's reading, reaches innerHTML,
+// or if a comment without a gist changes (an "Original" label, an empty box).
+await check('gist: the session\'s plain-words line shows above the original with its label; ids in it are chips; markup stays text; a comment without one is unchanged', async () => {
+  const gist = 'Priya says the retry task cannot send the idempotency header, so the payments PR needs a decision first (T-004).'
+  seedComments([
+    mkCm('CM10', { author: 'Priya', text: IDS_SENT, state: 'proposed', gist, proposal: mkProp('answer', { text: 'The sync worker (T-004) stays blocked until the manual sync action (T-003) ships.' }) }),
+    mkCm('CM11', { text: 'No gist here' }),
+    mkCm('CM12', { text: 'x', gist: '<img src=x onerror=alert(1)>' }),
+  ])
+  await open('/plan/' + STD, DESK, async (page, ctx) => {
+    await cmGoPrd(page)
+    await page.waitForSelector('.cm[data-id=CM10] .cm-gist')
+    eq(await page.textContent('.cm[data-id=CM10] .cm-gl'), 'In plain words · the session’s reading', 'marked as the session\'s reading')
+    eq(await page.textContent('.cm[data-id=CM10] .cm-gt'), gist, 'the gist text')
+    eq(await chipsOf(page, '.cm[data-id=CM10] .cm-gt .idc'), [['T-004', 'T-004']], 'an id in the gist is a chip')
+    eq(await page.textContent('.cm[data-id=CM10] .cm-ol'), 'Original', 'the original is labelled')
+    eq(await page.evaluate(() => { const c = document.querySelector('.cm[data-id=CM10]'); return !!(c.querySelector('.cm-gist').compareDocumentPosition(c.querySelector('.cm-text')) & Node.DOCUMENT_POSITION_FOLLOWING) }), true, 'above the original')
+    eq(await page.textContent('.cm[data-id=CM10] .cm-text'), IDS_SENT, 'the original stays verbatim')
+    eq(await chipsOf(page, '.cm[data-id=CM10] .cm-pt .idc'), [['T-004', 'T-004'], ['T-003', 'T-003']], 'ids in the proposal text are chips')
+    eq(await page.locator('.cm[data-id=CM11] .cm-gist, .cm[data-id=CM11] .cm-ol').count(), 0, 'no gist, no box')
+    eq(await page.locator('.cm[data-id=CM12] .cm-gt img').count(), 0, 'markup in a gist is text')
+    eq(await page.textContent('.cm[data-id=CM12] .cm-gt'), '<img src=x onerror=alert(1)>', 'the gist as written')
+    eq(ctx.dialogs, [], 'no dialog')
+    eq(ctx.errs, [], 'console errors')
+  })
+})
+
+// Breaks if chips appear in the comments only: node thread messages, PRD pane messages, comments in the node panel and GitHub-imported comments must get them too.
+await check('ids: chips in node thread messages, the PRD pane, a node panel comment and a GitHub comment; unknown ids stay text', async () => {
+  nodeOf('T-003').thread = [
+    { role: 'user', text: 'Does T-004 wait on this? And T-017?', at: T0, ref: 'e-i1' },
+    { role: 'session', text: 'Yes: the sync worker (T-004) waits on the manual sync action (T-003).', at: T0, ref: 'e-i1' },
+  ]
+  std().thread = [
+    { role: 'user', text: 'What does DEC-2 change for T-004?', at: P_AT, ref: 'e-p1', links: [] },
+    { role: 'session', text: 'Nothing for the sync worker (T-004): the decision (DEC-2) is settled. CM2 is unrelated.', at: P_AT, ref: 'e-p1', links: ['DEC-2'] },
+  ]
+  seedComments([
+    mkCm('CM11', { anchor: 'T-003', text: 'Blocked by T-002 and FR-003.' }),
+    mkCm('CM12', { author: 'octo', source: 'github', ext: 'rc:900', url: 'https://github.com/acme/notes/pull/3#discussion_r900', text: '[FR-003] question: is T-017 real?' }),
+  ])
+  await open('/plan/' + STD, DESK, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector('.cm[data-id=CM12] .cm-text')
+    eq(await chipsOf(page, '.cm[data-id=CM12] .cm-text .idc'), [['FR-003', 'FR-003']], 'GitHub comment: only the real id is a chip')
+    await openPane(page)
+    await page.waitForSelector(PN + ' .th-text .idc')
+    eq(await chipsOf(page, PN + ' .th-text .idc'), [['DEC-2', 'DEC-2'], ['T-004', 'T-004'], ['T-004', 'T-004'], ['DEC-2', 'DEC-2']], 'pane messages')
+    await page.click(PN + ' .pane-close')
+    await page.evaluate(() => selectNode('T-003'))
+    await page.waitForSelector(NP + ' #nodethread .th-text .idc')
+    eq(await chipsOf(page, NP + ' #nodethread .th-text .idc'), [['T-004', 'T-004'], ['T-004', 'T-004'], ['T-003', 'T-003']], 'node thread messages')
+    eq(await chipsOf(page, NP + ' .cm[data-id=CM11] .cm-text .idc'), [['T-002', 'T-002'], ['FR-003', 'FR-003']], 'a comment in the node panel')
+    await page.locator(NP + ' .cm[data-id=CM11] .idc').first().click()
+    eq(await page.textContent(NP + ' .np-id'), 'T-002', 'a chip inside the panel opens that node')
+  })
+})
+
+// ---------- polish pass: the collapsible Ask pane and its rail, the compact conversation, thread badges on the Lanes board ----------
+const RAIL = '#pane-rail'
+const COLL = '#pane-collapse'
+const blockStorage = page => page.addInitScript(() => { Object.defineProperty(window, 'localStorage', { get() { throw new Error('storage blocked') } }) })
+const noSideScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
+const prdRight = page => page.evaluate(() => Math.round(document.querySelector('.prd-wrap').getBoundingClientRect().right))
+const shotAs = async (page, name) => { if (SHOTS) await page.screenshot({ path: join(SHOTS, name) }) }
+const seedPaneLong = () => {
+  seedComments()
+  std().thread = [...paneThread(), ...Array.from({ length: 14 }, (_, i) => ({ role: i % 2 ? 'session' : 'user', text: (i % 2 ? 'Answer ' : 'Question ') + (i + 1) + ' ' + 'word '.repeat(14), at: P_AT, ref: 'e-pf' + i, ...(i % 2 ? { links: ['Q7', 'CM2'] } : {}) }))]
+}
+
+// Breaks if the docked pane has no collapse control, the rail does not replace it, the PRD does not get the width back, or the choice is lost on reload.
+await check('polish: the docked pane collapses into a rail at 2560, the PRD gets the width back, the choice survives a reload', async () => {
+  seedPaneLong()
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    eq(await page.getAttribute(COLL, 'aria-expanded'), 'true', 'collapse control is expanded')
+    eq(await page.evaluate(() => document.querySelector('#pane-collapse').tagName), 'BUTTON', 'a real button')
+    eq(await page.isVisible(RAIL), false, 'no rail while the pane is open')
+    const open = await prdRight(page)
+    await shotAs(page, 'pane-open-2560.png')
+    await page.click(COLL)
+    eq(await page.isVisible(PN), false, 'pane hidden when collapsed')
+    eq(await page.isVisible(RAIL), true, 'rail visible')
+    eq(await page.textContent(RAIL + ' .rail-lbl'), 'Ask', 'rail label')
+    eq(await page.getAttribute(RAIL, 'aria-expanded'), 'false', 'rail is the expand control')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-rail', 'focus moves to the rail')
+    const folded = await prdRight(page)
+    if (folded - open < 300) throw new Error('PRD did not get the width back: ' + open + ' -> ' + folded)
+    const rail = await paneBoxes(page, [RAIL])
+    if (folded > rail[0].l) throw new Error('PRD runs under the rail')
+    eq(await noSideScroll(page), true, 'no sideways scroll when collapsed')
+    await shotAs(page, 'pane-collapsed-2560.png')
+    await page.reload()
+    await cmGoPrd(page)
+    await page.waitForSelector(RAIL)
+    eq(await page.isVisible(RAIL), true, 'still collapsed after a reload')
+    eq(await page.isVisible(PN), false, 'pane still hidden after a reload')
+    await page.click(RAIL)
+    await page.waitForSelector(PN + ' .th-msg')
+    eq(await page.isVisible(RAIL), false, 'rail gone when expanded')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-text', 'focus lands in the composer')
+    eq(await prdRight(page), open, 'the PRD is back to its width')
+    await page.reload()
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    eq(await page.isVisible(PN), true, 'expanded stays expanded after a reload')
+  })
+})
+
+// Breaks if the page needs localStorage: with storage that throws, the pane must still collapse and expand in the session and start expanded after a reload.
+await check('polish: with storage blocked the pane still collapses and expands, and starts expanded', async () => {
+  seedPaneLong()
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    await page.click(COLL)
+    eq(await page.isVisible(RAIL), true, 'collapsed without storage')
+    await page.click(RAIL)
+    eq(await page.isVisible(PN), true, 'expanded without storage')
+    await page.click(COLL)
+    await page.reload()
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    eq(await page.isVisible(PN), true, 'a reload starts expanded when nothing is kept')
+  }, false, blockStorage)
+})
+
+// Breaks if the rail shows no badge for a reply the reader has not seen or for a question still waiting, or does not tell the two apart, or the badge stays after the pane is opened.
+await check('polish: the rail badge shows a new reply (and clears on opening) or a waiting question, and says so to a screen reader', async () => {
+  seedPaneLong()
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    await page.click(COLL)
+    eq(await page.isVisible(RAIL + ' .rail-badge'), false, 'no badge with nothing new')
+    eq(await page.getAttribute(RAIL, 'aria-label'), 'Ask about the PRD, expand', 'plain name')
+    std().thread = [...std().thread, { role: 'session', text: 'A fresh answer', at: '2026-10-17T07:00:00Z', ref: 'e-fresh', links: [] }]
+    std().rev++
+    await forcePoll(page)
+    await page.waitForSelector(RAIL + ' .rail-badge[data-kind=new]')
+    eq((await page.getAttribute(RAIL, 'aria-label')).includes('new reply'), true, 'announced')
+    await shotAs(page, 'pane-rail-badge-2560.png')
+    await page.click(RAIL)
+    await page.waitForSelector(PN + ' .th-msg')
+    await page.click(COLL)
+    eq(await page.isVisible(RAIL + ' .rail-badge'), false, 'badge cleared once the pane was open')
+    std().requests.push({ ref: 'e-wq', type: 'ask', node: null, lane: null, text: 'q', at: P_AT })
+    std().rev++
+    await forcePoll(page)
+    await page.waitForSelector(RAIL + ' .rail-badge[data-kind=wait]')
+    eq((await page.getAttribute(RAIL, 'aria-label')).includes('waiting for the session'), true, 'waiting announced')
+  })
+})
+
+// Breaks if the controls are not keyboard operable (a div for a button), the focus ring is missing on the rail, or Escape folds the docked pane away.
+await check('polish: keyboard folds and unfolds the pane, the rail shows a focus ring, Escape leaves the pane alone', async () => {
+  seedPaneLong()
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    await page.focus(COLL)
+    await page.keyboard.press('Escape')
+    eq(await page.isVisible(PN), true, 'Escape does not fold the pane')
+    await page.keyboard.press('Enter')
+    eq(await page.isVisible(RAIL), true, 'Enter on the collapse button folds the pane')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-rail', 'the rail is in the tab order')
+    eq(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'visible focus ring on the rail')
+    await page.keyboard.press('Space')
+    eq(await page.isVisible(PN), true, 'Space on the rail unfolds the pane')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-text', 'focus in the composer')
+  })
+})
+
+// Breaks if the layout overflows sideways, shows the rail below 1800px, or loses the existing sheet at 1440 and 390 (button to open, Close inside).
+await check('polish: layout with the pane open and collapsed at 2560, 1440 and 390; the sheet below 1800px is unchanged', async () => {
+  seedPaneLong()
+  for (const [vp, name] of [[WIDE, '2560'], [MID, '1440'], [PHONE, '390']]) {
+    await open('/plan/' + STD, vp, async page => {
+      const phone = vp.width < 700
+      await cmGoPrd(page, phone)
+      await page.waitForSelector('.prd-wrap')
+      eq(await noSideScroll(page), true, name + ' closed: no sideways scroll')
+      if (vp.width >= 1800) eq(await page.isVisible(RAIL), false, name + ' open pane has no rail')
+      else {
+        eq(await page.isVisible(RAIL), false, name + ' has no rail below 1800')
+        eq(await page.isVisible(COLL), false, name + ' has no collapse control below 1800')
+        eq(await page.isVisible('#pane-open'), true, name + ' button opens the sheet')
+        await shotAs(page, 'pane-collapsed-' + name + '.png')
+        await openPane(page)
+        eq(await page.isVisible(PN + ' .pane-close'), true, name + ' Close in the sheet')
+        eq(await noSideScroll(page), true, name + ' sheet: no sideways scroll')
+        await shotAs(page, 'pane-open-' + name + '.png')
+      }
+    })
+  }
+})
+
+const mkMsgs = (n, o) => Array.from({ length: n }, (_, i) => ({ role: i % 2 ? 'session' : 'user', text: (i % 2 ? 'Answer ' : 'Question ') + (i + 1), at: '2026-10-17T03:0' + (i % 10) + ':00Z', ref: 'e-m' + i, ...(o || {}) }))
+
+// Breaks if a long thread renders in full (the early messages should sit behind "N earlier messages"), if the button does not reveal them, or if a short thread hides anything.
+await check('polish: a long thread opens with the last five messages and "N earlier messages" expands the rest; a short one shows all', async () => {
+  nodeOf('AS-1').thread = mkMsgs(12)
+  nodeOf('Q9').thread = mkMsgs(6)
+  await open('/plan/' + STD, DESK, async page => {
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-msg')
+    eq(await page.locator(TH + ' .th-msg .th-text').allTextContents(), ['Answer 8', 'Question 9', 'Answer 10', 'Question 11', 'Answer 12'], 'last five, oldest first')
+    eq(await page.textContent(TH + ' .th-more'), '7 earlier messages', 'earlier button')
+    await page.click(TH + ' .th-more')
+    eq(await page.locator(TH + ' .th-msg').count(), 12, 'all twelve after expanding')
+    eq(await page.locator(TH + ' .th-more').count(), 0, 'button gone')
+    eq(await page.evaluate(() => document.activeElement.classList.contains('th-list')), true, 'focus kept in the list')
+    await page.click('.node[data-id=Q9]')
+    await page.waitForSelector(TH + ' .th-msg')
+    eq(await page.locator(TH + ' .th-msg').count(), 6, 'six messages are all shown (nothing worth hiding)')
+    eq(await page.locator(TH + ' .th-more').count(), 0, 'no button for six')
+  })
+})
+
+// Breaks if messages that arrived since the reader last looked are not marked: the New line sits above the first session reply past the seen count, and only there.
+await check('polish: a New marker sits above the first session reply the reader has not seen', async () => {
+  nodeOf('AS-1').thread = mkMsgs(8)
+  await open('/plan/' + STD, DESK, async page => {
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-msg')
+    eq(await page.locator(TH + ' .th-new').count(), 0, 'nothing new the first time')
+    await page.click(NP + ' .np-close')
+    nodeOf('AS-1').thread = [...nodeOf('AS-1').thread, ...mkMsgs(3).map((m, i) => ({ ...m, role: i % 2 ? 'user' : 'session', text: 'Later ' + i, ref: 'e-l' + i }))]
+    std().rev++
+    await forcePoll(page)
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-new')
+    eq(await page.locator(TH + ' .th-new').count(), 1, 'one marker')
+    eq(await page.evaluate(() => document.querySelector('#nodethread .th-new').nextElementSibling.querySelector('.th-text').textContent), 'Later 0', 'above the first unseen session reply')
+    eq(await page.textContent(TH + ' .th-new'), 'New', 'label')
+    await shotAs(page, 'thread-new-marker-1280.png')
+    await page.click(NP + ' .np-close')
+    await page.click('.node[data-id=AS-1]')
+    eq(await page.locator(TH + ' .th-new').count(), 0, 'seen now: the marker is gone')
+  })
+})
+
+// Breaks if the pending row is the old two-line text again: it must say what is queued, show how long ago, and add a hint only after a long wait.
+await check('polish: the pending row says what is queued and how long ago, and adds what to check after five minutes', async () => {
+  const ago = m => new Date(Date.now() - m * 60000).toISOString()
+  nodeOf('AS-1').thread = [{ role: 'user', text: 'Who confirms this?', at: ago(2), ref: 'e-w1' }]
+  std().requests.push({ ref: 'e-w1', type: 'ask', node: 'AS-1', lane: null, text: 'Who confirms this?', at: ago(2) })
+  await open('/plan/' + STD, DESK, async page => {
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-wait')
+    const t = await page.textContent(TH + ' .th-wait')
+    for (const part of ['Waiting for the session…', 'sent 2 min ago', 'Your question is queued', 'It answers when it is next at its prompt']) if (!t.includes(part)) throw new Error('pending text lacks "' + part + '": ' + t)
+    eq(await page.isVisible(TH + ' .th-slow'), false, 'no slow hint at two minutes')
+    await shotAs(page, 'pending-1280.png')
+    std().requests[std().requests.length - 1].at = ago(20)
+    std().rev++
+    await forcePoll(page)
+    await page.waitForSelector(TH + ' .th-slow:visible')
+    const t2 = await page.textContent(TH + ' .th-wait')
+    if (!t2.includes('sent 20 min ago') || !t2.includes('Taking a while') || !t2.includes('terminal')) throw new Error('slow text: ' + t2)
+  })
+})
+
+// Breaks if the pane composer does not send on Enter (or sends on Shift+Enter), or if the keys are not shown as a hint.
+await check('polish: the pane composer sends on Enter, Shift+Enter adds a line, and the keys are shown', async () => {
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' textarea')
+    eq((await page.textContent(PN + ' .th-hint')).replace(/\s+/g, ' '), 'Enter sends, Shift+Enter adds a line', 'hint')
+    await page.fill(PN + ' textarea', 'one')
+    await page.press(PN + ' textarea', 'Shift+Enter')
+    await page.keyboard.type('two')
+    eq(state.posts.length, 0, 'nothing sent by Shift+Enter')
+    await page.press(PN + ' textarea', 'Enter')
+    await waitPost(1)
+    eq(JSON.stringify(lastPost()), '{"type":"ask","text":"one\\ntwo"}', 'ask without a node')
+  })
+})
+
+// Breaks if "Turn into proposal" is a full button on every answer again: only the newest answer keeps it; older ones are quiet until hover or focus.
+await check('polish: only the newest session answer shows the full "Turn into proposal"; older ones appear on hover or focus', async () => {
+  seedPaneLong()
+  await open('/plan/' + STD, WIDE, async page => {
+    await cmGoPrd(page)
+    await page.waitForSelector(PN + ' .th-msg')
+    eq(await page.locator(PN + ' .th-msg[data-last]').count(), 1, 'one newest row')
+    const op = sel => page.$eval(sel, e => getComputedStyle(e.closest('.pane-acts')).opacity)
+    eq(await op(PN + ' .th-msg[data-last] .pane-turn'), '1', 'newest answer: visible')
+    const older = PN + ' .th-msg.session:not([data-last]) .pane-turn'
+    eq(await op(older), '0', 'older answer: hidden at rest')
+    await page.hover(older, { force: true })
+    eq(await op(older), '1', 'older answer: shown on hover')
+  })
+})
+
+// Breaks if a card with a conversation or an unanswered question looks like every other card on the Lanes board.
+await check('polish: Lanes cards with a conversation show a message-count badge, amber while a question is unanswered', async () => {
+  nodeOf('AS-1').thread = mkMsgs(2)
+  nodeOf('Q9').thread = mkMsgs(3)
+  await open('/plan/' + STD, WIDE, async page => {
+    await page.waitForSelector('.node[data-id=AS-1]')
+    eq(await page.textContent('.node[data-id=AS-1] .th-tb'), '2', 'count on a card with a thread')
+    eq(await page.getAttribute('.node[data-id=AS-1] .th-tb', 'aria-label'), '2 messages in the conversation', 'plain label')
+    eq(await page.locator('.node[data-id=AS-1] .th-tb.wait').count(), 0, 'not amber when answered')
+    eq(await page.locator('.node[data-id=Q8] .th-tb').count(), 0, 'no badge without a conversation')
+    eq(await page.getAttribute('.node[data-id=Q7] .th-tb.wait', 'aria-label'), 'A question waiting for the session', 'the open ask on Q7 shows the waiting marker')
+    std().requests.push({ ref: 'e-bq', type: 'ask', node: 'Q9', lane: null, text: 'q', at: P_AT })
+    std().rev++
+    await forcePoll(page)
+    await page.waitForSelector('.node[data-id=Q9] .th-tb.wait')
+    eq(await page.getAttribute('.node[data-id=Q9] .th-tb', 'aria-label'), '3 messages in the conversation, waiting for the session', 'count and waiting')
+    await shotAs(page, 'lanes-badges-2560.png')
+  })
+  for (const [vp, name] of [[MID, '1440'], [PHONE, '390']]) await open('/plan/' + STD, vp, async page => {
+    if (vp.width < 700) await page.click('#bnav [data-view=lanes]')
+    await page.waitForSelector('.node[data-id=AS-1] .th-tb')
+    eq(await noSideScroll(page), true, name + ': no sideways scroll with badges')
+    await page.locator('.node[data-id=AS-1]').scrollIntoViewIfNeeded()
+    await shotAs(page, 'lanes-badges-' + name + '.png')
+  })
+})
+
+// Breaks if moving between cards resets the conversation to the bottom and the panel to the top: each card keeps its own place.
+await check('polish: each card keeps its own scroll position in the node panel', async () => {
+  nodeOf('AS-1').thread = mkMsgs(4).map(m => ({ ...m, text: m.text + ' ' + 'word '.repeat(220) }))
+  nodeOf('Q9').thread = mkMsgs(2)
+  await open('/plan/' + STD, { width: 1280, height: 700 }, async page => {
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-msg')
+    await page.$eval(TH + ' .th-list', e => { e.scrollTop = 0 })
+    await page.$eval(NP + ' .np-body', e => { e.scrollTop = 120 })
+    await page.click('.node[data-id=Q9]')
+    await page.waitForSelector(NP + ' .np-id:has-text("Q9")')
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(NP + ' .np-id:has-text("AS-1")')
+    eq(await page.$eval(TH + ' .th-list', e => e.scrollTop), 0, 'the conversation is where it was left')
+    eq(await page.$eval(NP + ' .np-body', e => Math.round(e.scrollTop)), 120, 'the panel is where it was left')
+  })
+})
+
+// Breaks if a node with no conversation offers no way in (starters fill the composer, and are gone once there is a message).
+await check('polish: the empty node conversation offers starters that fill the composer', async () => {
+  await open('/plan/' + STD, DESK, async page => {
+    await page.click('.node[data-id=AS-1]')
+    await page.waitForSelector(TH + ' .th-start')
+    await page.click(TH + ' .th-start >> nth=1')
+    eq(await page.inputValue(TH + ' textarea'), 'What depends on AS-1?', 'starter fills the composer')
+    eq(await page.evaluate(() => document.activeElement.matches('#nodethread textarea')), true, 'composer focused')
+    eq(state.posts.length, 0, 'a starter does not send')
+  })
+})
+
+// Breaks if a comment that arrives above the reader pushes what they are reading down the page (a render rebuilds the lists; the first card in view must keep its place).
+await check('polish: a comment arriving above the reader does not move the card they are reading', async () => {
+  seedComments()
+  for (const [vp, phone] of [[MID, false], [WIDE, false], [PHONE, true]]) {
+    await open('/plan/' + STD, vp, async page => {
+      await cmGoPrd(page, phone)
+      await page.waitForSelector('.cm[data-id=CM6]')
+      await page.evaluate(() => document.querySelector('.cm[data-id=CM6]').scrollIntoView({ block: 'center' }))
+      const before = await page.evaluate(() => Math.round(document.querySelector('.cm[data-id=CM6]').getBoundingClientRect().top))
+      std().comments = [mkCm('CM20', { author: 'Eli', anchor: '§2', text: 'A new comment above the reader\n' + 'with several lines\n'.repeat(6) }), ...std().comments]
+      std().rev++
+      await forcePoll(page)
+      await page.waitForSelector('.cm[data-id=CM20]')
+      await page.waitForTimeout(150)
+      const after = await page.evaluate(() => Math.round(document.querySelector('.cm[data-id=CM6]').getBoundingClientRect().top))
+      eq(Math.abs(after - before) <= 1, true, vp.width + 'px: the card being read moved from ' + before + ' to ' + after)
+    })
+  }
+})
+
+// Breaks if tabs, option rows, buttons and the lane cards look dead under the pointer or while pressed, or lose their focus ring from the keyboard.
+await check('polish: tabs, options, buttons and cards react to hover and press, and show a focus ring from the keyboard', async () => {
+  await open('/plan/' + STD, DESK, async page => {
+    await page.waitForSelector('.node[data-id=Q8]')
+    const css = (sel, prop) => page.$eval(sel, (e, p) => getComputedStyle(e)[p], prop)
+    const tab = '#tabs .tab[aria-selected=false] >> nth=0'
+    eq(await css('#tabs .tab[aria-selected=false]', 'backgroundColor'), 'rgba(0, 0, 0, 0)', 'tab at rest')
+    await page.hover(tab)
+    eq((await css('#tabs .tab[aria-selected=false]', 'backgroundColor')) !== 'rgba(0, 0, 0, 0)', true, 'tab shows hover')
+    const rest = await css('.opt', 'borderColor')
+    await page.hover('.opt >> nth=1')
+    eq((await page.$eval('.opt:nth-child(2)', e => getComputedStyle(e).borderColor)) !== rest, true, 'option row shows hover')
+    const btn = '.btn[data-act=later]'
+    await page.hover(btn)
+    await page.mouse.down()
+    eq(await css(btn, 'transform'), 'matrix(1, 0, 0, 1, 0, 1)', 'button is pressed in')
+    await page.mouse.up()
+    await page.focus('.node[data-id=Q8]')
+    await page.keyboard.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    eq(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'focus ring on a lane card')
+  })
+})
+
+// ---------- the "Waiting for the session" rows in the left rail: each row is one control, and shows how long it has waited ----------
+const REQ = '#now .reqs .req-row'
+const minsAgo = m => new Date(Date.now() - m * 60000).toISOString()
+
+// Breaks if only the small id opens the card (the whole row must be the control), if closing the panel loses the row's focus, or the row is not a real button.
+await check('requests: clicking anywhere on a row opens the card it points at, with its conversation docked; closing returns focus to the row', async () => {
+  await open('/plan/' + STD, DESK, async page => {
+    await page.waitForSelector(REQ)
+    eq(await page.evaluate(() => document.querySelector('#now .reqs .req-row').tagName), 'BUTTON', 'a real button')
+    await page.click(REQ + ' .tx >> nth=0')
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'Q7', 'the ask on Q7 opens Q7')
+    eq(await page.isVisible(TH + ' textarea'), true, 'the conversation composer is in view')
+    await page.click(NP + ' .np-close')
+    eq(await page.evaluate(() => document.activeElement.classList.contains('req-row')), true, 'focus back on the row')
+  })
+})
+
+// Breaks if a row cannot be reached or used from the keyboard (a div with a click handler): Enter and Space must both open the card.
+await check('requests: a row opens with Enter and with Space, and shows a focus ring', async () => {
+  await open('/plan/' + STD, DESK, async page => {
+    await page.waitForSelector(REQ)
+    await page.focus(REQ + ' >> nth=0')
+    eq(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'focus ring on the row')
+    await page.keyboard.press('Enter')
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'Q7', 'Enter opens Q7')
+    await page.keyboard.press('Escape')
+    eq(await page.evaluate(() => document.activeElement.classList.contains('req-row')), true, 'Escape returns to the row')
+    await page.keyboard.press('Space')
+    await page.waitForSelector(NP + ':not([hidden])')
+    eq(await page.textContent(NP + ' .np-id'), 'Q7', 'Space opens Q7')
+  })
+})
+
+// Breaks if a request without a node does nothing: a plan-level ask must open the Ask pane (unfolded when it was collapsed) with the composer focused,
+// a lane note must open that lane, and a request with nothing to open must say so instead of throwing.
+await check('requests: a row with no node opens the Ask pane, a lane note opens the lane, and an unopenable request says so', async () => {
+  std().requests = [
+    { ref: 'e-r1', type: 'ask', node: null, lane: null, text: 'What is unclear in the PRD?', at: minsAgo(3) },
+    { ref: 'e-r2', type: 'note', node: null, lane: 'scope', text: 'Should pinned notes sync first?', at: minsAgo(30) },
+    { ref: 'e-r3', type: 'research', node: null, lane: null, text: 'Look at CRDTs', at: minsAgo(90) },
+  ]
+  await open('/plan/' + STD, WIDE, async page => {
+    await page.waitForSelector(REQ)
+    await cmGoPrd(page)
+    await page.waitForSelector(COLL)
+    await page.click(COLL)
+    await page.click('#tabs .tab:has-text("Lanes")')
+    await page.click(REQ + ' >> nth=0')
+    await page.waitForSelector(PN + ' textarea')
+    eq(await page.isVisible(RAIL), false, 'pane unfolded')
+    eq(await page.evaluate(() => document.body.dataset.view), 'prd', 'on the PRD view where the pane is docked')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-text', 'composer focused')
+    await page.click('#tabs .tab:has-text("Lanes")')
+    await page.click(REQ + ' >> nth=1')
+    eq(await page.evaluate(() => document.body.dataset.view), 'lanes', 'lane view')
+    eq(await page.evaluate(() => { const a = document.activeElement; return [a.dataset.lane, a.getAttribute('aria-expanded')] }), ['scope', 'true'], 'the Scope lane is open and focused')
+    await page.click(REQ + ' >> nth=2')
+    await page.waitForSelector('#toast.on')
+    eq(await page.textContent('#toast'), 'This request has no card to open', 'says so')
+  })
+  await open('/plan/' + STD, MID, async page => {
+    await page.waitForSelector(REQ)
+    await page.click(REQ + ' >> nth=0')
+    await page.waitForSelector(PN + ':not([hidden])')
+    eq(await page.getAttribute(PN, 'role'), 'dialog', 'the sheet below 1800px')
+    eq(await page.evaluate(() => document.activeElement.id), 'pane-text', 'composer focused in the sheet')
+  })
+})
+
+// Breaks if a row shows only the date (it must say how long it has waited), keeps the date out of the title, or never updates or tones a long wait.
+await check('requests: each row shows how long it has waited, the date is the title, a wait past five minutes is toned, and the timer updates it', async () => {
+  const ats = [30 / 60, 12, 3 * 60, 2 * 1440]
+  std().requests = ats.map((m, i) => ({ ref: 'e-w' + i, type: 'ask', node: null, lane: null, text: 'Request ' + i, at: minsAgo(m) }))
+  await open('/plan/' + STD, DESK, async page => {
+    await page.waitForSelector(REQ)
+    eq(await page.locator(REQ + ' .at').allTextContents(), ['<1 min', '12 min', '3 h', '2 d'], 'wait texts')
+    eq(await page.locator(REQ + ' .at.slow').count(), 3, 'all but the first are toned')
+    eq(await page.getAttribute(REQ + ' .at >> nth=1', 'title'), std().requests[1].at, 'the date stays as the title')
+    await page.evaluate(() => { document.querySelector('#now .reqs .at').dataset.at = new Date(Date.now() - 20 * 60000).toISOString(); thTick() })
+    eq(await page.textContent(REQ + ' .at >> nth=0'), '20 min', 'the timer updates the text')
+    eq(await page.evaluate(() => document.querySelector('#now .reqs .at').classList.contains('slow')), true, 'and the tone')
+  })
+})
+
+// Shots of the rail rows (rest and hovered) at 2560.
+await check('requests: shots of the rail rows at 2560, at rest and hovered', async () => {
+  std().requests = [
+    { ref: 'e-s1', type: 'ask', node: 'Q7', lane: null, text: 'What happens to the version that loses?', at: minsAgo(2) },
+    { ref: 'e-s2', type: 'note', node: null, lane: 'scope', text: 'Should pinned notes sync first?', at: minsAgo(40) },
+    { ref: 'e-s3', type: 'ask', node: null, lane: null, text: 'What is still unclear in this PRD?', at: minsAgo(26 * 60) },
+  ]
+  await open('/plan/' + STD, WIDE, async page => {
+    await page.waitForSelector(REQ)
+    await shotAs(page, 'rail-rows-2560.png')
+    await page.hover(REQ + ' >> nth=1')
+    await shotAs(page, 'rail-rows-hover-2560.png')
+  })
 })
 
 // Breaks if the page loads anything the CSP forbids or throws; also covers every page opened above.

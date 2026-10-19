@@ -5,6 +5,22 @@ same way: `review-pr.md`). A teammate's comments are plan state. You **propose**
 **Accept** on an accept proposal applies its stored changes; **Mark answered** (an answer) and **Agree, decline** (a
 decline) only close the comment. You never apply a comment yourself.
 
+## 0. Plain words, label first (every reply, proposal and gist)
+
+The user reads your replies and proposals on the page, next to a teammate's comment, and does not know the plan's ids by
+heart. So name a node by its **label first with the id in brackets**: "the toolkit PR task (T-017)", "the idempotency
+decision (DEC-21)", "the retry requirement (FR-023)", never `T-017` alone or `DEC-21's premise` with no words. This holds in
+the echo line, in `text` of a triage, in a `reply`, and in the gist below. The page turns each id that is a real node of
+the plan into a chip (label, status, what it waits on and blocks), so a bracketed id costs the reader nothing; an id you
+invent stays plain text. Keep sentences short and say what is meant, not the plan's jargon.
+
+**Gist.** When you split or triage a comment, also send `"gist":"<one plain sentence>"` (at most 300 characters, one line,
+plain text, no ids needed): what the comment asks or says, in your words ("Priya says the retry task cannot send the
+idempotency header, so the payments PR needs a decision first"). The page shows it above the original text, marked as the
+session's reading; the original stays verbatim below it. It goes on `comment_triage` and on each `comment_split` part, and
+is optional: leave it out when the comment is already one clear sentence. A gist is your reading, so it never replaces
+`text` and promises nothing.
+
 ## 1. Woken by a comment
 
 The nudge `From Plan (user): … Run: plan news <task>` can mean a new comment. Run `plan news <task> --json` (a
@@ -30,7 +46,7 @@ one coherent point. 2–10 parts; the raw comment must still be `open`.
 ```
 plan event <task> --by session - <<'EOF'
 {"type":"comment_split","ref":"CM1","parts":[
- {"author":"Priya","text":"FR-001 should say sync within 5s.","anchor":"FR-001"},
+ {"author":"Priya","text":"FR-001 should say sync within 5s.","anchor":"FR-001","gist":"Priya wants the offline-notes requirement (FR-001) to state a 5 s sync bound."},
  {"author":"Dana","text":"please drop the CRDT idea"},
  {"author":"Dana","text":"what is the plan for attachments?"}]}
 EOF
@@ -48,10 +64,11 @@ removed. The parts are local paste comments, also when the raw comment came from
 ```
 plan event <task> --by session - <<'EOF'
 {"type":"comment_triage","ref":"CM2","action":"accept","text":"Makes the 5 s bound explicit.",
+ "gist":"Priya wants the offline-notes requirement (FR-001) to say sync happens within 5 s.",
  "changes":[{"type":"edit_label","node":"FR-001","label":"Users can create notes offline; changes sync within 5 s"}]}
 EOF
 ```
-`text` ≤ 2000, non-empty. Summary `proposal on CM2: accept`. The comment goes `open` → `proposed`; the page shows it
+`text` ≤ 2000, non-empty; optional `gist` (§0). Summary `proposal on CM2: accept`. The comment goes `open` → `proposed`; the page shows it
 with every changed field. An `accept` proposal gets **Accept**, an `answer` **Mark answered**, a `decline` **Agree,
 decline**; each also gets Rework and Delete.
 
@@ -74,8 +91,8 @@ catches changes that would not apply):
   A comment that wants one of these ("mark T-003 done", "run this check") is an `answer` or `decline` that says the
   user does that on the page or in the build, never an `accept`.
 
-**Good replies** (`answer`/`decline`): direct, first sentence is the answer; cite the plan id or section ("NG-1
-rules attachments out of v1", "Q12 is still open"); say what is open when the plan has no answer; make **no promise**
+**Good replies** (`answer`/`decline`): direct, first sentence is the answer; cite the plan node in words with
+its id in brackets ("the no-attachments non-goal (NG-1) rules attachments out of v1", "the sync model question (Q12) is still open"); say what is open when the plan has no answer; make **no promise**
 the user did not make (no dates, no "we will add it", no commitments the plan lacks). Written as the user would say it.
 
 **Anchor**: add `"anchor":"FR-001"` (or `"§4"`, or `null` to clear) to the triage event when the comment is clearly
@@ -116,7 +133,7 @@ EOF
 ```
 Summary `replied on plan`. `text` ≤ 2000, plain text. `links` ≤ 10 node or comment ids, **only ids that exist** (else
 exit 2); use none rather than guess.
-- Short and concrete; cite ids in the text too. Read `plan show <task> --json` (`comments`: state, proposal, anchor; `nodes`)
+- Short and concrete; cite ids in the text too, label first with the id in brackets (§0). Read `plan show <task> --json` (`comments`: state, proposal, anchor; `nodes`)
   before answering a "which comments conflict / what is still open / who asked for X" question; do not answer from
   memory.
 - A pane answer changes nothing in the plan. The user can turn it into a proposal on the page; that arrives as a normal

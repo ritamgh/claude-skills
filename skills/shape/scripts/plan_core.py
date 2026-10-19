@@ -64,7 +64,7 @@ EVENT_FIELDS = {
     "research": ("node", "text"), "reply": ("ref", "text", "links"),
     "comment": ("text", "author", "anchor"), "comment_accept": ("ref", "proposal"), "comment_rework": ("ref", "text"),
     "comment_delete": ("ref",), "comment_split": ("ref", "parts"),
-    "comment_triage": ("ref", "action", "text", "changes", "anchor"),
+    "comment_triage": ("ref", "action", "text", "changes", "anchor", "gist"),
     "comment_import": ("items",), "comment_posted": ("ref", "url", "ext"), "review": ("action", "refs", "proposals"),
     "review_set": ("value",),
     "score": ("node", "rubric", "value", "pass", "label", "rationale", "sources", "basis"),
@@ -96,7 +96,8 @@ REVIEW_REF_LIMIT = 20
 REVIEW_ACTIONS = ("open", "push", "pull", "post")
 TRUNCATED = " [truncated]"
 COMMENT_KEYS = {"id", "author", "text", "anchor", "at", "state", "source", "proposal"}
-COMMENT_REVIEW_KEYS = {"ext", "url", "reply_to", "resolved", "edited", "posted"}  # optional per record (contract 14.1)
+GIST_LIMIT = 300  # the session's one plain-words line on a comment (contract 13.1)
+COMMENT_REVIEW_KEYS = {"ext", "url", "reply_to", "resolved", "edited", "posted", "gist"}  # optional per record (contract 13.1, 14.1)
 PR_KEYS = {"repo", "number", "url", "branch", "head_sha", "prd_rev", "opened_at", "pulled_at"}
 PR_FIXED = ("repo", "number", "url", "branch", "opened_at")  # review_set may change only head_sha, prd_rev, pulled_at while a PR is recorded
 IMPORT_KEYS = {"ext", "author", "text", "anchor", "reply_to", "url", "resolved", "path", "line"}
@@ -341,6 +342,8 @@ def validate_comments(plan, byid):
         need((ext is None or ext_valid(ext)) and (comment["source"] == "github") == (ext is not None) and (ext is None or ext not in exts),
              f"{cid}: invalid or duplicate ext")
         exts.add(ext)
+        if "gist" in comment:
+            text(comment["gist"], f"{cid}.gist", GIST_LIMIT, line=True)
         need(comment.get("url", "") == "" or https_url(comment["url"]), f"{cid}: url must be an https link")
         need(comment.get("reply_to") is None or ext_valid(comment["reply_to"]), f"{cid}: invalid reply_to")
         need(all(type(comment.get(flag, False)) is bool for flag in ("resolved", "edited")), f"{cid}: resolved/edited must be booleans")
@@ -819,15 +822,16 @@ def comment_event(plan, event, byid):
         need(len(comments) - 1 + len(parts) <= COMMENT_LIMIT, "Too many comments: delete closed comments")
         clean = []
         for part in parts:
-            need(isinstance(part, dict) and "text" in part and set(part) <= {"text", "author", "anchor"}, "Invalid comment part")
+            need(isinstance(part, dict) and "text" in part and set(part) <= {"text", "author", "anchor", "gist"}, "Invalid comment part")
             clean.append({"text": text(part["text"], "part text", COMMENT_TEXT_LIMIT),
                           "author": text(part["author"], "author", 80, empty=True, line=True) if "author" in part else comment["author"],
-                          "anchor": comment_anchor(part["anchor"], byid) if "anchor" in part else comment["anchor"]})
+                          "anchor": comment_anchor(part["anchor"], byid) if "anchor" in part else comment["anchor"],
+                          **({"gist": text(part["gist"], "gist", GIST_LIMIT, line=True)} if "gist" in part else {})})
         comments.remove(comment)
         forget_ext(plan, comment)
         drop_comment_request(plan, ref)
         for part in clean:
-            add_comment(plan, part["text"], part["author"], part["anchor"], event["at"], byid)
+            add_comment(plan, part["text"], part["author"], part["anchor"], event["at"], byid, **({"gist": part["gist"]} if "gist" in part else {}))
         event["parts"] = clean
         return f"split {ref} into {len(clean)}"
     if kind == "comment_triage":
@@ -846,6 +850,8 @@ def comment_event(plan, event, byid):
             need(reason, f"{action} needs text")
             need(not changes, f"{action} takes no changes")
             changes = []
+        if "gist" in event:
+            event["gist"] = comment["gist"] = text(event["gist"], "gist", GIST_LIMIT, line=True)
         if "anchor" in event:
             comment["anchor"] = comment_anchor(event["anchor"], byid)
         comment.update(state="proposed", proposal={"action": action, "text": reason, "rev": event["rev"],
@@ -979,6 +985,7 @@ def review_event(plan, event, byid):
             continue
         if comment["text"] != item["text"]:
             comment.update(text=item["text"], edited=True)
+            comment.pop("gist", None)  # the session's reading was of the old wording
             if comment["state"] == "proposed":
                 comment.update(state="open", proposal=None)
                 comment_request(plan, comment, item["text"], event["at"], byid)

@@ -96,6 +96,8 @@ body.busy .btn,body.busy .opt,body.busy .b-btn{pointer-events:none;opacity:.6}
 .opts{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
 .opt{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px 8px 32px;position:relative}
 .opt::before{content:"";position:absolute;left:10px;top:11px;width:12px;height:12px;border-radius:50%;border:1.5px solid var(--muted)}
+.opt:hover{border-color:var(--muted)}
+.opt:active{background:var(--surface2)}
 .opt.pick{border-color:var(--focus);background:var(--focus-bg)}
 .opt.pick::before{border-color:var(--focus);background:radial-gradient(var(--focus) 0 4px,transparent 5px)}
 .opt b{font-weight:600}
@@ -107,12 +109,17 @@ body.busy .btn,body.busy .opt,body.busy .b-btn{pointer-events:none;opacity:.6}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px 12px;font-weight:600;font-size:13px}
 .btn:hover{border-color:var(--muted)}
+.btn:active:not(:disabled){background:var(--surface2);transform:translateY(1px)}
 .btn.primary{background:var(--focus);border-color:var(--focus);color:#fff}
+.btn.primary:hover:not(:disabled){border-color:var(--focus);filter:brightness(1.12)}
+.btn.primary:active:not(:disabled){background:var(--focus);filter:brightness(.92)}
 @media (prefers-color-scheme:dark){.btn.primary{color:#0b1a1d}}
 .btn.danger{color:var(--bad);border-color:var(--bad)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.primary.big{flex:1 1 100%;order:-1}
 .field{display:block;width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--surface);color:var(--ink)}
+.field:hover{border-color:var(--muted)}
+.field:focus{border-color:var(--focus)}
 textarea.field{min-height:66px;resize:vertical}
 .form{display:flex;flex-direction:column;gap:8px;margin:0 0 10px}
 .form .btns{justify-content:flex-end}
@@ -123,18 +130,26 @@ textarea.field{min-height:66px;resize:vertical}
 .next .t{flex:1;min-width:0;overflow-wrap:anywhere;background:none;border:0;padding:0;text-align:left}
 .reqs{margin-top:14px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}
 .reqs ul{margin:6px 0 0;padding:0;list-style:none}
-.req-i{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:5px 0;border-bottom:1px dotted var(--line)}
+.req-i{padding:0;border-bottom:1px dotted var(--line)}
+.req-row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;width:100%;margin:0;padding:6px 6px;border:0;border-radius:6px;background:none;text-align:left;font:inherit;color:inherit}
+.req-row:hover{background:var(--surface2)}
+.req-row:active{background:var(--line)}
+.req-go{align-self:center;flex:none;width:6px;height:6px;margin-left:2px;border:solid var(--muted);border-width:1.5px 1.5px 0 0;transform:rotate(45deg)}
+.req-row:hover .req-go{border-color:var(--ink)}
 .req-i:last-child{border-bottom:0}
 .req-i .ty{font:600 11px var(--mono);color:var(--warn)}
 .req-i .tx{flex:1 1 160px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .req-more{padding:5px 0;color:var(--muted);font-size:12px}
 .req-i .at{font:11.5px var(--mono);color:var(--muted)}
+.req-i .at.slow{color:var(--warn)}
 .linkbtn{background:none;border:0;padding:0;color:var(--focus);font:600 12px var(--mono);cursor:pointer}
 .done-card{padding:6px 0;color:var(--muted)}
 
 /* right area */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 8px}
 .tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px 9px;color:var(--muted);font-weight:600;font-size:13px;margin-bottom:-1px}
+.tab:hover{color:var(--ink);background:var(--surface2)}
+.tab:active{background:var(--line)}
 .tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--focus)}
 .panel{display:none;padding:14px}
 .panel.on{display:block}
@@ -147,6 +162,7 @@ textarea.field{min-height:66px;resize:vertical}
 .lane-h .c{font:11px var(--mono);color:var(--muted)}
 .node{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:6px;padding:6px 8px 7px;margin-bottom:8px;position:relative}
 .node:hover{border-color:var(--muted)}
+.node:active{filter:brightness(.97)}
 .node .r1{display:flex;align-items:center;justify-content:space-between;gap:4px}
 .node .id{font:600 11px var(--mono);color:var(--muted);white-space:nowrap}
 .node .g{font:700 13px/1 var(--sans)}
@@ -438,6 +454,7 @@ textarea.field{min-height:66px;resize:vertical}
 .np-grp h4{margin:0 0 3px;font:600 12px var(--sans);color:var(--muted)}
 .np-link{display:flex;align-items:baseline;gap:8px;width:100%;padding:5px 6px;border:0;border-radius:6px;background:none;text-align:left}
 .np-link:hover{background:var(--surface2)}
+.np-link:active{background:var(--line)}
 .np-link .qid{flex:none}
 .np-link .lb{flex:1;min-width:0;overflow-wrap:anywhere}
 .np-link .chip{flex:none}
@@ -448,21 +465,49 @@ textarea.field{min-height:66px;resize:vertical}
 .np-sum{display:block;overflow-wrap:anywhere}
 .np-meta{display:block;font-size:12px;color:var(--muted)}
 .np-empty{margin:0;font-size:13px;color:var(--muted)}
-/* conversation: the thread scrolls on its own, the composer sits under it */
-.th-list{display:flex;flex-direction:column;gap:10px;max-height:min(50vh,420px);overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 2px 0;margin-bottom:10px}
-.th-msg{max-width:90%;min-width:0}
-.th-msg.user{align-self:flex-end}
-.th-meta{display:flex;gap:6px;align-items:baseline;margin-bottom:2px;font-size:11.5px;color:var(--muted)}
-.th-meta b{font-weight:600}
-.th-msg.user .th-meta{justify-content:flex-end}
-.th-text{padding:7px 10px;border:1px solid var(--line);border-radius:10px 10px 10px 3px;background:var(--surface2);font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
-.th-msg.user .th-text{border-color:transparent;border-radius:10px 10px 3px 10px;background:var(--focus-bg)}
-.th-wait{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted)}
-.th-wait .dot{flex:none;width:7px;height:7px;margin-top:6px;border-radius:50%;background:var(--muted)}
-.th-wait small{display:block;font-size:12px}
-.th-composer .field{min-height:60px}
-.th-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px}
+/* conversation: compact rows with a hairline between them (no bubbles); the thread scrolls on its own, the composer sits under it and stays in reach */
+.th-list{display:flex;flex-direction:column;max-height:min(50vh,420px);overflow-y:auto;overscroll-behavior:contain;padding:0 4px 0 0;margin-bottom:8px}
+.th-list:focus-visible{outline-offset:-2px}
+.th-msg{position:relative;min-width:0;padding:7px 2px 8px;border-top:1px solid var(--line)}
+.th-list>.th-msg:first-child,.th-list>.th-more+.th-msg{border-top:0}
+.th-meta{display:flex;gap:8px;align-items:baseline;margin-bottom:1px;font-size:11.5px;color:var(--muted)}
+.th-meta b{font-weight:600;color:var(--ink)}
+.th-msg.session .th-meta b{color:var(--focus)}
+.th-meta time{font-variant-numeric:tabular-nums}
+.th-text{font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.th-msg.user .th-text{color:var(--ink)}
+.th-msg.session .th-text{color:var(--ink)}
+.th-more{align-self:flex-start;margin:0 0 6px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-size:12px;font-weight:600;color:var(--muted)}
+.th-more:hover{border-color:var(--muted);color:var(--ink)}
+.th-more:active{background:var(--surface2)}
+.th-new{display:flex;align-items:center;gap:8px;margin:2px 0 0;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--focus)}
+.th-new::after{content:"";flex:1;height:1px;background:var(--focus);opacity:.5}
+.th-new+.th-msg{border-top:0}
+.th-wait{display:flex;gap:10px;align-items:flex-start;margin-top:4px;padding:9px 10px;border:1px dashed var(--line);border-radius:8px;font-size:13px;color:var(--ink)}
+.th-wait .dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:var(--warn)}
+.th-wait b{font-weight:600}
+.th-wait small{display:block;margin-top:2px;font-size:12px;line-height:1.4;color:var(--muted)}
+.th-wait .th-slow{color:var(--warn)}
+.th-starts{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin:10px 0 12px}
+.th-start{text-align:left;font-weight:500;overflow-wrap:anywhere}
+.th-composer{background:var(--surface)}
+.np-dock{flex:0 1 auto;min-height:0;max-height:55%;display:flex;flex-direction:column;padding:10px 16px 12px;border-top:1px solid var(--line);background:var(--surface)}
+.np-dock h3{flex:none;margin:0 0 6px;font:600 14px var(--serif)}
+.np-dock-n{margin-left:8px;font:600 11px var(--mono);color:var(--muted)}
+#nodethread{display:flex;flex-direction:column;min-height:0}
+.np-dock .th-list{flex:1 1 auto;min-height:0;max-height:min(40vh,420px)}
+.np-dock .np-empty{flex:none}
+.np-dock .th-starts{flex-direction:row;flex-wrap:wrap;margin:8px 0 10px}
+.np-dock .th-start{padding:5px 10px;font-size:12.5px}
+.np-dock .th-composer{flex:none}
+.th-composer .field{min-height:44px;resize:vertical}
+.th-bar{display:flex;align-items:center;gap:10px;margin-top:6px}
+.th-hint{flex:1;min-width:0;font-size:11.5px;color:var(--muted)}
+.th-hint kbd{font:600 11px var(--mono);padding:0 4px;border:1px solid var(--line);border-radius:3px;background:var(--surface2)}
 .th-count{font-size:12px;color:var(--muted)}
+.th-tb{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:15px;padding:0 4px;border:1px solid var(--muted);border-radius:5px 5px 5px 1px;font:600 10px/1 var(--mono);color:var(--muted)}
+.th-tb.wait{border-color:var(--warn);background:var(--warn);color:var(--surface)}
+.node .r1 .id{margin-right:auto}
 
 /* PRD-wide pane: a fixed column beside the PRD from 1800px (the page makes room, like the node panel), a right sheet below, a full-screen sheet on a phone */
 :root{--pw:30rem}
@@ -470,7 +515,19 @@ textarea.field{min-height:66px;resize:vertical}
 .pane:focus{outline:none}
 .pane-head{flex:none;display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
 .pane-head h2{margin:0;font:600 17px/1.3 var(--serif)}
-.pane-close{margin-left:auto;padding:5px 11px}
+.pane-close,.pane-collapse{margin-left:auto;padding:5px 11px}
+.pane-collapse{display:none}
+.pane-collapse::after{content:"";display:inline-block;width:6px;height:6px;margin:0 1px 1px 8px;border:solid currentColor;border-width:1.5px 1.5px 0 0;transform:rotate(45deg)}
+/* the rail the docked pane folds into (from 1800px, on the PRD view) */
+:root{--rw:44px}
+.pane-rail{display:none;position:fixed;top:12px;right:12px;bottom:12px;width:var(--rw);z-index:44;flex-direction:column;align-items:center;gap:14px;padding:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 10px 36px rgb(0 0 0 / .12);color:var(--ink)}
+.pane-rail:hover{border-color:var(--focus);background:var(--focus-bg)}
+.pane-rail:active{background:var(--surface2)}
+.rail-lbl{writing-mode:vertical-rl;font:600 14px/1 var(--serif);letter-spacing:.04em}
+.rail-chev{width:7px;height:7px;border:solid var(--muted);border-width:0 0 1.5px 1.5px;transform:rotate(45deg)}
+.rail-badge{width:11px;height:11px;border-radius:50%}
+.rail-badge[data-kind=new]{background:var(--focus);box-shadow:0 0 0 3px var(--focus-bg)}
+.rail-badge[data-kind=wait]{background:var(--warn);box-shadow:0 0 0 3px var(--warn-bg)}
 .pane-main{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 16px 0}
 .pane .th-list{flex:1;min-height:0;max-height:none;margin-bottom:0;padding-bottom:10px}
 .pane-empty{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
@@ -480,8 +537,13 @@ textarea.field{min-height:66px;resize:vertical}
 .pane-links{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:4px;font-size:11.5px;color:var(--muted)}
 .pane-chip{max-width:100%;padding:0 6px;border:0;border-radius:4px;background:var(--focus-bg);color:var(--focus);font:600 11.5px/1.6 var(--mono);text-align:left;overflow-wrap:anywhere}
 .pane-chip.gone{background:var(--surface2);color:var(--muted);cursor:default}
-.pane-acts{margin-top:6px}
+.pane-acts{margin-top:4px}
 .pane-turn{padding:4px 10px;font-size:12px}
+/* the newest answer keeps the full button; older ones are quiet and show on hover or focus (always, once sent) */
+.th-msg:not([data-last]) .pane-acts{position:absolute;top:3px;right:0;margin:0}
+.th-msg:not([data-last]) .pane-turn:not(:disabled){border-color:transparent;background:none;color:var(--muted)}
+.th-msg:not([data-last]) .pane-turn:not(:disabled):hover{color:var(--ink);border-color:var(--line)}
+@media (hover:hover){.th-msg:not([data-last]) .pane-acts:not(.sent){opacity:0}.th-msg:not([data-last]):hover .pane-acts:not(.sent),.th-msg:not([data-last]):focus-within .pane-acts:not(.sent){opacity:1}}
 .pane-ask,.cm-jump{padding:5px 11px;font-size:12.5px;color:var(--ink)}
 .pane-ask{position:relative;margin-left:auto}
 .cm-jump{margin-left:auto}
@@ -543,6 +605,27 @@ textarea.field{min-height:66px;resize:vertical}
 .cm .cm-rw .field{flex:1 1 220px;min-width:0;padding:6px 10px}
 .cm .cm-confirm span{color:var(--bad);font-weight:600}
 .cm-scratch{position:fixed;top:0;left:0;width:1px;height:1px;opacity:0}
+.cm .cm-gist{margin-bottom:6px;padding:6px 10px;border-left:3px solid var(--focus);border-radius:0 6px 6px 0;background:var(--focus-bg)}
+.cm .cm-gl{display:block;font:600 11.5px/1.5 var(--sans);color:var(--focus)}
+.cm .cm-gt{overflow-wrap:anywhere}
+.cm .cm-ol{margin-bottom:2px;font:600 11.5px/1.5 var(--sans);color:var(--muted)}
+
+/* a plan id in comment, proposal and thread text: the id, then the node's label cut with an ellipsis (drawn by CSS, so copying the text copies only what was written); the card opens on hover, focus or tap */
+.idc{display:inline-flex;align-items:baseline;max-width:100%;padding:0 6px;border:0;border-radius:4px;background:var(--focus-bg);color:var(--focus);font:600 11.5px/1.6 var(--mono);text-align:left;white-space:nowrap;cursor:pointer;vertical-align:baseline}
+.idc::after{content:attr(data-label);min-width:0;max-width:24ch;margin-left:6px;overflow:hidden;text-overflow:ellipsis;font:500 12px/1.6 var(--sans);color:var(--ink)}
+.idc:hover,.idc[aria-describedby]{box-shadow:inset 0 0 0 1px var(--focus)}
+.idcard{position:fixed;z-index:70;box-sizing:border-box;width:max-content;max-width:360px;overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 6px 24px rgb(0 0 0 / .25);font:13px/1.45 var(--sans);overscroll-behavior:contain}
+.idcard[hidden]{display:none}
+.idcard .ic-top{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.idcard .ic-id{font:600 12px var(--mono);color:var(--focus)}
+.idcard .ic-kind{font-size:12px;color:var(--muted)}
+.idcard .ic-label{margin-top:4px;font-weight:600;overflow-wrap:anywhere}
+.idcard .ic-row{margin-top:6px;font-size:12.5px;overflow-wrap:anywhere}
+.idcard .ic-row b{display:block;font:600 11.5px var(--sans);color:var(--muted)}
+.idcard .ic-row ul{margin:1px 0 0;padding-left:16px}
+.idcard .ic-none,.idcard .ic-more{color:var(--muted)}
+.idcard .ic-body{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin-top:6px;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.idcard .ic-hint{margin-top:8px;font-size:11.5px;color:var(--muted)}
 
 /* GitHub review PR (contract §14): the strip above the comments, source tags and reply boxes on the cards, the sticky post bar */
 .rv{max-width:84ch;margin:12px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:13.5px/1.45 var(--sans);color:var(--ink)}
@@ -614,6 +697,13 @@ textarea.field{min-height:66px;resize:vertical}
   body[data-view=prd] .app{padding-right:calc(var(--pw) + 36px)}
   body.np-open[data-view=prd] .app{padding-right:calc(var(--pw) + var(--npw) + 60px)}
   .pane-close,.pane-ask{display:none}
+  .pane-collapse{display:inline-flex;align-items:center}
+  /* folded: the pane is a slim rail, the page keeps only the rail's column free */
+  body[data-view=prd].pane-folded .pane{display:none}
+  body[data-view=prd].pane-folded .pane-rail{display:flex}
+  body[data-view=prd].pane-folded .app{padding-right:calc(var(--rw) + 36px)}
+  body.np-open[data-view=prd].pane-folded .app{padding-right:calc(var(--npw) + var(--rw) + 60px)}
+  body.np-open .pane-rail{right:calc(var(--npw) + 24px)}
 }
 @media (min-width:1800px) and (max-width:2199px){
   body.np-open[data-view=prd] #now{display:none}
@@ -683,6 +773,12 @@ textarea.field{min-height:66px;resize:vertical}
   .pane-close,.pane-ask{min-height:44px}
   .pane-close{flex:none;padding:12px 18px}
   .pane-turn,.pane-chip{min-height:36px}
+  .th-more,.th-start{min-height:40px}
+  .th-hint{display:none}
+  .np-dock{padding:8px 16px 10px}
+  .np-dock .th-list{max-height:26vh}
+  .idc{align-items:center;min-height:30px;padding:2px 8px}
+  .idc::after{max-width:16ch}
   .bottomnav{display:flex;position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:25;padding-bottom:env(safe-area-inset-bottom)}
   .bottomnav button{flex:1;background:none;border:0;min-height:56px;font-weight:600;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
   .bottomnav button[aria-selected=true]{color:var(--ink);box-shadow:inset 0 2px 0 var(--focus)}
@@ -749,6 +845,7 @@ textarea.field{min-height:66px;resize:vertical}
 
 <aside id="nodepanel" class="np" tabindex="-1" aria-label="Node details" hidden></aside>
 <aside id="prdpane" class="pane" tabindex="-1" aria-label="Ask about the PRD"></aside>
+<button id="pane-rail" class="pane-rail" type="button" aria-expanded="false" aria-controls="prdpane" aria-label="Ask about the PRD, expand"><span class="rail-badge" hidden></span><span class="rail-lbl">Ask</span><span class="rail-chev" aria-hidden="true"></span></button>
 <nav class="bottomnav" id="bnav" role="tablist" aria-label="Sections" hidden></nav>
 <div class="toast" id="toast" role="status"></div>
 
@@ -790,13 +887,26 @@ function cmDraftSave() {
   try { if (S.cm.text.trim()) localStorage.setItem(cmDraftKey(), JSON.stringify({ text: S.cm.text, anchor: S.cm.anchor })); else localStorage.removeItem(cmDraftKey()) } catch (e) { /* not kept */ }
 }
 function rvAutoPref() { try { return localStorage.getItem('hq.plan.autopull') === '1' } catch (e) { return false } }
+// Whether the docked Ask pane is folded into its rail is remembered per browser too.
+function paneCollPref() { try { return localStorage.getItem('hq.plan.panecollapsed') === '1' } catch (e) { return false } }
+function paneCollSave(v) { try { if (v) localStorage.setItem('hq.plan.panecollapsed', '1'); else localStorage.removeItem('hq.plan.panecollapsed') } catch (e) { /* not kept */ } }
+// How many messages of each conversation (by key: n:<id> or pane) the reader has seen, per task; what arrives after it shows under a New marker.
+const thSeenKey = () => 'hq.plan.seen.' + task
+function thSeenLoad() {
+  try {
+    const d = JSON.parse(localStorage.getItem(thSeenKey())), o = {}
+    if (d && typeof d === 'object' && !Array.isArray(d)) for (const [k, v] of Object.entries(d)) if (Number.isInteger(v) && v >= 0) o[k] = v
+    return o
+  } catch (e) { return {} }
+}
 const S = {
   cm: { text: '', author: cmAuthor(), anchor: '', open: {}, more: {}, rw: null, del: null }, // composer draft, quiet cards expanded, long texts expanded, the one rework input / delete confirm open
   rv: { confirm: false, picks: {}, auto: rvAutoPref(), at: Date.now() }, // review PR: "Open" asked once, reply boxes ticked (by comment id), auto-pull on, when the last auto pull was asked (or the toggle turned on)
   plan: null, prd: '', rev: null, sel: null, opener: null, npPick: null, view: null, collapsed: {}, collapsedInit: false,
   pick: null, form: null, busy: false, lint: null, err: null, errStale: false, online: true, missing: false,
   bd: { open: {}, shortOnly: false, kill: null, killText: '', killErr: false, focusKill: false, promote: null, merge: null },
-  pane: { open: false, draft: '', sent: {}, asking: null, seen: null, hl: null }, // the PRD pane: sheet open, composer draft, answers already sent as comments (by ref), rev of our last ask, last session answer seen, comment marked by a chip
+  pane: { open: false, collapsed: paneCollPref(), draft: '', sent: {}, asking: null, seen: null, hl: null }, // the PRD pane: sheet open, docked pane folded into its rail, composer draft, answers already sent as comments (by ref), rev of our last ask, last session answer seen, comment marked by a chip
+  th: { seen: task ? thSeenLoad() : {}, from: {}, open: {}, scroll: {}, body: {}, askAt: {} }, // conversations: messages seen (kept), seen count while one is open, "N earlier" expanded, list scroll, node panel scroll, when our last ask was sent (by key)
   ask: {}, asking: {}, focusDraft: false, nodeJson: {}, prdChunks: {}, flash: { nodes: new Set(), prd: new Set(), recent: new Set() },
 }
 
@@ -1010,6 +1120,138 @@ function renderPrdBody(md, flash) {
 function chip(d, withWord) {
   return h('span', { class: 'chip ' + d }, h('span', { class: 'g', 'aria-hidden': 'true' }, GL[d]), h('span', { class: withWord ? '' : 'wd' }, WD[d]))
 }
+// ---------- plan ids in free text (comments, proposals, gists, thread messages): a token that is a node id of THIS plan becomes a chip ----------
+// A token is letters, an optional hyphen and digits, bounded by anything but a letter, digit or underscore, and case as written. It is a chip only when
+// the plan has that node: the number is compared without leading zeros (T-17 finds T-017, the plan's padded id), the letters and the hyphen must match.
+// Anything else (CM2, T-99, #107, a lower-case t-017) stays plain text. The text and the chip are built with h() (text nodes, never markup).
+const ID_TOKEN = /(?<![A-Za-z0-9_])([A-Z]+)(-?)(\d+)(?![A-Za-z0-9_])/g
+const idKey = (letters, hyphen, digits) => letters + hyphen + digits.replace(/^0+(?=\d)/, '')
+let idxFor = null, idxMap = null
+function idIndex() {
+  const ns = S.plan && S.plan.nodes
+  if (ns !== idxFor) {
+    idxFor = ns
+    idxMap = new Map()
+    for (const n of arr(ns)) { const m = /^([A-Z]+)(-?)(\d+)$/.exec(String(n.id)); if (m) idxMap.set(idKey(m[1], m[2], m[3]), n) }
+  }
+  return idxMap
+}
+// The pieces of `text` for h(): plain strings and chips. `w` names the spot (a comment, a message), so focus and the opener return to the right chip.
+function rich(text, w) {
+  const s = String(text == null ? '' : text), idx = idIndex(), out = []
+  if (!idx.size) return [s]
+  const re = new RegExp(ID_TOKEN.source, 'g')
+  let last = 0, m
+  while ((m = re.exec(s))) {
+    const n = idx.get(idKey(m[1], m[2], m[3]))
+    if (!n) continue
+    if (m.index > last) out.push(s.slice(last, m.index))
+    out.push(idChip(n, m[0], w))
+    last = re.lastIndex
+  }
+  if (last < s.length) out.push(s.slice(last))
+  return out
+}
+const idSel = (id, w) => '.idc[data-nid="' + CSS.escape(id) + '"]' + (w ? '[data-w="' + CSS.escape(w) + '"]' : '')
+const IDC = { el: null, anchor: null, timer: 0, last: '' } // the one card, the chip it hangs on, the hover delay, how the last input came (mouse, touch, pen, key)
+// The visible text of a chip is only its token (the label is drawn by CSS from data-label), so copying a comment copies what the teammate wrote.
+function idChip(n, token, w) {
+  const label = String(n.label == null ? '' : n.label)
+  return h('button', {
+    type: 'button', class: 'idc', 'data-nid': n.id, 'data-label': label, 'data-w': w || null, 'aria-label': token + ', ' + label,
+    onclick: ev => idClick(ev, ev.currentTarget, n.id, w),
+    onpointerenter: ev => { if (ev.pointerType === 'mouse') { clearTimeout(IDC.timer); const a = ev.currentTarget; IDC.timer = setTimeout(() => idShow(a), 120) } },
+    onpointerleave: ev => { if (ev.pointerType === 'mouse') idLater() },
+    onfocus: ev => { try { if (ev.currentTarget.matches(':focus-visible')) idShow(ev.currentTarget) } catch (e) { /* no :focus-visible: the card opens on hover or tap only */ } },
+    onblur: () => idHide(),
+  }, token)
+}
+function idClick(ev, a, id, w) {
+  const t = ev.pointerType || IDC.last
+  if (t === 'touch' && !(IDC.anchor === a && IDC.el && !IDC.el.hidden)) { ev.preventDefault(); idShow(a); return } // a first tap reads the card, the next one opens the node
+  idHide()
+  selectNode(id, idSel(id, w))
+}
+function idLater() { clearTimeout(IDC.timer); IDC.timer = setTimeout(idHide, 180) }
+function idHide() {
+  clearTimeout(IDC.timer)
+  const c = IDC.el
+  if (c && !c.hidden) c.hidden = true
+  if (IDC.anchor) IDC.anchor.removeAttribute('aria-describedby')
+  IDC.anchor = null
+}
+const idList = ids => {
+  const ns = ids.map(node).filter(Boolean)
+  if (!ns.length) return h('span', { class: 'ic-none' }, 'nothing')
+  return h('ul', {}, ns.slice(0, 4).map(x => h('li', {}, x.label + ' (' + x.id + ')')), ns.length > 4 ? h('li', { class: 'ic-more' }, 'and ' + (ns.length - 4) + ' more') : null)
+}
+function idFill(c, n) {
+  const line = String(n.body || '').split('\n').map(l => l.replace(/^[\s#>*+-]+/, '').trim()).find(Boolean)
+  const blocks = S.plan.nodes.filter(x => arr(x.depends_on).includes(n.id)).map(x => x.id)
+  c.replaceChildren(...kidsOf([
+    h('div', { class: 'ic-top' }, h('span', { class: 'ic-id' }, n.id), h('span', { class: 'ic-kind' }, n.kind), chip(display(n), true)),
+    h('div', { class: 'ic-label' }, n.label),
+    h('div', { class: 'ic-row' }, h('b', {}, 'Waits on'), idList(arr(n.depends_on))),
+    h('div', { class: 'ic-row' }, h('b', {}, 'Blocks'), idList(blocks)),
+    line ? h('div', { class: 'ic-body' }, line) : null,
+    h('div', { class: 'ic-hint' }, IDC.last === 'touch' ? 'Tap again to open' : 'Click to open')]))
+}
+// Fixed to the viewport: below the chip, above it when there is no room, never past an edge (the card scrolls when it is taller than the screen).
+function idPlace(a, c) {
+  const r = a.getBoundingClientRect(), vw = document.documentElement.clientWidth, vh = window.innerHeight, m = 8
+  c.style.maxWidth = Math.min(360, vw - 2 * m) + 'px'
+  c.style.maxHeight = vh - 2 * m + 'px'
+  c.style.left = '0px'
+  c.style.top = '0px'
+  const w = c.offsetWidth, ht = c.offsetHeight
+  let top = r.bottom + 6
+  if (top + ht > vh - m) top = r.top - ht - 6
+  c.style.left = Math.max(m, Math.min(r.left, vw - w - m)) + 'px'
+  c.style.top = Math.max(m, Math.min(top, vh - ht - m)) + 'px'
+}
+function idShow(a) {
+  clearTimeout(IDC.timer)
+  const n = a.isConnected && node(a.dataset.nid)
+  if (!n) return
+  if (!IDC.el) {
+    IDC.el = h('div', { id: 'idcard', class: 'idcard', role: 'tooltip', hidden: true, onpointerenter: () => clearTimeout(IDC.timer), onpointerleave: ev => { if (ev.pointerType === 'mouse') idLater() } })
+    document.body.append(IDC.el)
+  }
+  if (IDC.anchor && IDC.anchor !== a) IDC.anchor.removeAttribute('aria-describedby')
+  IDC.anchor = a
+  a.setAttribute('aria-describedby', 'idcard')
+  idFill(IDC.el, n)
+  IDC.el.hidden = false
+  idPlace(a, IDC.el)
+}
+// A re-render replaces the chips: the card follows the same chip in the new DOM, or goes when there is none.
+function idSync() {
+  const a = IDC.anchor
+  if (!a || a.isConnected) return
+  const next = document.querySelector(idSel(a.dataset.nid, a.dataset.w))
+  IDC.anchor = null
+  if (next) idShow(next)
+  else idHide()
+}
+document.addEventListener('keydown', ev => {
+  IDC.last = 'key'
+  if (ev.key === 'Escape' && IDC.el && !IDC.el.hidden) { ev.preventDefault(); idHide() } // the card first; the panel or the sheet needs a second Escape
+}, true)
+document.addEventListener('pointerdown', ev => {
+  IDC.last = ev.pointerType
+  if (IDC.el && !IDC.el.hidden && !(ev.target.closest && ev.target.closest('.idc, #idcard'))) idHide()
+}, true)
+// Focusing a chip scrolls it into view, so a scroll must not close the card: it follows its chip, and goes when the chip leaves the screen.
+function idFollow() {
+  const a = IDC.anchor
+  if (!a || !IDC.el || IDC.el.hidden) return
+  const r = a.isConnected ? a.getBoundingClientRect() : null
+  if (!r || r.bottom < 0 || r.top > window.innerHeight) idHide()
+  else idPlace(a, IDC.el)
+}
+document.addEventListener('scroll', ev => { if (ev.target !== IDC.el) idFollow() }, true)
+window.addEventListener('resize', idFollow)
+
 // The toast sits at the bottom centre; a sticky bar there (reply bar, Approve gate, the pane composer) would hide it, so lift it above whichever one reaches into its slot.
 function toastLift(t) {
   t.style.bottom = ''
@@ -1104,15 +1346,57 @@ function openForm(where, kind, text, node) {
 // One line per request (the full text is the title) and at most REQ_SHOWN of them: a long comment must not turn the Now card into a page of its own.
 const REQ_SHOWN = 5, REQ_CHARS = 100
 const reqLine = text => { const cs = Array.from(String(text || '').replace(/\s+/g, ' ').trim()); return cs.length > REQ_CHARS ? cs.slice(0, REQ_CHARS - 1).join('') + '…' : cs.join('') }
+// A row is one control: it opens what the request points at. A node: its card, with the conversation docked in the panel. A question about the whole PRD: the Ask pane
+// (unfolded, composer focused). A note on a lane: that lane, opened. A comment: the PRD view. Anything else has nothing to open and says so.
+function reqOpen(r, opener) {
+  if (r.node && node(r.node)) return selectNode(r.node, opener)
+  if (r.type === 'ask') {
+    if (paneDocked()) {
+      S.view = 'prd'
+      if (S.pane.collapsed) { S.pane.collapsed = false; paneCollSave(false) }
+      renderTabs()
+    } else openPane()
+    const f = $('#pane-text')
+    if (f) f.focus({ preventScroll: true })
+    return
+  }
+  const lane = LANES.find(l => l[0] === r.lane)
+  if (lane) {
+    S.view = 'lanes'
+    S.collapsed[lane[0]] = false
+    renderTabs(); renderLanes()
+    const hd = $('.lane-h[data-lane="' + lane[0] + '"]')
+    if (hd) { hd.scrollIntoView({ block: 'start' }); hd.focus({ preventScroll: true }) }
+    return
+  }
+  if (r.type === 'comment') { S.view = 'prd'; renderTabs(); window.scrollTo(0, 0); return }
+  toast('This request has no card to open')
+}
+// How long a request has waited, short: "<1 min", "12 min", "3 h", "2 d". A bad stamp shows its date.
+function reqWait(at) {
+  const t = Date.parse(at)
+  if (isNaN(t)) return fmtAt(at)
+  const m = Math.max(0, Math.floor((Date.now() - t) / 60000))
+  return m < 1 ? '<1 min' : m < 60 ? m + ' min' : m < 1440 ? Math.floor(m / 60) + ' h' : Math.floor(m / 1440) + ' d'
+}
+function reqAge(e) { // the wait text, toned like the pending row once it is past SLOW_MS
+  const t = Date.parse(e.dataset.at)
+  e.textContent = reqWait(e.dataset.at)
+  e.classList.toggle('slow', !isNaN(t) && Date.now() - t >= SLOW_MS)
+}
 function requestsBlock(cls, scope) {
   const rs = arr(S.plan.requests)
   if (!rs.length) return null
   return h('div', { class: cls }, h('div', { class: 'eyebrow' }, 'Waiting for the session · ' + rs.length),
-    h('ul', {}, rs.slice(0, REQ_SHOWN).map(r => h('li', { class: 'req-i' },
-      h('span', { class: 'ty' }, r.type),
-      r.node && node(r.node) ? h('button', { class: 'linkbtn', 'data-id': r.node, onclick: () => selectNode(r.node, byId(scope + ' .linkbtn', r.node)) }, r.node) : null,
-      h('span', { class: 'tx', title: r.text || null }, reqLine(r.text)),
-      h('span', { class: 'at', title: r.at }, fmtAt(r.at)))),
+    h('ul', {}, rs.slice(0, REQ_SHOWN).map((r, i) => {
+      const age = h('span', { class: 'at', 'data-at': r.at || null, title: r.at || null }, fmtAt(r.at))
+      if (r.at) reqAge(age)
+      return h('li', { class: 'req-i' }, h('button', { class: 'req-row', 'data-i': String(i), onclick: () => reqOpen(r, scope + ' .req-row[data-i="' + i + '"]') },
+        h('span', { class: 'ty' }, r.type),
+        r.node && node(r.node) ? h('span', { class: 'linkbtn', 'data-id': r.node }, r.node) : null,
+        h('span', { class: 'tx', title: r.text || null }, reqLine(r.text)),
+        age, h('span', { class: 'req-go', 'aria-hidden': 'true' })))
+    }),
     rs.length > REQ_SHOWN ? h('li', { class: 'req-more' }, '+' + (rs.length - REQ_SHOWN) + ' more') : null))
 }
 const fmtAt = at => (at ? String(at).slice(5, 16).replace('T', ' ') : '')
@@ -1175,6 +1459,13 @@ function renderNow() {
   if (rq) root.append(rq)
 }
 
+// A card with a conversation shows a small speech-bubble badge with the message count; filled amber while a question to the session is unanswered.
+function threadBadge(n) {
+  const c = arr(n.thread).length, wait = askWaiting(n.id)
+  if (!c && !wait) return null
+  const label = (c ? c + ' message' + (c === 1 ? '' : 's') + ' in the conversation' : 'A question') + (wait ? (c ? ', ' : ' ') + 'waiting for the session' : '')
+  return h('span', { class: 'th-tb' + (wait ? ' wait' : ''), role: 'img', 'aria-label': label, title: label }, c ? String(c) : '?')
+}
 function renderLanes() {
   const root = $('#p-lanes'), p = S.plan
   root.replaceChildren()
@@ -1191,12 +1482,12 @@ function renderLanes() {
     const ns = p.nodes.filter(n => laneOf(n) === l)
     const col = !!S.collapsed[l]
     lanes.append(h('div', { class: 'lane' + (col ? ' collapsed' : '') },
-      h('button', { class: 'lane-h', 'aria-expanded': String(!col), onclick: () => { S.collapsed[l] = !S.collapsed[l]; renderLanes() } },
+      h('button', { class: 'lane-h', 'data-lane': l, 'aria-expanded': String(!col), onclick: () => { S.collapsed[l] = !S.collapsed[l]; renderLanes() } },
         h('span', { class: 'n' }, name), h('span', { class: 'c' }, ns.filter(n => display(n) === 'settled').length + '/' + ns.length)),
       h('div', { class: 'nodes' }, ns.map(n => {
         const d = display(n)
         return h('button', { class: 'node s-' + d + (S.sel === n.id ? ' sel' : '') + (dep.has(n.id) ? ' dep' : '') + (pre.has(n.id) ? ' pre' : '') + (S.flash.nodes.has(n.id) ? ' fresh' : ''), 'data-id': n.id, 'aria-pressed': String(S.sel === n.id), onclick: () => toggleNode(n.id, byId('.node', n.id)) },
-          h('span', { class: 'r1' }, h('span', { class: 'id' }, n.id), chip(d, false)),
+          h('span', { class: 'r1' }, h('span', { class: 'id' }, n.id), threadBadge(n), chip(d, false)),
           h('span', { class: 't' }, n.label), h('span', { class: 's' }, sub(n, d)))
       }))))
   }
@@ -1306,12 +1597,12 @@ function cmChange(ch, note) {
     ref ? h('span', { class: 'cm-ref' }, ref) : null,
     fields && fields.length ? h('dl', { class: 'cm-f' }, fields.map(([f, v]) => h('div', {}, h('dt', {}, f), h('dd', {}, cmStr(v))))) : null)
 }
-function cmProposal(pr, c) {
+function cmProposal(pr, c, loc) {
   const label = { accept: 'Proposal: add to the plan', answer: 'Proposed reply', decline: 'Proposal: decline' }[pr.action] || 'Proposal'
   const changes = arr(pr.changes)
   return h('div', { class: 'cm-prop' },
     h('div', { class: 'cm-pl' }, label),
-    pr.text ? h('div', { class: 'cm-pt' }, String(pr.text)) : null,
+    pr.text ? h('div', { class: 'cm-pt' }, ...rich(pr.text, 'p:' + loc + ':' + c.id)) : null,
     changes.length ? h('div', { class: 'cm-changes' }, changes.map(ch => cmChange(ch, cmNote(c, ch)))) : null)
 }
 function cmActions(c, pr, loc) {
@@ -1376,11 +1667,14 @@ function cmCard(c, loc, chip) {
     : h('div', { class: 'cm-head' }, ...meta, ...tags, anchor)
   const long = text.split('\n').length > 4 || text.length > 400
   const more = !!S.cm.more[c.id]
+  const gist = typeof c.gist === 'string' ? c.gist.trim() : ''
   const body = !quiet || x ? h('div', { class: 'cm-body' },
-    h('div', { class: 'cm-text' + (long && !more ? ' clamp' : '') }, text),
+    gist ? h('div', { class: 'cm-gist' }, h('span', { class: 'cm-gl' }, 'In plain words · the session’s reading'), h('div', { class: 'cm-gt' }, ...rich(gist, 'g:' + loc + ':' + c.id))) : null,
+    gist ? h('div', { class: 'cm-ol' }, 'Original') : null,
+    h('div', { class: 'cm-text' + (long && !more ? ' clamp' : '') }, ...rich(text, 'c:' + loc + ':' + c.id)),
     long ? h('button', { class: 'cm-more', 'data-act': 'more', 'aria-expanded': String(more), onclick: () => { S.cm.more[c.id] = !more; cmRefresh(cmSel(c.id, loc, 'more')) } }, more ? 'show less' : 'show more') : null,
     st === 'open' ? h('div', { class: 'cm-wait' }, 'Waiting for the session…') : null,
-    pr ? cmProposal(pr, c) : null,
+    pr ? cmProposal(pr, c, loc) : null,
     ...cmActions(c, pr, loc)) : null
   const kids = cmKids(c)
   return h('div', { class: 'cm' + (quiet ? ' quiet' : '') + (loc === 'prd' && S.pane.hl === c.id ? ' hl' : ''), 'data-id': c.id, 'data-state': st }, head, body, rvReply(c, loc),
@@ -1880,14 +2174,34 @@ function renderTabs() {
   renderPane() // after data-view: the docked pane shows on the PRD view only
   prdSpy()
 }
+// A render rebuilds the panels, so a card that arrives above the reader would push what they are reading down. The first thing in view keeps its place on screen.
+function scrollAnchor() {
+  if (window.scrollY < 1) return null
+  for (const e of document.querySelectorAll('.panel.on [id], .panel.on [data-id]')) {
+    const r = e.getBoundingClientRect()
+    if (r.bottom > 40 && r.top < innerHeight && (e.id || (e.dataset.id && e.classList.length))) {
+      return { key: e.id ? '#' + CSS.escape(e.id) : '.panel.on .' + e.classList[0] + '[data-id="' + CSS.escape(e.dataset.id) + '"]', top: r.top }
+    }
+  }
+  return null
+}
+function scrollKeep(a) {
+  const e = a && document.querySelector(a.key)
+  if (!e) return
+  const d = e.getBoundingClientRect().top - a.top
+  if (Math.abs(d) >= 1) window.scrollBy(0, d)
+}
 function renderAll() {
+  const anchor = scrollAnchor()
   const ae = document.activeElement
   const keep = ae && ae.hasAttribute && ae.hasAttribute('data-draft') ? { sel: (ae.closest('#nodepanel') ? '#nodepanel ' : '') + '[data-draft="' + ae.getAttribute('data-draft') + '"]', a: ae.selectionStart, b: ae.selectionEnd } : null
   // A comment button keeps focus through a re-render too (drafts are covered by data-draft above).
   const cb = ae && ae.dataset && ae.dataset.act && ae.closest && ae.closest('.cm')
   const cmKey = cb ? cmRoot(ae.closest('#nodepanel') ? 'panel' : 'prd') + '.cm[data-id="' + CSS.escape(cb.dataset.id) + '"] [data-act="' + ae.dataset.act + '"]' : null
-  const rk = ae && ae.id && ae.closest && ae.closest('#rv, #rv-bar') ? '#' + ae.id : null // the review strip and bar keep focus too
+  const rk = ae && ae.id && ae.closest && ae.closest('#rv, #rv-bar') ? '#' + ae.id
+    : ae && ae.classList && ae.classList.contains('idc') ? idSel(ae.dataset.nid, ae.dataset.w) : null // the review strip and bar, and an id chip, keep focus too
   renderHead(); renderNotice(); renderNow(); renderLanes(); renderPrd(); renderBuild(); renderLog(); renderBoard(); renderStrip(); renderTabs(); renderPanel()
+  scrollKeep(anchor)
   S.flash = { nodes: new Set(), prd: new Set(), recent: new Set() }
   if (keep || S.focusDraft) {
     const fresh = S.focusDraft
@@ -1898,6 +2212,7 @@ function renderAll() {
     const f = $(cmKey || rk)
     if (f) f.focus({ preventScroll: true })
   }
+  idSync()
 }
 
 // ---------- node panel: one column on the right (a full-screen sheet on a phone). Plan text only ever enters through h(). ----------
@@ -1946,7 +2261,8 @@ function syncInert() {
 }
 const npAnswerable = n => n.kind === 'question' && n.status === 'open'
 const npFocusKey = e => e.hasAttribute('data-act') ? '[data-act="' + e.getAttribute('data-act') + '"]'
-  : e.classList.contains('opt') ? '.opt[data-key="' + e.getAttribute('data-key') + '"]'
+  : e.classList.contains('idc') ? idSel(e.dataset.nid, e.dataset.w)
+    : e.classList.contains('opt') ? '.opt[data-key="' + e.getAttribute('data-key') + '"]'
     : e.classList.contains('np-link') ? '.np-link[data-id="' + e.getAttribute('data-id') + '"]'
       : e.classList.contains('np-close') ? '.np-close' : null
 
@@ -2071,12 +2387,18 @@ function npActions(n) {
 // The conversation about a node: its thread (oldest first), a pending row while an ask is open, and the composer.
 // The draft lives in S.ask[node] so a live re-render keeps it; S.asking[node] (the rev we posted at) shows the pending row until the plan has caught up.
 function npThread(n) {
-  const th = arr(n.thread)
-  const waiting = S.asking[n.id] != null || arr(S.plan.requests).some(r => r.type === 'ask' && r.node === n.id)
+  const th = arr(n.thread), key = 'n:' + n.id
+  const waiting = askWaiting(n.id)
   const out = []
   if (th.length || waiting) {
-    out.push(h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about ' + n.id }, th.map(m => thMsg(m)), waiting ? thWait() : null))
-  } else out.push(h('p', { class: 'np-empty' }, 'Ask anything about this node: why it is here, what it blocks, what to change.'))
+    out.push(h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about ' + n.id, 'data-th-key': key, onscroll: ev => thSave(key, ev.currentTarget) },
+      thRows(key, th, null, i => 'th:' + n.id + ':' + i, renderPanel), waiting ? thWait(n.id) : null))
+  } else {
+    const fill = t => { S.ask[n.id] = t; renderPanel(); const f = $('#nodethread textarea'); if (f) { f.focus({ preventScroll: true }); f.setSelectionRange(t.length, t.length) } }
+    out.push(h('p', { class: 'np-empty' }, 'Ask anything about this node: why it is here, what it blocks, what to change.'),
+      h('div', { class: 'th-starts' }, ['Why is ' + n.id + ' in the plan?', 'What depends on ' + n.id + '?', 'What is still unclear about ' + n.id + '?']
+        .map((t, i) => h('button', { class: 'btn th-start', 'data-i': String(i), onclick: () => fill(t) }, t))))
+  }
   out.push(thComposer({
     draft: 'thread', value: S.ask[n.id] || '', placeholder: 'Ask the session about ' + n.id + '…', label: 'Ask the session about ' + n.id,
     onInput: v => { S.ask[n.id] = v },
@@ -2084,6 +2406,7 @@ function npThread(n) {
       const d = await post({ type: 'ask', node: n.id, text })
       if (!d) return
       S.ask[n.id] = ''
+      S.th.askAt[n.id] = new Date().toISOString()
       if (d.rev > S.rev) S.asking[n.id] = d.rev
       renderPanel()
       const f = $('#nodethread textarea')
@@ -2092,15 +2415,78 @@ function npThread(n) {
   }))
   return out
 }
-// The parts of a conversation the node panel and the PRD pane share: a bubble (`extra`: what a session answer adds under its text), the pending row, the composer.
-const thMsg = (m, extra) => h('div', { class: 'th-msg ' + (m.role === 'user' ? 'user' : 'session') },
+// A question to the session is waiting: for a node (id) or for the whole PRD (no id). Ours not yet in the plan's requests counts too.
+const askWaiting = id => (id ? S.asking[id] != null : S.pane.asking != null) || arr(S.plan.requests).some(r => r.type === 'ask' && (id ? r.node === id : !r.node))
+// When the oldest waiting question of this conversation was sent: the plan's own stamp, else the time we posted it here.
+function askSince(id) {
+  const at = arr(S.plan.requests).filter(r => r.type === 'ask' && (id ? r.node === id : !r.node) && r.at).map(r => String(r.at)).sort()[0]
+  return at || S.th.askAt[id || ''] || ''
+}
+// The parts of a conversation the node panel and the PRD pane share: rows, the pending row, the composer.
+const TH_OPEN = 5 // messages open by default; older ones sit behind "N earlier"
+const thSave = (key, el) => { if (el.clientHeight) S.th.scroll[key] = { top: el.scrollTop, end: el.scrollHeight - el.scrollTop - el.clientHeight < 8 } }
+function thFrom(key, len) { // how many messages the reader had seen when this conversation was opened
+  if (!(key in S.th.from)) S.th.from[key] = Math.min(Number.isInteger(S.th.seen[key]) ? S.th.seen[key] : len, len)
+  return S.th.from[key]
+}
+function thMark(key, len) { // call when the conversation is on screen
+  if (S.th.seen[key] === len) return
+  S.th.seen[key] = len
+  try { localStorage.setItem(thSeenKey(), JSON.stringify(S.th.seen)) } catch (e) { /* not kept */ }
+}
+// The rows of a conversation: the last few open, "N earlier messages" for the rest, a New marker above the first session reply the reader has not seen.
+// extra(m, isNewest): what a session answer adds under its text. w(i): the id-chip scope of message i. redraw(): rebuilds the host after "N earlier" opens.
+function thRows(key, th, extra, w, redraw) {
+  const from = thFrom(key, th.length)
+  const hidden = Math.max(0, th.length - TH_OPEN)
+  let start = S.th.open[key] ? 0 : Math.min(hidden, from)
+  if (start === 1) start = 0
+  const fresh = th.findIndex((m, i) => i >= from && m.role !== 'user')
+  let newest = -1
+  th.forEach((m, i) => { if (m.role !== 'user') newest = i })
+  const rows = []
+  if (start) rows.push(h('button', { class: 'th-more', 'data-act': 'earlier', 'data-key': key, 'aria-label': start + ' earlier messages, show them', onclick: ev => {
+    const list = ev.currentTarget.closest('.th-list'), before = list.scrollHeight
+    S.th.open[key] = true
+    redraw()
+    const now = document.querySelector('[data-th-key="' + CSS.escape(key) + '"]')
+    if (now) { now.scrollTop += now.scrollHeight - before; now.focus({ preventScroll: true }) }
+  } }, start + ' earlier messages'))
+  th.forEach((m, i) => {
+    if (i < start) return
+    if (i === fresh) rows.push(h('div', { class: 'th-new', role: 'separator' }, 'New'))
+    rows.push(thMsg(m, extra ? extra(m, i === newest) : null, w(i), i === newest))
+  })
+  return rows
+}
+// A message row (`extra`: what a session answer adds under its text).
+const thMsg = (m, extra, w, newest) => h('div', { class: 'th-msg ' + (m.role === 'user' ? 'user' : 'session'), 'data-last': newest ? '1' : null },
   h('div', { class: 'th-meta' }, h('b', {}, m.role === 'user' ? 'You' : 'Session'), m.at ? h('time', { title: m.at }, fmtAt(m.at)) : null),
-  h('div', { class: 'th-text' }, String(m.text == null ? '' : m.text)), extra)
-const thWait = () => h('div', { class: 'th-wait', role: 'status' }, h('span', { class: 'dot', 'aria-hidden': 'true' }),
-  h('div', {}, 'Waiting for the session…', h('small', {}, 'It answers when it is next at its prompt.')))
+  h('div', { class: 'th-text' }, ...rich(m.text, w)), extra)
+// The pending row: what is happening, how long, what to do. thTick keeps the time and the slow hint current.
+const SLOW_MS = 5 * 60000
+function thWait(id) {
+  const at = askSince(id)
+  const w = h('div', { class: 'th-wait', role: 'status', 'data-at': at || null },
+    h('span', { class: 'dot', 'aria-hidden': 'true' }),
+    h('div', {}, h('b', {}, 'Waiting for the session…'), h('span', { class: 'th-age' }),
+      h('small', {}, 'Your question is queued. It answers when it is next at its prompt.'),
+      h('small', { class: 'th-slow', hidden: true }, 'Taking a while: the session may be busy or closed. Check its terminal; the question stays queued until it is back at its prompt.')))
+  thAge(w)
+  return w
+}
+function thAge(w) {
+  const t = Date.parse(w.dataset.at)
+  if (isNaN(t)) return
+  w.querySelector('.th-age').textContent = ' · sent ' + cmAgo(w.dataset.at)
+  w.querySelector('.th-slow').hidden = Date.now() - t < SLOW_MS
+}
+const thTick = () => { document.querySelectorAll('.th-wait[data-at]').forEach(thAge); document.querySelectorAll('.req-row .at[data-at]').forEach(reqAge) }
 // o: draft (the data-draft key), value (the draft), onInput(value), submit(text) (does the post), placeholder, label, id.
+// Enter sends and Shift+Enter breaks the line (Ctrl or Cmd+Enter sends too); on a touch screen Enter stays a line break and the button sends.
 function thComposer(o) {
-  const field = h('textarea', { id: o.id, class: 'field', 'data-draft': o.draft, maxlength: 2000, rows: 3, placeholder: o.placeholder, 'aria-label': o.label })
+  const typed = !window.matchMedia('(pointer:coarse)').matches
+  const field = h('textarea', { id: o.id, class: 'field', 'data-draft': o.draft, maxlength: 2000, rows: 2, placeholder: o.placeholder, 'aria-label': o.label })
   const count = h('span', { class: 'th-count' })
   const send = h('button', { class: 'btn primary th-send' }, 'Send')
   const sync = () => { send.disabled = !field.value.trim(); count.textContent = field.value.length >= 1800 ? field.value.length + ' / 2000' : '' }
@@ -2108,16 +2494,21 @@ function thComposer(o) {
   field.value = o.value
   sync()
   field.addEventListener('input', () => { o.onInput(field.value); sync() })
-  field.addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); go() } })
+  field.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' || ev.isComposing || ev.shiftKey || ev.altKey) return
+    if (typed || ev.ctrlKey || ev.metaKey) { ev.preventDefault(); go() }
+  })
   send.addEventListener('click', go)
-  return h('div', { class: 'th-composer' }, field, h('div', { class: 'th-bar' }, count, send))
+  return h('div', { class: 'th-composer' }, field, h('div', { class: 'th-bar' },
+    typed ? h('span', { class: 'th-hint' }, h('kbd', {}, 'Enter'), ' sends, ', h('kbd', {}, 'Shift+Enter'), ' adds a line') : null, count, send))
 }
 
 // ---------- the PRD pane: the session conversation about the whole PRD (plan.thread), docked from 1800px, a sheet below ----------
 const TRUNC = ' [truncated]' // what the core appends to a comment text it cuts at 5000
 const paneDocked = () => window.matchMedia('(min-width:1800px)').matches
 const paneSheet = () => S.pane.open && !paneDocked()
-const paneShown = () => (paneDocked() ? curView() === 'prd' : S.pane.open)
+const paneFolded = () => paneDocked() && S.pane.collapsed
+const paneShown = () => (paneDocked() ? curView() === 'prd' && !S.pane.collapsed : S.pane.open)
 const paneThread = () => arr(S.plan.thread).filter(m => m && typeof m === 'object')
 const paneSig = () => { const m = paneThread().filter(x => x.role !== 'user').pop(); return m ? m.ref + '|' + m.at : '' }
 const paneUnread = () => S.pane.seen !== null && !paneShown() && paneSig() !== S.pane.seen
@@ -2127,10 +2518,29 @@ function paneBtnSync(b) {
   if (u && !d) b.append(h('span', { class: 'pane-dot', 'aria-hidden': 'true' }))
   else if (!u && d) d.remove()
 }
+// The slim rail at the right edge while the docked pane is folded: always there on the PRD view, with a badge for a reply not yet seen or a question still waiting.
+function paneRailSync() {
+  const r = $('#pane-rail')
+  if (!r) return
+  const u = paneUnread(), w = !u && S.plan && askWaiting(null)
+  const kind = u ? 'new' : w ? 'wait' : ''
+  r.setAttribute('aria-label', 'Ask about the PRD, expand' + (u ? ', new reply' : w ? ', waiting for the session' : ''))
+  r.dataset.badge = kind
+  const b = r.querySelector('.rail-badge')
+  if (b) b.hidden = !kind
+  if (b) b.dataset.kind = kind
+}
 function paneButton() {
   const b = h('button', { id: 'pane-open', class: 'btn pane-ask', onclick: openPane }, 'Ask about the PRD')
   paneBtnSync(b)
   return b
+}
+function paneFold(on) {
+  S.pane.collapsed = on
+  paneCollSave(on)
+  renderPane()
+  const f = on ? $('#pane-rail') : $('#pane-text')
+  if (f) f.focus({ preventScroll: true })
 }
 function openPane() {
   S.pane.open = true
@@ -2176,18 +2586,19 @@ async function paneTurn(m, key, links) {
   renderPane()
   toast('Sent as a comment; the session will propose a change')
 }
-function paneAnswerExtras(m) {
+function paneAnswerExtras(m, newest) {
   const links = [...new Set(arr(m.links).map(String))]
   const key = String(m.ref || m.at || '')
   const sent = !!S.pane.sent[key]
   return [
     links.length ? h('div', { class: 'pane-links' }, h('span', {}, 'Refers to'), links.map(paneChip)) : null,
-    String(m.text == null ? '' : m.text).trim() ? h('div', { class: 'pane-acts' },
+    String(m.text == null ? '' : m.text).trim() ? h('div', { class: 'pane-acts' + (sent ? ' sent' : '') },
       h('button', { class: 'btn pane-turn', 'data-act': 'turn', 'data-ref': key, disabled: sent, onclick: () => paneTurn(m, key, links) }, sent ? 'Sent' : 'Turn into proposal')) : null,
   ]
 }
-const paneFocusKey = e => e.dataset.act ? '[data-act="' + e.dataset.act + '"]' + (e.dataset.ref ? '[data-ref="' + CSS.escape(e.dataset.ref) + '"]' : '')
-  : e.classList.contains('pane-chip') ? '.pane-chip[data-id="' + CSS.escape(e.dataset.id) + '"]'
+const paneFocusKey = e => e.id === 'pane-collapse' ? '#pane-collapse' : e.dataset.act ? '[data-act="' + e.dataset.act + '"]' + (e.dataset.ref ? '[data-ref="' + CSS.escape(e.dataset.ref) + '"]' : '')
+  : e.classList.contains('idc') ? idSel(e.dataset.nid, e.dataset.w)
+    : e.classList.contains('pane-chip') ? '.pane-chip[data-id="' + CSS.escape(e.dataset.id) + '"]'
     : e.classList.contains('pane-start') ? '.pane-start[data-i="' + e.dataset.i + '"]'
       : e.classList.contains('pane-close') ? '.pane-close' : null
 function renderPane() {
@@ -2196,12 +2607,14 @@ function renderPane() {
   el.classList.toggle('open', S.pane.open)
   document.body.classList.toggle('pane-open', sheet && isPhone())
   document.body.classList.toggle('pane-sheet', sheet)
+  document.body.classList.toggle('pane-folded', S.pane.collapsed)
   el.setAttribute('role', sheet ? 'dialog' : 'complementary')
   const sig = paneSig()
   if (S.pane.seen === null || paneShown()) S.pane.seen = sig
   const b = $('#pane-open')
   if (b) paneBtnSync(b)
-  const waiting = S.pane.asking != null || arr(S.plan.requests).some(r => r.type === 'ask' && !r.node)
+  paneRailSync()
+  const waiting = askWaiting(null)
   const vis = el.getClientRects().length > 0
   const was = el.contains(document.activeElement) && document.activeElement !== el ? document.activeElement : null
   const caret = was && was.hasAttribute('data-draft') ? [was.selectionStart, was.selectionEnd] : null
@@ -2216,13 +2629,15 @@ function renderPane() {
   const starts = ['Which comments conflict?', 'What would change if we accept ' + (ids[0] || 'CM1') + '?', 'What is still unclear in this PRD?']
   const fill = t => { S.pane.draft = t; renderPane(); const f = $('#pane-text'); f.focus({ preventScroll: true }); f.setSelectionRange(t.length, t.length) }
   const main = th.length || waiting
-    ? h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about the PRD' },
-      th.map(m => thMsg(m, m.role === 'user' ? null : paneAnswerExtras(m))), waiting ? thWait() : null)
+    ? h('div', { class: 'th-list', role: 'log', tabindex: '0', 'aria-label': 'Conversation about the PRD', 'data-th-key': 'pane', onscroll: ev => thSave('pane', ev.currentTarget) },
+      thRows('pane', th, (m, newest) => (m.role === 'user' ? null : paneAnswerExtras(m, newest)), i => 'pane:' + i, renderPane), waiting ? thWait(null) : null)
     : h('div', { class: 'pane-empty' },
       h('p', { class: 'np-empty' }, 'Ask anything about the whole PRD or the comments: what conflicts, what a comment would change, what is still unclear.'),
       h('div', { class: 'pane-starts' }, starts.map((t, i) => h('button', { class: 'btn pane-start', 'data-i': String(i), onclick: () => fill(t) }, t))))
   el.replaceChildren(
-    h('div', { class: 'pane-head' }, h('h2', {}, 'Ask about the PRD'), h('button', { class: 'btn pane-close', title: 'Close (Esc)', onclick: closePane }, 'Close')),
+    h('div', { class: 'pane-head' }, h('h2', {}, 'Ask about the PRD'),
+      h('button', { id: 'pane-collapse', class: 'btn pane-collapse', 'aria-expanded': 'true', 'aria-controls': 'prdpane', title: 'Fold the pane into the rail on the right; the PRD gets the width back', onclick: () => paneFold(true) }, 'Collapse'),
+      h('button', { class: 'btn pane-close', title: 'Close (Esc)', onclick: closePane }, 'Close')),
     h('div', { class: 'pane-main' }, sheet && isPhone() && S.err ? h('p', { class: 'np-err', role: 'alert' }, S.err) : null, main),
     h('div', { class: 'pane-comp' }, thComposer({
       id: 'pane-text', draft: 'pane-ask', value: S.pane.draft, placeholder: 'Ask about the whole PRD or the comments…', label: 'Ask the session about the PRD',
@@ -2231,6 +2646,7 @@ function renderPane() {
         const d = await post({ type: 'ask', text })
         if (!d) return
         S.pane.draft = ''
+        S.th.askAt[''] = new Date().toISOString()
         if (d.rev > S.rev) S.pane.asking = d.rev
         renderPane()
         const f = $('#pane-text')
@@ -2247,6 +2663,10 @@ function renderPane() {
   const f = caret ? $('#pane-text') : key && el.querySelector(key)
   if (f) { f.focus({ preventScroll: true }); if (caret) f.setSelectionRange(...caret) }
   else if (was) el.focus({ preventScroll: true })
+  if (vis && th.length) thMark('pane', th.length)
+  if (!paneShown()) delete S.th.from.pane
+  thTick()
+  idSync()
 }
 
 function renderPanel() {
@@ -2254,14 +2674,18 @@ function renderPanel() {
   document.body.classList.toggle('np-open', !!n)
   el.hidden = !n
   syncInert()
-  if (!n) { el.replaceChildren(); delete el.dataset.node; return }
+  if (!n) { el.replaceChildren(); delete el.dataset.node; for (const k of Object.keys(S.th.from)) if (k.startsWith('n:')) delete S.th.from[k]; return }
   const was = el.contains(document.activeElement) && document.activeElement !== el ? document.activeElement : null
   const key = was && !was.hasAttribute('data-draft') ? npFocusKey(was) : null
   const old = el.querySelector('.np-body')
-  const top = old && el.dataset.node === n.id ? old.scrollTop : 0
-  const oldList = el.dataset.node === n.id && el.querySelector('.th-list')
-  const follow = !oldList || oldList.scrollHeight - oldList.scrollTop - oldList.clientHeight < 8
-  const listTop = oldList ? oldList.scrollTop : 0
+  const same = el.dataset.node === n.id
+  // Scroll is kept per card: the same card keeps its place across renders, a card opened again gets back where it was left.
+  const sv = S.th.scroll['n:' + n.id]
+  const top = old && same ? old.scrollTop : S.th.body[n.id] || 0
+  const oldList = same && el.querySelector('.th-list')
+  const follow = oldList ? oldList.scrollHeight - oldList.scrollTop - oldList.clientHeight < 8 : !sv || sv.end
+  const listTop = oldList ? oldList.scrollTop : sv ? sv.top : 0
+  if (!same) for (const k of Object.keys(S.th.from)) if (k.startsWith('n:')) delete S.th.from[k]
   el.dataset.node = n.id
   const lane = LANES.find(l => l[0] === laneOf(n))
   const sec = (title, ...kids) => h('section', { class: 'np-sec' }, h('h3', {}, title), ...kids)
@@ -2275,14 +2699,20 @@ function renderPanel() {
     sec('Linked nodes', ...npLinks(n)),
     cms.length ? sec('Comments', h('div', { id: 'nodecomments' }, cms.map(c => cmCard(c, 'panel', false)))) : null,
     h('section', { class: 'np-sec np-hist' }, h('h3', {}, 'History'), npHistory(n)),
-    sec('Conversation', h('div', { id: 'nodethread', 'data-node': n.id }, npThread(n))))
+    null)
+  // The conversation is docked under the scrolling details, so the thread and its composer are always in reach.
+  const th = arr(n.thread).length
+  const dock = h('section', { class: 'np-dock', 'aria-label': 'Conversation' }, h('h3', {}, 'Conversation', th ? h('span', { class: 'np-dock-n' }, String(th)) : null),
+    h('div', { id: 'nodethread', 'data-node': n.id }, npThread(n)))
   el.replaceChildren(h('div', { class: 'np-head' },
     h('div', { class: 'np-top' }, h('span', { class: 'np-id' }, n.id), h('span', { class: 'np-kind' }, n.kind), chip(display(n), true), lane ? h('span', { class: 'np-lane' }, lane[1] + ' lane') : null,
       h('button', { class: 'btn np-close', title: 'Close (Esc)', onclick: closePanel }, 'Close')),
-    h('h2', {}, n.label)), body)
+    h('h2', {}, n.label)), body, dock)
   body.scrollTop = top
-  const list = body.querySelector('.th-list')
-  if (list) list.scrollTop = follow ? list.scrollHeight : listTop
+  body.addEventListener('scroll', () => { S.th.body[n.id] = body.scrollTop })
+  const list = dock.querySelector('.th-list')
+  if (list) { list.scrollTop = follow ? list.scrollHeight : listTop; thMark('n:' + n.id, arr(n.thread).length) }
+  thTick()
   if (was && !el.contains(document.activeElement)) (key && el.querySelector(key) || el).focus({ preventScroll: true })
 }
 
@@ -2378,7 +2808,7 @@ function apply(data) {
     const id = hashNode(), n = id && node(id)
     if (n) { S.sel = id; S.collapsed[laneOf(n)] = false }
   }
-  if (first && hashPane()) { S.pane.open = true; S.view = 'prd' }
+  if (first && hashPane()) { S.pane.open = true; S.view = 'prd'; if (S.pane.collapsed) { S.pane.collapsed = false; paneCollSave(false) } } // a link that names the pane unfolds it
   if (S.sel && !node(S.sel)) { toast(S.sel + ' was removed by the session'); S.sel = null; syncHash() }
   for (const id of Object.keys(S.asking)) if (plan.rev >= S.asking[id]) delete S.asking[id]
   if (S.pane.asking != null && plan.rev >= S.pane.asking) S.pane.asking = null
@@ -2423,6 +2853,8 @@ async function loadList() {
 }
 
 setInterval(rvTick, 10000)
+setInterval(thTick, 10000)
+$('#pane-rail').addEventListener('click', () => paneFold(false))
 document.addEventListener('visibilitychange', () => { if (S.plan || task) (document.hidden ? schedule() : poll()) })
 window.matchMedia('(max-width:640px)').addEventListener('change', () => { if (S.plan) { renderTabs(); renderPanel() } })
 window.matchMedia('(min-width:1800px)').addEventListener('change', () => { if (S.plan) { renderTabs(); renderPanel() } })

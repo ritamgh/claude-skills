@@ -331,6 +331,15 @@ class ReviewTests(unittest.TestCase):
         requests = {r["ref"]: r["text"] for r in self.comment_requests()}
         self.assertEqual(requests, {"CM1": "edited 1", "CM2": "edited 2"})  # CM2 has a new request, CM1's carries the new text
 
+    def test_import_text_change_drops_the_gist_but_a_resolved_flip_keeps_it(self):
+        """A gist that outlives an edit on GitHub shows the session's reading of words the comment no longer has."""
+        self.imp(item("rc:1", text="old wording"))
+        self.triage("CM1", "answer", "Because", gist="Asks about the old wording.")
+        self.imp(item("rc:1", text="old wording", resolved=True))
+        self.assertEqual(self.comments()[0]["gist"], "Asks about the old wording.")
+        self.imp(item("rc:1", text="new wording", resolved=True))
+        self.assertNotIn("gist", self.comments()[0])
+
     def test_import_resolved_change_updates_the_flag_only(self):
         """A resolved flip that also marks the comment edited or reopens its state must fail."""
         self.imp(item())

@@ -337,6 +337,44 @@ class CommentTests(unittest.TestCase):
             {"type": "upsert", "node": {"kind": "risk", "label": "ok"}}, {"type": "reopen", "node": "AS-1"}]}, code=2)
         self.assertEqual(self.snapshot(), before)
 
+    # ---- 4b. gist: the session's one plain-words line on a comment (contract 13.1)
+
+    def test_gist_is_stored_by_triage_and_by_split_parts_and_survives_accept(self):
+        """A core that drops `gist` from a triage or a split part, or that lets Accept clear it, loses the line the page shows."""
+        one = self.comment("a b")
+        self.event({"type": "comment_split", "ref": one, "parts": [
+            {"text": "T-017 needs a headers arg", "gist": "Priya says the retry task cannot send the idempotency header."},
+            {"text": "second point"}]})
+        first, second = self.comments()
+        self.assertEqual(first["gist"], "Priya says the retry task cannot send the idempotency header.")
+        self.assertNotIn("gist", second)  # optional: a part without one stores none
+        self.triage(first["id"], "answer", "Q12 is still open.", gist="  Asks whether the header can be sent.  ")
+        self.assertEqual(self.comments()[0]["gist"], "Asks whether the header can be sent.")  # stripped, replaced
+        self.triage(second["id"], "accept", "Adds it.", [{"type": "upsert", "node": {"kind": "requirement", "label": "Pinned"}}],
+                    gist="Wants pinned notes.")
+        self.accept(second["id"])
+        self.assertEqual(self.comments()[1]["gist"], "Wants pinned notes.")
+        self.assertEqual(self.comments()[1]["state"], "accepted")
+
+    def test_gist_is_refused_when_long_multiline_control_empty_or_not_text_and_a_page_user_cannot_send_it(self):
+        """A gist over 300 chars, with a newline or an escape, empty, not text, or sent by the user must fail, as its neighbours do."""
+        cid = self.comment()
+        before = self.snapshot()
+        for gist in ("x" * 301, "two\nlines", "esc\x1b[0m", "   ", 7, ["a"], None):
+            with self.subTest(gist=gist):
+                self.event({"type": "comment_triage", "ref": cid, "action": "answer", "text": "ok", "gist": gist}, code=2)
+                self.event({"type": "comment_split", "ref": cid, "parts": [{"text": "a", "gist": gist}, {"text": "b"}]}, code=2)
+                self.assertEqual(self.snapshot(), before)
+        self.event({"type": "comment", "text": "t", "gist": "mine"}, code=2, by="user", source="page")
+        self.triage(cid, "answer", "ok", gist="x" * 300)  # the cap is inclusive
+        plan = self.loaded()
+        self.apply(plan, {"type": "comment", "text": "t"}, by="user")
+        for bad in ("x" * 301, 5, "a\nb", ""):
+            broken = copy.deepcopy(plan)
+            broken["comments"][0]["gist"] = bad
+            with self.subTest(stored=bad), self.assertRaises(core.PlanError):
+                core.validate(broken, strict=True)
+
     # ---- 5. accept / rework / delete
 
     def test_accept_applies_the_stored_changes_atomically_with_the_event(self):
